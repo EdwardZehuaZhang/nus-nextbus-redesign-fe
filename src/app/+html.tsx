@@ -21,35 +21,6 @@ export default function Root({ children }: { children: React.ReactNode }) {
           content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1.00001,viewport-fit=cover"
         />
 
-        {/* Early patch: upgrade ws:// to wss:// when page is served over HTTPS */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(() => {
-  try {
-    var w = window;
-    if (!w || !w.location || typeof w.WebSocket === 'undefined') return;
-    var isHttps = w.location.protocol === 'https:';
-    if (!isHttps) return;
-    var NativeWS = w.WebSocket;
-    var Wrap = function(url, protocols) {
-      var u = typeof url === 'string' ? url : url.toString();
-      if (/^ws:\/\//i.test(u)) u = u.replace(/^ws:\/\//i, 'wss://');
-      if (/^https?:\/\//i.test(u)) u = u.replace(/^https?:\/\//i, 'wss://');
-      if (/^\/\//.test(u)) u = 'wss:' + u;
-      if (/^\//.test(u)) u = 'wss://' + w.location.host + u;
-      if (!/^wss?:\/\//i.test(u)) u = 'wss://' + w.location.host + '/' + u.replace(/^\//, '');
-      return new NativeWS(u, protocols);
-    };
-    // Copy static props
-    Object.getOwnPropertyNames(NativeWS).forEach(function(k){
-      try { Wrap[k] = NativeWS[k]; } catch (_) {}
-    });
-    Wrap.prototype = NativeWS.prototype;
-    w.WebSocket = Wrap;
-  } catch (_) {}
-})();`,
-          }}
-        />
 
         {/*
           Disable body scrolling on web. This makes ScrollView components work closer to how they do on native.
