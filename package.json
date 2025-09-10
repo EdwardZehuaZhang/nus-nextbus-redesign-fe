@@ -9,6 +9,8 @@
     "android": "cross-env EXPO_NO_DOTENV=1 expo run:android",
     "ios": "cross-env EXPO_NO_DOTENV=1 expo run:ios",
     "web": "cross-env EXPO_NO_DOTENV=1 expo start --web",
+    "build:web": "cross-env EXPO_NO_DOTENV=1 expo export --platform web",
+    "preview:web": "npx serve -s dist -l 8082",
     "xcode": "xed -b ios",
     "doctor": "npx expo-doctor@latest",
     "preinstall": "npx only-allow pnpm",
