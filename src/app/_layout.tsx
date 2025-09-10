@@ -15,6 +15,47 @@ import { APIProvider } from '@/api';
 import { hydrateAuth, loadSelectedTheme } from '@/lib';
 import { useThemeConfig } from '@/lib/use-theme-config';
 
+// Ensure WebSocket uses secure protocol (wss) when the page is served over HTTPS.
+// This prevents SecurityError: "An insecure WebSocket connection may not be initiated from a page loaded over HTTPS.".
+if (typeof window !== 'undefined' && typeof (window as any).WebSocket !== 'undefined') {
+  try {
+    const { protocol } = window.location || { protocol: '' };
+    if (protocol === 'https:') {
+      const NativeWebSocket = (window as any).WebSocket;
+      // Create a wrapper constructor
+      const SecureWebSocket = function (this: any, url: string | URL, protocols?: string | string[]) {
+        let finalUrl = typeof url === 'string' ? url : url.toString();
+        if (finalUrl.startsWith('ws://')) {
+          finalUrl = finalUrl.replace(/^ws:\/\//i, 'wss://');
+        }
+        // @ts-ignore
+        return new NativeWebSocket(finalUrl, protocols);
+      } as unknown as typeof WebSocket;
+
+      // Copy static properties
+      Object.keys(NativeWebSocket).forEach((key) => {
+        try {
+          // @ts-ignore
+          (SecureWebSocket as any)[key] = (NativeWebSocket as any)[key];
+        } catch (e) {
+          // ignore
+        }
+      });
+
+      // Preserve prototype so instanceof checks still work
+      SecureWebSocket.prototype = NativeWebSocket.prototype;
+
+      // Replace global WebSocket with the secure wrapper
+      // @ts-ignore
+      (window as any).WebSocket = SecureWebSocket;
+    }
+  } catch (err) {
+    // ignore failures in environments where window.location is restricted
+    // eslint-disable-next-line no-console
+    console.warn('Failed to patch WebSocket for secure contexts', err);
+  }
+}
+
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
