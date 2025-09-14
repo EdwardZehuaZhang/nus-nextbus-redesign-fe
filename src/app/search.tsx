@@ -65,24 +65,26 @@ export default function SearchPage() {
     router.back();
   };
 
-  const renderRecentItem = ({ item }: { item: RecentSearchItem }) => {
+  const renderRecentItem = ({ item, isLast }: { item: RecentSearchItem; isLast: boolean }) => {
     const IconComponent = item.icon;
     return (
-      <Pressable
-        key={item.id}
-        className="flex-row items-center gap-2 py-3"
-        onPress={() => {
-          // Handle navigation to location
-          console.log('Navigate to:', item.title);
-        }}
-      >
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100">
-          <IconComponent />
-        </View>
-        <Text className="flex-1 text-base font-medium text-neutral-900">
-          {item.title}
-        </Text>
-      </Pressable>
+      <View key={item.id}>
+        <Pressable
+          className="flex-row items-center gap-2 py-3"
+          onPress={() => {
+            // Handle navigation to location
+            console.log('Navigate to:', item.title);
+          }}
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100">
+            <IconComponent />
+          </View>
+          <Text className="flex-1 text-base font-medium text-neutral-900">
+            {item.title}
+          </Text>
+        </Pressable>
+        {!isLast && <View className="h-px bg-neutral-200" style={{ width: 390 }} />}
+      </View>
     );
   };
 
@@ -129,36 +131,36 @@ export default function SearchPage() {
       </View>
 
       {/* Content */}
-      <View className="flex-1 pt-4">
-        <View className="mx-5 mb-5 flex-1 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      <View className="flex-1" style={{ paddingTop: 68 }}>
+        <View className="flex-1 rounded-t-xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
           {/* Search Header */}
           <View className="mb-5 flex-row items-center gap-4">
             <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
               <SearchIcon />
-              <TextInput
-                value={searchText}
-                onChangeText={setSearchText}
-                placeholder="Search for location..."
-                placeholderTextColor="#737373"
-                className="flex-1 text-base text-neutral-900"
-                autoFocus
-              />
+              <View className="flex-1">
+                <Text className="text-base">
+                  <Text className="color-blue-600">|</Text>
+                  <Text className="text-neutral-500">Search for location...</Text>
+                </Text>
+              </View>
             </View>
             <Pressable onPress={handleCancel}>
-              <Text className="text-base font-medium text-blue-600">Cancel</Text>
+              <Text className="text-base font-medium" style={{ color: '#274F9C' }}>Cancel</Text>
             </Pressable>
           </View>
 
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
             {/* Recent Searches */}
-            <View className="mb-5">
+            <View className="mb-8">
               <View className="mb-2 flex-row items-center justify-between">
                 <Text className="text-sm font-medium text-neutral-500">Recents</Text>
-                <Text className="text-sm font-medium text-blue-600">View More</Text>
+                <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
               </View>
-              
-              <View className="gap-2">
-                {recentSearches.map((item) => renderRecentItem({ item }))}
+
+              <View>
+                {recentSearches.map((item, index) =>
+                  renderRecentItem({ item, isLast: index === recentSearches.length - 1 })
+                )}
               </View>
             </View>
 
@@ -166,13 +168,12 @@ export default function SearchPage() {
             <View>
               <View className="mb-2 flex-row items-center justify-between">
                 <Text className="text-sm font-medium text-neutral-500">Popular Searches</Text>
-                <Text className="text-sm font-medium text-blue-600">View More</Text>
+                <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
               </View>
-              
-              <ScrollView 
-                horizontal 
+
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
-                className="gap-2"
                 contentContainerStyle={{ gap: 8 }}
               >
                 {popularSearches.map((item) => renderPopularItem({ item }))}
