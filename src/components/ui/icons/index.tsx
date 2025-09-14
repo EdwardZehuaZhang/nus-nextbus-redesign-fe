@@ -1,6 +1,8 @@
 export * from './arrow-right';
+export * from './book-open';
 export * from './caret-down';
 export * from './feed';
+export * from './first-aid';
 export * from './github';
 export * from './home';
 export * from './language';
@@ -10,4 +12,6 @@ export * from './settings';
 export * from './share';
 export * from './style';
 export * from './support';
+export * from './train';
+export * from './van';
 export * from './website';
