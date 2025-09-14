@@ -1,13 +1,12 @@
 import * as React from 'react';
+import type { SvgProps } from 'react-native-svg';
 import Svg, { Path } from 'react-native-svg';
 
-import type { IconProps } from './type';
-
-export function Search({ color = 'black', size = 24, ...props }: IconProps) {
+export function Search({ color = '#737373', ...props }: SvgProps) {
   return (
     <Svg
-      width={size}
-      height={size}
+      width={20}
+      height={20}
       viewBox="0 0 20 20"
       fill="none"
       {...props}
