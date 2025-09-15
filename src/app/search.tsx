@@ -55,14 +55,44 @@ const popularSearches: PopularSearchItem[] = [
     title: 'UTown Infinite Pool',
     image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
+  {
+    id: '4',
+    title: 'UTown Infinite Pool',
+    image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '5',
+    title: 'UTown Infinite Pool',
+    image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '6',
+    title: 'UTown Infinite Pool',
+    image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '7',
+    title: 'UTown Infinite Pool',
+    image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '8',
+    title: 'UTown Infinite Pool',
+    image: 'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
 ];
 
 export default function SearchPage() {
   const router = useRouter();
   const [searchText, setSearchText] = React.useState('');
+  const [isExpanded, setIsExpanded] = React.useState(false);
 
   const handleCancel = () => {
     router.back();
+  };
+
+  const toggleExpanded = () => {
+    setIsExpanded(!isExpanded);
   };
 
   const renderRecentItem = ({ item, isLast }: { item: RecentSearchItem; isLast: boolean }) => {
@@ -92,7 +122,7 @@ export default function SearchPage() {
     return (
       <Pressable
         key={item.id}
-        className="h-29 w-38 overflow-hidden rounded-md border border-neutral-200"
+        className="overflow-hidden rounded-md border border-neutral-200"
         style={{ width: 154, height: 116 }}
         onPress={() => {
           // Handle navigation to location
@@ -114,6 +144,33 @@ export default function SearchPage() {
         </View>
       </Pressable>
     );
+  };
+
+  const renderPopularSearches = () => {
+    const displayItems = isExpanded ? popularSearches : popularSearches.slice(0, 3);
+
+    if (isExpanded) {
+      return (
+        <View style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 8,
+          width: '100%'
+        }}>
+          {displayItems.map((item) => renderPopularItem({ item }))}
+        </View>
+      );
+    } else {
+      return (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {displayItems.map((item) => renderPopularItem({ item }))}
+        </ScrollView>
+      );
+    }
   };
 
   return (
@@ -150,35 +207,63 @@ export default function SearchPage() {
           </View>
 
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-            {/* Recent Searches */}
-            <View className="mb-8">
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-sm font-medium text-neutral-500">Recents</Text>
-                <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
-              </View>
+            {isExpanded ? (
+              <>
+                {/* Popular Searches - Expanded View */}
+                <View className="mb-8">
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">Popular Searches</Text>
+                    <Pressable onPress={toggleExpanded}>
+                      <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View Less</Text>
+                    </Pressable>
+                  </View>
 
-              <View>
-                {recentSearches.map((item, index) =>
-                  renderRecentItem({ item, isLast: index === recentSearches.length - 1 })
-                )}
-              </View>
-            </View>
+                  {renderPopularSearches()}
+                </View>
 
-            {/* Popular Searches */}
-            <View>
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-sm font-medium text-neutral-500">Popular Searches</Text>
-                <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
-              </View>
+                {/* Recent Searches */}
+                <View>
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">Recents</Text>
+                    <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
+                  </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 8 }}
-              >
-                {popularSearches.map((item) => renderPopularItem({ item }))}
-              </ScrollView>
-            </View>
+                  <View>
+                    {recentSearches.map((item, index) =>
+                      renderRecentItem({ item, isLast: index === recentSearches.length - 1 })
+                    )}
+                  </View>
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Recent Searches */}
+                <View className="mb-8">
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">Recents</Text>
+                    <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
+                  </View>
+
+                  <View>
+                    {recentSearches.map((item, index) =>
+                      renderRecentItem({ item, isLast: index === recentSearches.length - 1 })
+                    )}
+                  </View>
+                </View>
+
+                {/* Popular Searches - Normal View */}
+                <View>
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">Popular Searches</Text>
+                    <Pressable onPress={toggleExpanded}>
+                      <Text className="text-sm font-medium" style={{ color: '#274F9C' }}>View More</Text>
+                    </Pressable>
+                  </View>
+
+                  {renderPopularSearches()}
+                </View>
+              </>
+            )}
           </ScrollView>
         </View>
       </View>
