@@ -15,3 +15,6 @@ export * from './support';
 export * from './train';
 export * from './van';
 export * from './website';
+export * from './map-trifold';
+export * from './check-square';
+export * from '../capacity-icons';

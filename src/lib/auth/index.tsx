@@ -13,8 +13,8 @@ interface AuthState {
 }
 
 const _useAuth = create<AuthState>((set, get) => ({
-  status: 'idle',
-  token: null,
+  status: 'signIn', // Changed from 'idle' to 'signIn' for development
+  token: { access: 'dev-token', refresh: 'dev-refresh' }, // Set default token for development
   signIn: (token) => {
     setToken(token);
     set({ status: 'signIn', token });
@@ -29,7 +29,8 @@ const _useAuth = create<AuthState>((set, get) => ({
       if (userToken !== null) {
         get().signIn(userToken);
       } else {
-        get().signOut();
+        // For development, don't sign out if no token - keep default signIn state
+        console.log('No token found, keeping default signIn state for development');
       }
     } catch (e) {
       // only to remove eslint error, handle the error properly

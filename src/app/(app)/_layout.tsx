@@ -10,6 +10,10 @@ import {
 } from '@/components/ui/icons';
 import { useAuth, useIsFirstTime } from '@/lib';
 
+export const unstable_settings = {
+  initialRouteName: 'transit',
+};
+
 export default function TabLayout() {
   const status = useAuth.use.status();
   const [isFirstTime] = useIsFirstTime();
@@ -24,16 +28,26 @@ export default function TabLayout() {
     }
   }, [hideSplash, status]);
 
-  if (isFirstTime) {
-    return <Redirect href="/onboarding" />;
-  }
+  // Comment out first time redirect - go directly to transit
+  // if (isFirstTime) {
+  //   return <Redirect href="/onboarding" />;
+  // }
   if (status === 'signOut') {
     return <Redirect href="/login" />;
   }
   return (
     <Tabs>
       <Tabs.Screen
-        name="index"
+        name="transit"
+        options={{
+          title: 'Transit',
+          headerShown: false,
+          tabBarIcon: ({ color }) => <FeedIcon color={color} />,
+          tabBarButtonTestID: 'transit-tab',
+        }}
+      />
+      <Tabs.Screen
+        name="feed"
         options={{
           title: 'Feed',
           tabBarIcon: ({ color }) => <FeedIcon color={color} />,
