@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import * as React from 'react';
+import { TextInput } from 'react-native';
 
 import {
   FocusAwareStatusBar,
@@ -8,7 +9,6 @@ import {
   SafeAreaView,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from '@/components/ui';
 import {
@@ -138,7 +138,7 @@ export default function SearchPage() {
     return (
       <Pressable
         key={item.id}
-        className="overflow-hidden rounded-md border border-neutral-200"
+        className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
         style={{ width: 154, height: 116 }}
         onPress={() => {
           // Handle navigation to location
@@ -151,7 +151,7 @@ export default function SearchPage() {
             className="h-full w-full"
             style={{ resizeMode: 'cover' }}
           />
-          <View className="absolute inset-0 bg-black/40" />
+          <View className="absolute inset-0 bg-black/25" />
           <View className="absolute bottom-0 left-0 right-0 p-3">
             <Text className="text-lg font-bold text-white leading-tight">
               {item.title}
@@ -216,14 +216,15 @@ export default function SearchPage() {
           <View className="mb-5 flex-row items-center gap-4">
             <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
               <SearchIcon />
-              <View className="flex-1">
-                <Text className="text-base">
-                  <Text className="color-blue-600">|</Text>
-                  <Text className="text-neutral-500">
-                    Search for location...
-                  </Text>
-                </Text>
-              </View>
+              <TextInput
+                className="flex-1 text-base text-neutral-900"
+                placeholder="Search for location..."
+                placeholderTextColor="#737373"
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus={true}
+                style={{ outlineWidth: 0 }}
+              />
             </View>
             <Pressable onPress={handleCancel}>
               <Text

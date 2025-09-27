@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
+import { TextInput } from 'react-native';
 
 import {
   FocusAwareStatusBar,
@@ -10,7 +11,7 @@ import {
   Text,
   View,
 } from '@/components/ui';
-import { CheckSquare, MapTrifold, Search as SearchIcon, MinCapacityIcon, AvgCapacityIcon, MaxCapacityIcon } from '@/components/ui/icons';
+import { CheckSquare, MapTrifold, Search as SearchIcon, MinCapacityIcon, AvgCapacityIcon, MaxCapacityIcon, HouseIcon, BriefcaseIcon, PlusIcon } from '@/components/ui/icons';
 
 type BusRoute = {
   route: string;
@@ -122,7 +123,7 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
         className="h-8 items-center justify-center rounded-t-md shadow-sm"
         style={{ backgroundColor: route.color }}
       >
-        <Text className="text-base font-semibold text-white">{route.route}</Text>
+  <Text className="text-base font-semibold text-black">{route.route}</Text>
       </View>
 
       {/* Times List */}
@@ -149,20 +150,32 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
 };
 
 const SearchBar = () => {
+  const [searchText, setSearchText] = React.useState('');
+  const [isFocused, setIsFocused] = React.useState(false);
+  
   const handleSearchPress = () => {
     router.push('/search');
   };
 
+  const handleFocus = () => {
+    setIsFocused(true);
+    // Navigate to search page when user focuses on search
+    handleSearchPress();
+  };
+
   return (
-    <Pressable
-      onPress={handleSearchPress}
-      className="mx-5 mb-4 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
-    >
+    <View className="mb-4 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       <SearchIcon />
-      <Text className="flex-1 text-base text-neutral-500">
-        Search for location...
-      </Text>
-    </Pressable>
+      <TextInput
+        className="flex-1 text-base text-neutral-900"
+        placeholder="Search for location..."
+        placeholderTextColor="#737373"
+        value={searchText}
+        onChangeText={setSearchText}
+        onFocus={handleFocus}
+        style={{ outlineWidth: 0 }}
+      />
+    </View>
   );
 };
 
@@ -211,38 +224,30 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
-        <View className="flex-row items-center gap-2 rounded-full bg-neutral-100 p-2">
-          <View className="h-5 w-5 items-center justify-center">
-            <Text>🏠</Text>
-          </View>
-          <View className="h-5 w-5 items-center justify-center">
-            <Text>💼</Text>
-          </View>
+        <View className="flex-row items-center gap-1 rounded-full bg-neutral-100 p-2">
+          <HouseIcon width={16} height={16} fill="#274F9C" />
+          <BriefcaseIcon width={16} height={16} fill="#274F9C" />
         </View>
       );
     } else if (item.icon === 'home') {
       return (
         <View className="items-center justify-center rounded-full bg-neutral-100 p-2">
-          <View className="h-5 w-5 items-center justify-center">
-            <Text>🏠</Text>
-          </View>
+          <HouseIcon width={16} height={16} fill="#274F9C" />
         </View>
       );
     } else {
       return (
         <View className="items-center justify-center rounded-full bg-neutral-100 p-2">
-          <View className="h-5 w-5 items-center justify-center">
-            <Text>💼</Text>
-          </View>
+          <BriefcaseIcon width={16} height={16} fill="#274F9C" />
         </View>
       );
     }
   };
 
   return (
-    <Pressable className="w-16 flex-col items-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+    <Pressable className="min-w-[64px] flex-col items-center gap-1 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       {renderIcons()}
-      <Text className="text-center text-sm font-medium text-primary-500" numberOfLines={2}>
+      <Text className="text-center text-xs font-medium leading-tight" style={{ color: '#274F9C' }} numberOfLines={1}>
         {item.label}
       </Text>
     </Pressable>
@@ -251,10 +256,8 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
 
 const AddButton = () => {
   return (
-    <Pressable className="h-5 w-5 items-center justify-center">
-      <View className="h-5 w-5 items-center justify-center rounded-full border border-primary-500">
-        <Text className="text-sm font-semibold text-primary-500">+</Text>
-      </View>
+    <Pressable className="h-12 w-12 items-center justify-center">
+      <PlusIcon width={24} height={24} fill="#274F9C" />
     </Pressable>
   );
 };

@@ -6,37 +6,37 @@ import { tv } from 'tailwind-variants';
 
 const button = tv({
   slots: {
-    container: 'my-2 flex flex-row items-center justify-center rounded-md px-4',
-    label: 'font-inter text-base font-semibold',
-    indicator: 'h-6 text-white',
+  container: 'my-2 flex flex-row items-center justify-center rounded-md px-4',
+  label: 'font-inter text-base font-semibold',
+  indicator: 'h-6 text-black',
   },
 
   variants: {
     variant: {
       default: {
-        container: 'bg-black dark:bg-white',
-        label: 'text-white dark:text-black',
-        indicator: 'text-white dark:text-black',
+        container: 'bg-black',
+        label: 'text-black',
+        indicator: 'text-black',
       },
       secondary: {
         container: 'bg-primary-600',
         label: 'text-secondary-600',
-        indicator: 'text-white',
+        indicator: 'text-black',
       },
       outline: {
         container: 'border border-neutral-400',
-        label: 'text-black dark:text-neutral-100',
-        indicator: 'text-black dark:text-neutral-100',
+        label: 'text-black',
+        indicator: 'text-black',
       },
       destructive: {
         container: 'bg-red-600',
-        label: 'text-white',
-        indicator: 'text-white',
+        label: 'text-black',
+        indicator: 'text-black',
       },
       ghost: {
         container: 'bg-transparent',
-        label: 'text-black underline dark:text-white',
-        indicator: 'text-black dark:text-white',
+        label: 'text-black underline',
+        indicator: 'text-black',
       },
       link: {
         container: 'bg-transparent',

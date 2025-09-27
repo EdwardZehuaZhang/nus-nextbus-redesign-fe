@@ -19,20 +19,18 @@ export const useSelectedTheme = () => {
 
   const setSelectedTheme = React.useCallback(
     (t: ColorSchemeType) => {
-      setColorScheme(t);
-      _setTheme(t);
+      // Always force light theme - dark mode disabled
+      setColorScheme('light');
+      _setTheme('light');
     },
     [setColorScheme, _setTheme]
   );
 
-  const selectedTheme = (theme ?? 'system') as ColorSchemeType;
+  const selectedTheme = 'light' as ColorSchemeType; // Always return light theme
   return { selectedTheme, setSelectedTheme } as const;
 };
 // to be used in the root file to load the selected theme from MMKV
 export const loadSelectedTheme = () => {
-  const theme = storage.getString(SELECTED_THEME);
-  if (theme !== undefined) {
-    console.log('theme', theme);
-    colorScheme.set(theme as ColorSchemeType);
-  }
+  // Always set to light theme - dark mode disabled
+  colorScheme.set('light');
 };

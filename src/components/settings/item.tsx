@@ -24,7 +24,7 @@ export const Item = ({ text, value, icon, onPress }: ItemProps) => {
         <Text tx={text} />
       </View>
       <View className="flex-row items-center">
-        <Text className="text-neutral-600 dark:text-white">{value}</Text>
+  <Text className="text-neutral-600">{value}</Text>
         {isPressable && (
           <View className="pl-2">
             <ArrowRight />

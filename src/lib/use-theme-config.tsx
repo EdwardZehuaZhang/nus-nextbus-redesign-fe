@@ -29,9 +29,6 @@ const LightTheme: Theme = {
 };
 
 export function useThemeConfig() {
-  const { colorScheme } = useColorScheme();
-
-  if (colorScheme === 'dark') return DarkTheme;
-
+  // Always return light theme - dark mode disabled
   return LightTheme;
 }

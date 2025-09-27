@@ -1,13 +1,8 @@
 /* eslint-disable react/no-unstable-nested-components */
-import { Link, Redirect, SplashScreen, Tabs } from 'expo-router';
+import { Link, Redirect, SplashScreen, Stack } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
 
 import { Pressable, Text } from '@/components/ui';
-import {
-  Feed as FeedIcon,
-  Settings as SettingsIcon,
-  Style as StyleIcon,
-} from '@/components/ui/icons';
 import { useAuth, useIsFirstTime } from '@/lib';
 
 export const unstable_settings = {
@@ -36,45 +31,36 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
   return (
-    <Tabs>
-      <Tabs.Screen
+    <Stack>
+      <Stack.Screen
         name="transit"
         options={{
           title: 'Transit',
           headerShown: false,
-          tabBarIcon: ({ color }) => <FeedIcon color={color} />,
-          tabBarButtonTestID: 'transit-tab',
         }}
       />
-      <Tabs.Screen
+      <Stack.Screen
         name="feed"
         options={{
           title: 'Feed',
-          tabBarIcon: ({ color }) => <FeedIcon color={color} />,
           headerRight: () => <CreateNewPostLink />,
-          tabBarButtonTestID: 'feed-tab',
         }}
       />
-
-      <Tabs.Screen
+      <Stack.Screen
         name="style"
         options={{
           title: 'Style',
           headerShown: false,
-          tabBarIcon: ({ color }) => <StyleIcon color={color} />,
-          tabBarButtonTestID: 'style-tab',
         }}
       />
-      <Tabs.Screen
+      <Stack.Screen
         name="settings"
         options={{
           title: 'Settings',
           headerShown: false,
-          tabBarIcon: ({ color }) => <SettingsIcon color={color} />,
-          tabBarButtonTestID: 'settings-tab',
         }}
       />
-    </Tabs>
+    </Stack>
   );
 }
 

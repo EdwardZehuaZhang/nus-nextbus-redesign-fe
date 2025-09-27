@@ -5,7 +5,7 @@ import { useColorScheme } from 'nativewind';
 import { Item } from '@/components/settings/item';
 import { ItemsContainer } from '@/components/settings/items-container';
 import { LanguageItem } from '@/components/settings/language-item';
-import { ThemeItem } from '@/components/settings/theme-item';
+// import { ThemeItem } from '@/components/settings/theme-item'; // Theme switching disabled
 import {
   colors,
   FocusAwareStatusBar,
@@ -32,7 +32,7 @@ export default function Settings() {
           </Text>
           <ItemsContainer title="settings.generale">
             <LanguageItem />
-            <ThemeItem />
+            {/* <ThemeItem /> - Theme switching disabled */}
           </ItemsContainer>
 
           <ItemsContainer title="settings.about">

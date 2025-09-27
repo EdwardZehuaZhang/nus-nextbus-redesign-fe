@@ -5,7 +5,7 @@ module.exports = {
   // NOTE: Update this to include the paths to all of your component files.
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
   presets: [require('nativewind/preset')],
-  darkMode: 'class',
+  darkMode: 'class', // Set to class mode for manual control
   theme: {
     extend: {
       fontFamily: {
