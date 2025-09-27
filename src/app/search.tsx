@@ -111,14 +111,20 @@ export default function SearchPage() {
     isLast: boolean;
   }) => {
     const IconComponent = item.icon;
+    
+    const handleRecentPress = () => {
+      // Navigate to navigation page with the selected destination
+      router.push({
+        pathname: '/navigation',
+        params: { destination: item.title }
+      });
+    };
+
     return (
       <View key={item.id}>
         <Pressable
           className="flex-row items-center gap-2 py-3"
-          onPress={() => {
-            // Handle navigation to location
-            console.log('Navigate to:', item.title);
-          }}
+          onPress={handleRecentPress}
         >
           <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100">
             <IconComponent />
@@ -135,15 +141,20 @@ export default function SearchPage() {
   };
 
   const renderPopularItem = ({ item }: { item: PopularSearchItem }) => {
+    const handleNavigationPress = () => {
+      // Navigate to navigation page with the selected destination
+      router.push({
+        pathname: '/navigation',
+        params: { destination: item.title.replace('\n', ' ') }
+      });
+    };
+
     return (
       <Pressable
         key={item.id}
         className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
         style={{ width: 154, height: 116 }}
-        onPress={() => {
-          // Handle navigation to location
-          console.log('Navigate to:', item.title);
-        }}
+        onPress={handleNavigationPress}
       >
         <View className="relative h-full w-full">
           <Image
