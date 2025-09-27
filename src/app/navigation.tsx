@@ -238,7 +238,7 @@ export default function NavigationPage() {
                               </View>
                               <View className="flex-1 items-center justify-center bg-white py-2">
                                 <Text className="text-sm text-neutral-600">10 Min</Text>
-                                <Text className="text-xs text-neutral-400">👥</Text>
+                                <Text className="text-xs text-neutral-400">����</Text>
                               </View>
                             </View>
                           </View>
@@ -291,7 +291,7 @@ export default function NavigationPage() {
                       <View className="items-center py-2">
                         <Text className="text-base font-medium text-neutral-900">COM3</Text>
                       </View>
-                    </div>
+                    </View>
                   </View>
                 </View>
               </View>
