@@ -1,6 +1,7 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Switch } from 'react-native';
+import Svg, { Path, Circle, G, ClipPath, Rect, Defs } from 'react-native-svg';
 
 import {
   FocusAwareStatusBar,
@@ -11,72 +12,156 @@ import {
   Text,
   View,
 } from '@/components/ui';
-import { CaretDown, PlusIcon } from '@/components/ui/icons';
 
-// Custom SVG Icons for this page
+// SVG Icons from Figma design
 const NavigationArrow = () => (
-  <View className="h-5 w-5 items-center justify-center">
-    <Text className="text-base text-neutral-500">📍</Text>
-  </View>
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
+      fill="#737373"
+    />
+  </Svg>
 );
 
-const MenuDots = () => (
-  <View className="h-5 w-5 items-center justify-center">
-    <View className="flex-col items-center justify-center gap-0.5">
-      <View className="h-1 w-1 rounded-full bg-neutral-500" />
-      <View className="h-1 w-1 rounded-full bg-neutral-500" />
-      <View className="h-1 w-1 rounded-full bg-neutral-500" />
-    </View>
-  </View>
+const MenuIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M17.5 10C17.5 10.1658 17.4342 10.3247 17.3169 10.4419C17.1997 10.5592 17.0408 10.625 16.875 10.625H3.125C2.95924 10.625 2.80027 10.5592 2.68306 10.4419C2.56585 10.3247 2.5 10.1658 2.5 10C2.5 9.83424 2.56585 9.67527 2.68306 9.55806C2.80027 9.44085 2.95924 9.375 3.125 9.375H16.875C17.0408 9.375 17.1997 9.44085 17.3169 9.55806C17.4342 9.67527 17.5 9.83424 17.5 10ZM3.125 5.625H16.875C17.0408 5.625 17.1997 5.55915 17.3169 5.44194C17.4342 5.32473 17.5 5.16576 17.5 5C17.5 4.83424 17.4342 4.67527 17.3169 4.55806C17.1997 4.44085 17.0408 4.375 16.875 4.375H3.125C2.95924 4.375 2.80027 4.44085 2.68306 4.55806C2.56585 4.67527 2.5 4.83424 2.5 5C2.5 5.16576 2.56585 5.32473 2.68306 5.44194C2.80027 5.55915 2.95924 5.625 3.125 5.625ZM16.875 14.375H3.125C2.95924 14.375 2.80027 14.4408 2.68306 14.5581C2.56585 14.6753 2.5 14.8342 2.5 15C2.5 15.1658 2.56585 15.3247 2.68306 15.4419C2.80027 15.5592 2.95924 15.625 3.125 15.625H16.875C17.0408 15.625 17.1997 15.5592 17.3169 15.4419C17.4342 15.3247 17.5 15.1658 17.5 15C17.5 14.8342 17.4342 14.6753 17.3169 14.5581C17.1997 14.4408 17.0408 14.375 16.875 14.375Z"
+      fill="#737373"
+    />
+  </Svg>
 );
 
-const MapPin = ({ color = "#274F9C" }) => (
-  <View className="h-5 w-5 items-center justify-center">
-    <Text className="text-base" style={{ color }}>📍</Text>
-  </View>
+const MapPin = () => (
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M10 1.25C8.17727 1.25207 6.42979 1.97706 5.14092 3.26592C3.85206 4.55479 3.12707 6.30227 3.125 8.125C3.125 14.0078 9.375 18.4508 9.64141 18.6367C9.74649 18.7103 9.87169 18.7498 10 18.7498C10.1283 18.7498 10.2535 18.7103 10.3586 18.6367C10.625 18.4508 16.875 14.0078 16.875 8.125C16.8729 6.30227 16.1479 4.55479 14.8591 3.26592C13.5702 1.97706 11.8227 1.25207 10 1.25ZM10 5.625C10.4945 5.625 10.9778 5.77162 11.3889 6.04633C11.8 6.32103 12.1205 6.71148 12.3097 7.16829C12.4989 7.62511 12.5484 8.12777 12.452 8.61273C12.3555 9.09768 12.1174 9.54314 11.7678 9.89277C11.4181 10.2424 10.9727 10.4805 10.4877 10.577C10.0028 10.6734 9.50011 10.6239 9.04329 10.4347C8.58648 10.2455 8.19603 9.92505 7.92133 9.51393C7.64662 9.1028 7.5 8.61945 7.5 8.125C7.5 7.46196 7.76339 6.82607 8.23223 6.35723C8.70107 5.88839 9.33696 5.625 10 5.625Z"
+      fill="#274F9C"
+    />
+  </Svg>
 );
 
-const Person = () => (
-  <View className="h-5 w-5 items-center justify-center">
-    <Text className="text-base text-neutral-500">🚶</Text>
-  </View>
+const PlusCircle = () => (
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M10 0.0996094C12.6248 0.102409 15.1411 1.14692 16.9971 3.00293C18.8531 4.85893 19.8976 7.37522 19.9004 10L19.8936 10.3662C19.8258 12.1959 19.2513 13.9736 18.2314 15.5C17.1436 17.128 15.5971 18.3972 13.7881 19.1465C11.9792 19.8956 9.98862 20.0919 8.06836 19.71C6.14803 19.3279 4.38449 18.3845 3 17C1.61551 15.6155 0.672059 13.852 0.290039 11.9316C-0.0919236 10.0114 0.104359 8.02078 0.853516 6.21191C1.60282 4.40293 2.87195 2.85638 4.5 1.76855C6.02638 0.748673 7.80407 0.174156 9.63379 0.106445L10 0.0996094ZM13.2764 2.08984C11.7121 1.44193 9.99069 1.27231 8.33008 1.60254C6.6693 1.93289 5.14364 2.74894 3.94629 3.94629C2.74894 5.14364 1.93289 6.6693 1.60254 8.33008C1.27231 9.99068 1.44193 11.7121 2.08984 13.2764C2.73785 14.8408 3.83523 16.1784 5.24316 17.1191C6.6511 18.0599 8.30669 18.5615 10 18.5615C12.2698 18.5589 14.4458 17.6558 16.0508 16.0508C17.6558 14.4458 18.5589 12.2698 18.5615 10L18.5557 9.68262C18.497 8.1005 18.001 6.563 17.1191 5.24316C16.1784 3.83523 14.8408 2.73785 13.2764 2.08984ZM10 5.48438C10.1775 5.48438 10.3481 5.55516 10.4736 5.68066C10.599 5.80615 10.6689 5.97691 10.6689 6.1543V9.33105H13.8457C14.0231 9.33105 14.1939 9.401 14.3193 9.52637C14.4448 9.65187 14.5156 9.82251 14.5156 10C14.5156 10.1775 14.4448 10.3481 14.3193 10.4736C14.1939 10.599 14.0231 10.6689 13.8457 10.6689H10.6689V13.8457C10.6689 14.0231 10.599 14.1939 10.4736 14.3193C10.3481 14.4448 10.1775 14.5156 10 14.5156C9.82251 14.5156 9.65187 14.4448 9.52637 14.3193C9.401 14.1939 9.33105 14.0231 9.33105 13.8457V10.6689H6.1543C5.97691 10.6689 5.80615 10.599 5.68066 10.4736C5.55516 10.3481 5.48438 10.1775 5.48438 10C5.48438 9.82251 5.55516 9.65187 5.68066 9.52637C5.80615 9.401 5.97691 9.33105 6.1543 9.33105H9.33105V6.1543C9.33105 5.97691 9.401 5.80615 9.52637 5.68066C9.65187 5.55516 9.82251 5.48438 10 5.48438Z"
+      fill="#274F9C"
+      stroke="#274F9C"
+      strokeWidth="0.2"
+    />
+  </Svg>
 );
 
-const Van = () => (
-  <View className="h-5 w-5 items-center justify-center">
-    <Text className="text-base" style={{ color: '#274F9C' }}>🚐</Text>
-  </View>
+const ChevronDown = () => (
+  <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+    <Path
+      d="M4 6L8 10L12 6"
+      stroke="#737373"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const PersonIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <G clipPath="url(#clip0_530_1543)">
+      <Path
+        d="M7.81257 2.81812C7.81257 2.38547 7.94086 1.96254 8.18123 1.60281C8.42159 1.24307 8.76323 0.962696 9.16295 0.79713C9.56266 0.631563 10.0025 0.588243 10.4268 0.672648C10.8512 0.757054 11.2409 0.965393 11.5469 1.27132C11.8528 1.57725 12.0611 1.96702 12.1455 2.39136C12.2299 2.81569 12.1866 3.25552 12.0211 3.65524C11.8555 4.05495 11.5751 4.39659 11.2154 4.63696C10.8556 4.87732 10.4327 5.00562 10.0001 5.00562C9.4199 5.00562 8.86351 4.77515 8.45327 4.36491C8.04303 3.95468 7.81257 3.39828 7.81257 2.81812ZM16.8298 11.0041L13.2946 6.99624C13.0893 6.76347 12.8369 6.57705 12.554 6.44935C12.2711 6.32166 11.9643 6.25562 11.654 6.25562H8.34616C8.03581 6.25562 7.729 6.32166 7.44614 6.44935C7.16327 6.57705 6.91081 6.76347 6.70553 6.99624L3.17038 11.0041C2.94083 11.2389 2.81293 11.5547 2.81434 11.8831C2.81575 12.2115 2.94635 12.5262 3.17791 12.7591C3.40947 12.992 3.72338 13.1244 4.05178 13.1277C4.38018 13.131 4.69669 13.0049 4.93288 12.7767L6.95319 11.1541L5.41413 17.0041C5.28023 17.3046 5.27026 17.6459 5.38639 17.9538C5.50253 18.2617 5.73539 18.5114 6.03445 18.6487C6.33351 18.786 6.67465 18.7998 6.98384 18.6872C7.29303 18.5745 7.54533 18.3445 7.686 18.047L10.0001 14.0681L12.311 18.0525C12.4517 18.35 12.704 18.58 13.0132 18.6926C13.3224 18.8053 13.6635 18.7915 13.9626 18.6542C14.2616 18.5169 14.4945 18.2672 14.6106 17.9593C14.7267 17.6514 14.7168 17.3101 14.5829 17.0095L13.0469 11.1541L15.0704 12.7767C15.3066 13.0049 15.6231 13.131 15.9515 13.1277C16.2799 13.1244 16.5938 12.992 16.8253 12.7591C17.0569 12.5262 17.1875 12.2115 17.1889 11.8831C17.1903 11.5547 17.0624 11.2389 16.8329 11.0041H16.8298Z"
+        fill="#737373"
+      />
+    </G>
+    <Defs>
+      <ClipPath id="clip0_530_1543">
+        <Rect width="20" height="20" fill="white" transform="translate(0 0.00561523)" />
+      </ClipPath>
+    </Defs>
+  </Svg>
+);
+
+const VanIcon = () => (
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M19.8492 8.34297L16.2914 4.19766C16.1741 4.05749 16.0274 3.94476 15.8618 3.86741C15.6962 3.79007 15.5156 3.74999 15.3328 3.75H2.5C2.16848 3.75 1.85054 3.8817 1.61612 4.11612C1.3817 4.35054 1.25 4.66848 1.25 5V13.75C1.25 14.0815 1.3817 14.3995 1.61612 14.6339C1.85054 14.8683 2.16848 15 2.5 15H3.82812C3.96581 15.5378 4.27856 16.0144 4.71707 16.3548C5.15557 16.6952 5.69489 16.8799 6.25 16.8799C6.80511 16.8799 7.34443 16.6952 7.78293 16.3548C8.22144 16.0144 8.53419 15.5378 8.67188 15H12.5781C12.7158 15.5378 13.0286 16.0144 13.4671 16.3548C13.9056 16.6952 14.4449 16.8799 15 16.8799C15.5551 16.8799 16.0944 16.6952 16.5329 16.3548C16.9714 16.0144 17.2842 15.5378 17.4219 15H18.75C19.0815 15 19.3995 14.8683 19.6339 14.6339C19.8683 14.3995 20 14.0815 20 13.75V8.75C20 8.60067 19.9465 8.45628 19.8492 8.34297ZM2.5 8.125V5H6.875V8.125H2.5ZM6.25 15.625C6.00277 15.625 5.7611 15.5517 5.55554 15.4143C5.34998 15.277 5.18976 15.0818 5.09515 14.8534C5.00054 14.6249 4.97579 14.3736 5.02402 14.1311C5.07225 13.8887 5.1913 13.6659 5.36612 13.4911C5.54093 13.3163 5.76366 13.1972 6.00614 13.149C6.24861 13.1008 6.49995 13.1255 6.72835 13.2201C6.95676 13.3148 7.15199 13.475 7.28934 13.6805C7.42669 13.8861 7.5 14.1278 7.5 14.375C7.5 14.7065 7.3683 15.0245 7.13388 15.2589C6.89946 15.4933 6.58152 15.625 6.25 15.625ZM12.5 8.125H8.125V5H12.5V8.125ZM15 15.625C14.7528 15.625 14.5111 15.5517 14.3055 15.4143C14.1 15.277 13.9398 15.0818 13.8451 14.8534C13.7505 14.6249 13.7258 14.3736 13.774 14.1311C13.8222 13.8887 13.9413 13.6659 14.1161 13.4911C14.2909 13.3163 14.5137 13.1972 14.7561 13.149C14.9986 13.1008 15.2499 13.1255 15.4784 13.2201C15.7068 13.3148 15.902 13.475 16.0393 13.6805C16.1767 13.8861 16.25 14.1278 16.25 14.375C16.25 14.7065 16.1183 15.0245 15.8839 15.2589C15.6495 15.4933 15.3315 15.625 15 15.625ZM13.75 8.125V5H15.3328L18.0148 8.125H13.75Z"
+      fill="#274F9C"
+    />
+  </Svg>
 );
 
 const BookmarkIcon = () => (
-  <View className="h-5 w-5 items-center justify-center">
-    <Text className="text-base text-neutral-900">🔖</Text>
-  </View>
+  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+    <Path
+      d="M14.375 2.50562H5.625C5.29348 2.50562 4.97554 2.63731 4.74112 2.87173C4.5067 3.10615 4.375 3.42409 4.375 3.75562V17.5056C4.37506 17.6172 4.40496 17.7266 4.46161 17.8227C4.51826 17.9188 4.59959 17.998 4.69716 18.052C4.79473 18.1061 4.90498 18.133 5.01648 18.1301C5.12798 18.1271 5.23666 18.0944 5.33125 18.0353L10 15.1173L14.6695 18.0353C14.7641 18.0942 14.8727 18.1268 14.9841 18.1296C15.0955 18.1325 15.2056 18.1055 15.303 18.0514C15.4005 17.9974 15.4817 17.9183 15.5383 17.8224C15.5949 17.7264 15.6249 17.617 15.625 17.5056V3.75562C15.625 3.42409 15.4933 3.10615 15.2589 2.87173C15.0245 2.63731 14.7065 2.50562 14.375 2.50562ZM14.375 16.3783L10.3305 13.8509C10.2311 13.7888 10.1164 13.7559 9.99922 13.7559C9.88208 13.7559 9.7673 13.7888 9.66797 13.8509L5.625 16.3783V3.75562H14.375V16.3783Z"
+      fill="black"
+    />
+  </Svg>
 );
 
-const ExpandIcon = ({ expanded }: { expanded: boolean }) => (
-  <View className={`h-5 w-5 items-center justify-center transition-transform ${expanded ? 'rotate-180' : ''}`}>
-    <CaretDown width={16} height={16} />
-  </View>
+const DotDivider = () => (
+  <Svg width={2} height={12} viewBox="0 0 2 12" fill="none">
+    <Circle cx="1" cy="1" r="1" fill="#737373" />
+    <Circle cx="1" cy="6" r="1" fill="#737373" />
+    <Circle cx="1" cy="11" r="1" fill="#737373" />
+  </Svg>
+);
+
+// Capacity Icons
+const CapacityIcons = () => (
+  <Svg width={30} height={23} viewBox="0 0 30 23" fill="none">
+    <Path
+      opacity="0.5"
+      d="M21.4932 17.075C20.5629 15.6493 19.1978 14.5615 17.6005 13.9727C18.646 13.2684 19.3838 12.1923 19.6638 10.9632C19.9438 9.73412 19.7449 8.44455 19.1076 7.35697C18.4702 6.26939 17.4424 5.46554 16.2333 5.10905C15.0242 4.75256 13.7247 4.87022 12.5993 5.43809C12.5563 5.4603 12.5187 5.49171 12.4891 5.53009C12.4596 5.56846 12.4388 5.61286 12.4284 5.66015C12.4179 5.70743 12.4179 5.75644 12.4285 5.80371C12.439 5.85097 12.4599 5.89534 12.4895 5.93366C13.3263 6.97751 13.8069 8.2619 13.8609 9.59868C13.9148 10.9355 13.5393 12.2544 12.7893 13.3623C12.7408 13.4347 12.7229 13.5233 12.7395 13.6089C12.756 13.6944 12.8057 13.77 12.8777 13.8191C13.8555 14.5015 14.6926 15.3661 15.3432 16.3655C15.6055 16.7673 15.7127 17.2508 15.6446 17.7258C15.637 17.7731 15.6397 17.8214 15.6526 17.8675C15.6654 17.9136 15.6882 17.9564 15.7192 17.9929C15.7502 18.0293 15.7888 18.0586 15.8323 18.0786C15.8757 18.0987 15.923 18.1091 15.9709 18.1091H20.9514C21.0969 18.1091 21.2384 18.0611 21.3538 17.9726C21.4692 17.884 21.5522 17.7598 21.5899 17.6193C21.6128 17.5269 21.6161 17.4306 21.5995 17.3369C21.5828 17.2431 21.5466 17.1539 21.4932 17.075Z"
+      fill="#211F26"
+    />
+    <Path
+      d="M14.0481 17.0884C14.1131 17.1881 14.15 17.3035 14.1548 17.4225C14.1597 17.5414 14.1323 17.6594 14.0756 17.7641C14.0189 17.8687 13.935 17.9561 13.8328 18.017C13.7305 18.078 13.6137 18.1101 13.4947 18.1101H1.30851C1.18949 18.1101 1.07268 18.078 0.970423 18.017C0.868168 17.9561 0.784265 17.8687 0.727579 17.7641C0.670892 17.6594 0.643528 17.5414 0.648376 17.4225C0.653224 17.3035 0.690104 17.1881 0.755121 17.0884C1.68523 15.6567 3.05334 14.5642 4.65529 13.9737C3.76969 13.3842 3.09734 12.5252 2.73766 11.524C2.37798 10.5227 2.35006 9.43233 2.65803 8.41399C2.96601 7.39564 3.59352 6.50344 4.44778 5.86932C5.30204 5.2352 6.3377 4.89282 7.40159 4.89282C8.46548 4.89282 9.50114 5.2352 10.3554 5.86932C11.2097 6.50344 11.8372 7.39564 12.1451 8.41399C12.4531 9.43233 12.4252 10.5227 12.0655 11.524C11.7058 12.5252 11.0335 13.3842 10.1479 13.9737C11.7498 14.5642 13.1179 15.6567 14.0481 17.0884Z"
+      fill="#211F26"
+    />
+    <Path
+      opacity="0.5"
+      d="M29.103 17.075C28.1726 15.6493 26.8076 14.5615 25.2102 13.9727C26.2557 13.2684 26.9936 12.1923 27.2735 10.9632C27.5535 9.73412 27.3546 8.44455 26.7173 7.35697C26.08 6.26939 25.0522 5.46554 23.8431 5.10905C22.634 4.75256 21.3345 4.87022 20.2091 5.43809C20.166 5.4603 20.1284 5.49171 20.0989 5.53009C20.0693 5.56846 20.0486 5.61286 20.0381 5.66015C20.0276 5.70743 20.0277 5.75644 20.0382 5.80371C20.0488 5.85097 20.0696 5.89534 20.0992 5.93366C20.9361 6.97751 21.4167 8.2619 21.4706 9.59868C21.5246 10.9355 21.149 12.2544 20.3991 13.3623C20.3506 13.4347 20.3327 13.5233 20.3492 13.6089C20.3658 13.6944 20.4154 13.77 20.4874 13.8191C21.4653 14.5015 22.3024 15.3661 22.9529 16.3655C23.2153 16.7673 23.3224 17.2508 23.2544 17.7258C23.2467 17.7731 23.2494 17.8214 23.2623 17.8675C23.2752 17.9136 23.2979 17.9564 23.3289 17.9929C23.36 18.0293 23.3985 18.0586 23.442 18.0786C23.4855 18.0987 23.5328 18.1091 23.5806 18.1091H28.5612C28.7067 18.1091 28.8481 18.0611 28.9635 17.9726C29.079 17.884 29.162 17.7598 29.1996 17.6193C29.2226 17.5269 29.2259 17.4306 29.2092 17.3369C29.1926 17.2431 29.1564 17.1539 29.103 17.075Z"
+      fill="#211F26"
+    />
+  </Svg>
 );
 
 export default function NavigationPage() {
   const router = useRouter();
-  const { from, to } = useLocalSearchParams();
+  const { destination } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
 
+  // Get destination from URL parameter or default to "COM3"
+  const currentDestination = typeof destination === 'string' ? destination : 'COM3';
+
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
       
-      {/* Status Bar - Custom for the design */}
+      {/* Status Bar */}
       <View className="flex-row items-center justify-between px-6 py-3">
-        <Text className="text-lg font-semibold text-neutral-900">9:41</Text>
-        <View className="flex-row items-center gap-1">
-          <Text className="text-sm text-neutral-900">📶</Text>
-          <Text className="text-sm text-neutral-900">📶</Text>
-          <Text className="text-sm text-neutral-900">🔋</Text>
+        <Text className="text-lg font-semibold" style={{ color: '#27272A' }}>9:41</Text>
+        <View className="flex-row items-center gap-2">
+          {/* Cellular */}
+          <Svg width={19} height={12} viewBox="0 0 20 13" fill="none">
+            <Path
+              d="M2.41296 7.90222C3.04622 7.90222 3.56038 8.41546 3.56042 9.04871V11.3417C3.56042 11.975 3.04625 12.4891 2.41296 12.4891H1.26648C0.633276 12.489 0.119995 11.9749 0.119995 11.3417V9.04871C0.120043 8.41552 0.633306 7.90232 1.26648 7.90222H2.41296ZM7.76453 5.60925C8.39775 5.60933 8.91101 6.1225 8.91101 6.75574V11.3417C8.91101 11.9749 8.39775 12.4891 7.76453 12.4891H6.61804C5.98476 12.4891 5.47058 11.975 5.47058 11.3417V6.75574C5.47058 6.12245 5.98476 5.60925 6.61804 5.60925H7.76453ZM13.1151 2.93347C13.7484 2.93347 14.2625 3.44669 14.2626 4.07996V11.3427C14.2623 11.9757 13.7483 12.4891 13.1151 12.4891H11.9686C11.3356 12.489 10.8224 11.9756 10.8221 11.3427V4.07996C10.8222 3.44679 11.3355 2.93363 11.9686 2.93347H13.1151ZM18.4667 0.25769C19.0999 0.257699 19.613 0.770996 19.6132 1.40417V11.3427C19.6129 11.9757 19.0998 12.4891 18.4667 12.4891H17.3202C16.6871 12.4891 16.174 11.9757 16.1737 11.3427V1.40417C16.1738 0.770991 16.687 0.25769 17.3202 0.25769H18.4667Z"
+              fill="#27272A"
+            />
+          </Svg>
+          {/* WiFi */}
+          <Svg width={18} height={13} viewBox="0 0 18 14" fill="none">
+            <Path
+              d="M6.59473 10.535C8.06312 9.29429 10.2132 9.29433 11.6816 10.535C11.7555 10.6018 11.7987 10.6963 11.8008 10.7958C11.8028 10.8952 11.7634 10.9908 11.6924 11.0604L9.39355 13.3798C9.32627 13.4477 9.23432 13.4861 9.13867 13.4862C9.04284 13.4862 8.95021 13.4478 8.88281 13.3798L6.58301 11.0604C6.5122 10.9907 6.47356 10.8951 6.47559 10.7958C6.47769 10.6963 6.52079 10.6017 6.59473 10.535ZM3.52637 7.44226C6.6902 4.50179 11.5891 4.50179 14.7529 7.44226C14.8244 7.51121 14.8652 7.60573 14.8662 7.70496C14.8672 7.80403 14.8286 7.89927 14.7588 7.9696L13.4297 9.31238C13.2927 9.44934 13.0712 9.45162 12.9307 9.31824C11.8918 8.37831 10.5402 7.85828 9.13867 7.85828C7.73798 7.85886 6.3869 8.37885 5.34863 9.31824C5.20814 9.45162 4.9866 9.44933 4.84961 9.31238L3.52148 7.9696C3.45135 7.89933 3.41216 7.8042 3.41309 7.70496C3.41402 7.6057 3.4549 7.51121 3.52637 7.44226ZM0.458008 4.3573C5.31062 -0.288962 12.9659 -0.289159 17.8184 4.3573C17.8886 4.42633 17.9281 4.52059 17.9287 4.61902C17.9293 4.71741 17.8907 4.81188 17.8213 4.88171L16.4902 6.22351C16.3531 6.36122 16.1304 6.363 15.9912 6.22742C14.1425 4.4715 11.6894 3.49228 9.13867 3.49207C6.58748 3.49206 4.13323 4.47118 2.28418 6.22742C2.14504 6.36321 1.92219 6.36143 1.78516 6.22351L0.454102 4.88171C0.384796 4.81184 0.346049 4.71739 0.34668 4.61902C0.347328 4.52058 0.387715 4.42628 0.458008 4.3573Z"
+              fill="#27272A"
+            />
+          </Svg>
+          {/* Battery */}
+          <View className="relative">
+            <View className="w-6 h-3 border border-zinc-800 rounded-sm opacity-35" />
+            <View className="absolute right-0 top-1 w-0.5 h-1 bg-zinc-800 opacity-40" />
+            <View className="absolute left-0.5 top-0.5 w-5 h-2 bg-zinc-800 rounded-sm" />
+          </View>
         </View>
       </View>
 
@@ -91,7 +176,7 @@ export default function NavigationPage() {
         />
 
         {/* Location Input Card */}
-        <View className="mx-3 mt-4 rounded-xl border border-neutral-200 bg-white p-3 shadow-lg">
+        <View className="mx-2.5 mt-0 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
           {/* Your Location */}
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
@@ -100,17 +185,13 @@ export default function NavigationPage() {
                 Your location
               </Text>
             </View>
-            <MenuDots />
+            <MenuIcon />
           </View>
 
           {/* Divider with dots */}
-          <View className="my-2 flex-row items-center gap-5 pl-2">
-            <View className="flex-col items-center gap-1">
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-            </View>
-            <View className="h-px flex-1 bg-neutral-200" />
+          <View className="my-2.5 flex-row items-center gap-5 pl-2">
+            <DotDivider />
+            <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
           </View>
 
           {/* Destination */}
@@ -118,25 +199,21 @@ export default function NavigationPage() {
             <View className="flex-row items-center gap-3">
               <MapPin />
               <Text className="text-base font-medium text-neutral-900">
-                COM3
+                {currentDestination}
               </Text>
             </View>
-            <MenuDots />
+            <MenuIcon />
           </View>
 
           {/* Divider with dots */}
-          <View className="my-2 flex-row items-center gap-5 pl-2">
-            <View className="flex-col items-center gap-1">
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-              <View className="h-1 w-1 rounded-full bg-neutral-400" />
-            </View>
-            <View className="h-px flex-1 bg-neutral-200" />
+          <View className="my-2.5 flex-row items-center gap-5 pl-2">
+            <DotDivider />
+            <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
           </View>
 
           {/* Add Stop */}
-          <View className="flex-row items-center gap-3">
-            <PlusIcon width={20} height={20} fill="#274F9C" />
+          <View className="flex-row items-center gap-1">
+            <PlusCircle />
             <Text className="text-base font-medium" style={{ color: '#274F9C' }}>
               Add Stop
             </Text>
@@ -147,16 +224,16 @@ export default function NavigationPage() {
         <View className="absolute bottom-0 left-0 right-0 rounded-t-xl border border-neutral-200 bg-white p-5 shadow-xl">
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Journey Time Header */}
-            <View className="mb-4 flex-row items-center justify-between">
+            <View className="mb-4 flex-row items-center justify-between pb-2">
               <Text className="text-2xl font-medium text-neutral-900">28 Mins</Text>
-              <View className="flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+              <View className="flex-row items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm" style={{ width: 154, height: 32 }}>
                 <Text className="text-sm text-neutral-900">Arrive 9:15PM</Text>
-                <CaretDown width={16} height={16} />
+                <ChevronDown />
               </View>
             </View>
 
             {/* Journey Steps */}
-            <View className="mb-6 gap-4">
+            <View className="mb-6 gap-0">
               {/* Step 1: Your location */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
@@ -169,19 +246,15 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View className="flex-row items-center gap-5 pl-2">
-                <View className="flex-col items-center gap-1">
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                </View>
-                <View className="h-px flex-1 bg-neutral-200" />
+              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+                <DotDivider />
+                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 2: Walk */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
-                  <Person />
+                  <PersonIcon />
                   <Text className="text-base font-medium text-neutral-900">
                     Walk 10 min
                   </Text>
@@ -190,13 +263,9 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View className="flex-row items-center gap-5 pl-2">
-                <View className="flex-col items-center gap-1">
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                </View>
-                <View className="h-px flex-1 bg-neutral-200" />
+              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+                <DotDivider />
+                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 3: Bus Journey */}
@@ -204,14 +273,14 @@ export default function NavigationPage() {
                 <View className="flex-1">
                   <View className="flex-row items-center gap-4">
                     {/* Blue line indicator */}
-                    <View className="h-full w-4 items-center">
-                      <View className="h-60 w-3 rounded-full" style={{ backgroundColor: '#274F9C' }} />
-                      {/* Bus icons */}
+                    <View className="h-58 w-5 items-center justify-center">
+                      <View className="h-58 w-3 rounded-full" style={{ backgroundColor: '#274F9C' }} />
+                      {/* Bus icons positioned on the line */}
                       <View className="absolute top-4 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
-                        <Van />
+                        <VanIcon />
                       </View>
-                      <View className="absolute top-24 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
-                        <Van />
+                      <View className="absolute top-16 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
+                        <VanIcon />
                       </View>
                     </View>
 
@@ -223,43 +292,51 @@ export default function NavigationPage() {
                         {/* Bus Routes */}
                         <View className="gap-2">
                           {/* A1 Route */}
-                          <View className="flex-row rounded-md border border-neutral-200 overflow-hidden">
-                            <View className="items-center justify-center bg-red-500 px-3 py-2">
+                          <View className="flex-row rounded-md border-0 overflow-hidden" style={{ height: 37 }}>
+                            <View className="items-center justify-center px-2.5 py-2" style={{ backgroundColor: '#F00', width: 38 }}>
                               <Text className="text-sm font-semibold text-white">A1</Text>
                             </View>
-                            <View className="flex-1 flex-row">
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white py-2">
+                            <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
+                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
                                 <Text className="text-sm text-neutral-900">1 Min</Text>
-                                <Text className="text-xs text-neutral-500">👥</Text>
+                                <CapacityIcons />
                               </View>
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white py-2">
-                                <Text className="text-sm text-neutral-600">5 Min</Text>
-                                <Text className="text-xs text-neutral-400">👥</Text>
+                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
+                                <Text className="text-sm text-neutral-500">5 Min</Text>
+                                <View style={{ opacity: 0.6 }}>
+                                  <CapacityIcons />
+                                </View>
                               </View>
-                              <View className="flex-1 items-center justify-center bg-white py-2">
-                                <Text className="text-sm text-neutral-600">10 Min</Text>
-                                <Text className="text-xs text-neutral-400">����</Text>
+                              <View className="flex-1 items-center justify-center bg-white">
+                                <Text className="text-sm text-neutral-500">10 Min</Text>
+                                <View style={{ opacity: 0.6 }}>
+                                  <CapacityIcons />
+                                </View>
                               </View>
                             </View>
                           </View>
 
                           {/* D2 Route */}
-                          <View className="flex-row rounded-md border border-neutral-200 overflow-hidden">
-                            <View className="items-center justify-center px-3 py-2" style={{ backgroundColor: '#6F1B6F' }}>
+                          <View className="flex-row rounded-md border-0 overflow-hidden" style={{ height: 37 }}>
+                            <View className="items-center justify-center px-2.5 py-2" style={{ backgroundColor: '#6F1B6F', width: 38 }}>
                               <Text className="text-sm font-semibold text-white">D2</Text>
                             </View>
-                            <View className="flex-1 flex-row">
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white py-2">
+                            <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
+                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
                                 <Text className="text-sm text-neutral-900">3 Min</Text>
-                                <Text className="text-xs text-neutral-500">👥</Text>
+                                <CapacityIcons />
                               </View>
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white py-2">
-                                <Text className="text-sm text-neutral-600">7 Min</Text>
-                                <Text className="text-xs text-neutral-400">👥</Text>
+                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
+                                <Text className="text-sm text-neutral-500">7 Min</Text>
+                                <View style={{ opacity: 0.6 }}>
+                                  <CapacityIcons />
+                                </View>
                               </View>
-                              <View className="flex-1 items-center justify-center bg-white py-2">
-                                <Text className="text-sm text-neutral-600">12 Min</Text>
-                                <Text className="text-xs text-neutral-400">👥</Text>
+                              <View className="flex-1 items-center justify-center bg-white">
+                                <Text className="text-sm text-neutral-500">12 Min</Text>
+                                <View style={{ opacity: 0.6 }}>
+                                  <CapacityIcons />
+                                </View>
                               </View>
                             </View>
                           </View>
@@ -270,16 +347,30 @@ export default function NavigationPage() {
                       <View className="mb-4">
                         <Pressable 
                           onPress={() => setRouteExpanded(!routeExpanded)}
-                          className="flex-row items-center gap-2"
+                          className="flex-row items-center gap-1"
                         >
-                          <ExpandIcon expanded={routeExpanded} />
+                          <Svg
+                            width={20}
+                            height={20}
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            style={{ transform: [{ rotate: routeExpanded ? '180deg' : '0deg' }] }}
+                          >
+                            <Path
+                              d="M5 7.50562L10 12.5056L15 7.50562"
+                              stroke="#211F26"
+                              strokeWidth="1.25"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </Svg>
                           <Text className="text-xs font-medium text-neutral-900">
                             Ride 5 stops (9 mins)
                           </Text>
                         </Pressable>
                         
                         {routeExpanded && (
-                          <View className="ml-6 mt-2 gap-2">
+                          <View className="ml-6 mt-2.5 gap-2.5">
                             <Text className="text-xs text-neutral-600">LT13</Text>
                             <Text className="text-xs text-neutral-600">AS5</Text>
                             <Text className="text-xs text-neutral-600">Opp NUSS</Text>
@@ -288,8 +379,8 @@ export default function NavigationPage() {
                       </View>
 
                       {/* Final Stop */}
-                      <View className="items-center py-2">
-                        <Text className="text-base font-medium text-neutral-900">COM3</Text>
+                      <View className="items-center py-2" style={{ height: 36 }}>
+                        <Text className="text-base font-medium text-neutral-900">{currentDestination}</Text>
                       </View>
                     </View>
                   </View>
@@ -297,19 +388,15 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View className="flex-row items-center gap-5 pl-2">
-                <View className="flex-col items-center gap-1">
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                </View>
-                <View className="h-px flex-1 bg-neutral-200" />
+              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+                <DotDivider />
+                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 4: Final Walk */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
-                  <Person />
+                  <PersonIcon />
                   <Text className="text-base font-medium text-neutral-900">
                     Walk 10 min
                   </Text>
@@ -318,27 +405,23 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View className="flex-row items-center gap-5 pl-2">
-                <View className="flex-col items-center gap-1">
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                  <View className="h-1 w-1 rounded-full bg-neutral-400" />
-                </View>
-                <View className="h-px flex-1 bg-neutral-200" />
+              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+                <DotDivider />
+                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 5: Destination */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <MapPin />
-                  <Text className="text-base font-medium text-neutral-900">COM3</Text>
+                  <Text className="text-base font-medium text-neutral-900">{currentDestination}</Text>
                 </View>
                 <Text className="text-sm text-neutral-600">9:50AM</Text>
               </View>
             </View>
 
             {/* Divider */}
-            <View className="mb-4 h-px bg-neutral-200" />
+            <View className="mb-4 h-px" style={{ backgroundColor: '#E4E7E7' }} />
 
             {/* Reminder Toggle */}
             <View className="mb-4 flex-row items-center justify-between">
@@ -350,11 +433,12 @@ export default function NavigationPage() {
                 onValueChange={setReminderEnabled}
                 trackColor={{ false: '#D9D9D9', true: '#274F9C' }}
                 thumbColor={'#FFFFFF'}
+                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
               />
             </View>
 
             {/* Save as Favorite Button */}
-            <Pressable className="flex-row items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-3 shadow-sm">
+            <Pressable className="flex-row items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 shadow-sm" style={{ height: 36 }}>
               <Text className="text-sm font-medium text-neutral-900">
                 Save as favorite
               </Text>
@@ -362,6 +446,11 @@ export default function NavigationPage() {
             </Pressable>
           </ScrollView>
         </View>
+      </View>
+
+      {/* Home Indicator */}
+      <View className="absolute bottom-0 left-0 right-0 items-center pb-2">
+        <View className="h-1.5 w-39 rounded-full opacity-40" style={{ backgroundColor: '#E4E4E7' }} />
       </View>
     </SafeAreaView>
   );
