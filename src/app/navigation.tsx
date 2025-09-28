@@ -176,7 +176,13 @@ const DotDivider = () => (
 
 // Capacity Icons with people
 const CapacityIcons = ({ opacity = 1 }: { opacity?: number }) => (
-  <Svg width={30} height={23} viewBox="0 0 30 23" fill="none" style={{ opacity }}>
+  <Svg
+    width={30}
+    height={23}
+    viewBox="0 0 30 23"
+    fill="none"
+    style={{ opacity }}
+  >
     <Path
       opacity="0.5"
       d="M21.4932 17.075C20.5629 15.6493 19.1978 14.5615 17.6005 13.9727C18.646 13.2684 19.3838 12.1923 19.6638 10.9632C19.9438 9.73412 19.7449 8.44455 19.1076 7.35697C18.4702 6.26939 17.4424 5.46554 16.2333 5.10905C15.0242 4.75256 13.7247 4.87022 12.5993 5.43809C12.5563 5.4603 12.5187 5.49171 12.4891 5.53009C12.4596 5.56846 12.4388 5.61286 12.4284 5.66015C12.4179 5.70743 12.4179 5.75644 12.4285 5.80371C12.439 5.85097 12.4599 5.89534 12.4895 5.93366C13.3263 6.97751 13.8069 8.2619 13.8609 9.59868C13.9148 10.9355 13.5393 12.2544 12.7893 13.3623C12.7408 13.4347 12.7229 13.5233 12.7395 13.6089C12.756 13.6944 12.8057 13.77 12.8777 13.8191C13.8555 14.5015 14.6926 15.3661 15.3432 16.3655C15.6055 16.7673 15.7127 17.2508 15.6446 17.7258C15.637 17.7731 15.6397 17.8214 15.6526 17.8675C15.6654 17.9136 15.6882 17.9564 15.7192 17.9929C15.7502 18.0293 15.7888 18.0586 15.8323 18.0786C15.8757 18.0987 15.923 18.1091 15.9709 18.1091H20.9514C21.0969 18.1091 21.2384 18.0611 21.3538 17.9726C21.4692 17.884 21.5522 17.7598 21.5899 17.6193C21.6128 17.5269 21.6161 17.4306 21.5995 17.3369C21.5828 17.2431 21.5466 17.1539 21.4932 17.075Z"
@@ -285,10 +291,20 @@ export default function NavigationPage() {
           }}
         >
           {/* Your Location */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            >
               <NavigationArrow />
-              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+              <Text
+                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}
+              >
                 Your location
               </Text>
             </View>
@@ -296,16 +312,35 @@ export default function NavigationPage() {
           </View>
 
           {/* Divider with dots */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 20,
+              paddingLeft: 9,
+              height: 10,
+              justifyContent: 'center',
+            }}
+          >
             <DotDivider />
             <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
           </View>
 
           {/* Destination */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+            >
               <MapPin />
-              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+              <Text
+                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}
+              >
                 {currentDestination}
               </Text>
             </View>
@@ -313,7 +348,16 @@ export default function NavigationPage() {
           </View>
 
           {/* Divider with dots */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 20,
+              paddingLeft: 9,
+              height: 10,
+              justifyContent: 'center',
+            }}
+          >
             <DotDivider />
             <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
           </View>
@@ -350,8 +394,18 @@ export default function NavigationPage() {
         >
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Journey Time Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, marginBottom: 16 }}>
-              <Text style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingBottom: 8,
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}
+              >
                 28 Mins
               </Text>
               <View
@@ -374,7 +428,9 @@ export default function NavigationPage() {
                   height: 32,
                 }}
               >
-                <Text style={{ fontSize: 14, color: '#09090B' }}>Arrive 9:15PM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>
+                  Arrive 9:15PM
+                </Text>
                 <ChevronDown />
               </View>
             </View>
@@ -382,10 +438,28 @@ export default function NavigationPage() {
             {/* Journey Steps */}
             <View style={{ marginBottom: 16 }}>
               {/* Step 1: Your location */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <NavigationArrow />
-                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '500',
+                      color: '#211F26',
+                    }}
+                  >
                     Your location
                   </Text>
                 </View>
@@ -393,16 +467,45 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 10,
+                  justifyContent: 'center',
+                }}
+              >
                 <DotDivider />
-                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                <View
+                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 2: Walk */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <PersonIcon />
-                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '500',
+                      color: '#211F26',
+                    }}
+                  >
                     Walk 10 min
                   </Text>
                 </View>
@@ -410,16 +513,48 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 10,
+                  justifyContent: 'center',
+                }}
+              >
                 <DotDivider />
-                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                <View
+                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 3: Bus Journey */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 16,
+                    flex: 1,
+                  }}
+                >
                   {/* Blue line indicator with bus icons */}
-                  <View style={{ width: 21, height: 230, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      width: 21,
+                      height: 230,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
                     <View
                       style={{
                         width: 13,
@@ -474,17 +609,47 @@ export default function NavigationPage() {
                     </View>
                   </View>
 
-                  <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16, flex: 1 }}>
+                  <View
+                    style={{
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: 16,
+                      flex: 1,
+                    }}
+                  >
                     {/* Ventus */}
-                    <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8, alignSelf: 'stretch' }}>
-                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                    <View
+                      style={{
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: 8,
+                        alignSelf: 'stretch',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
                         Ventus
                       </Text>
 
                       {/* Bus Routes */}
                       <View style={{ gap: 2 }}>
                         {/* A1 Route */}
-                        <View style={{ width: 353, height: 37, alignItems: 'center', gap: -0.881, borderRadius: 5.286, borderWidth: 0, borderColor: '#E5E5E5' }}>
+                        <View
+                          style={{
+                            width: 353,
+                            height: 37,
+                            alignItems: 'center',
+                            gap: -0.881,
+                            borderRadius: 5.286,
+                            borderWidth: 0,
+                            borderColor: '#E5E5E5',
+                          }}
+                        >
                           <View
                             style={{
                               width: 38,
@@ -504,7 +669,14 @@ export default function NavigationPage() {
                               flexShrink: 0,
                             }}
                           >
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' }}>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: '#FFFFFF',
+                                textAlign: 'center',
+                              }}
+                            >
                               A1
                             </Text>
                           </View>
@@ -537,7 +709,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#211F26',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 1 Min
                               </Text>
                               <CapacityIcons />
@@ -557,7 +736,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#737373',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 5 Min
                               </Text>
                               <CapacityIcons opacity={0.6} />
@@ -576,7 +762,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#737373',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 10 Min
                               </Text>
                               <CapacityIcons opacity={0.6} />
@@ -585,7 +778,17 @@ export default function NavigationPage() {
                         </View>
 
                         {/* D2 Route */}
-                        <View style={{ width: 353, height: 37, alignItems: 'center', gap: -0.881, borderRadius: 5.286, borderWidth: 0, borderColor: '#E5E5E5' }}>
+                        <View
+                          style={{
+                            width: 353,
+                            height: 37,
+                            alignItems: 'center',
+                            gap: -0.881,
+                            borderRadius: 5.286,
+                            borderWidth: 0,
+                            borderColor: '#E5E5E5',
+                          }}
+                        >
                           <View
                             style={{
                               width: 38,
@@ -605,7 +808,14 @@ export default function NavigationPage() {
                               flexShrink: 0,
                             }}
                           >
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' }}>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: '#FFFFFF',
+                                textAlign: 'center',
+                              }}
+                            >
                               D2
                             </Text>
                           </View>
@@ -638,7 +848,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#211F26',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 3 Min
                               </Text>
                               <CapacityIcons />
@@ -658,7 +875,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#737373',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 7 Min
                               </Text>
                               <CapacityIcons opacity={0.6} />
@@ -677,7 +901,14 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                              <Text
+                                style={{
+                                  fontSize: 14,
+                                  fontWeight: '500',
+                                  color: '#737373',
+                                  textAlign: 'center',
+                                }}
+                              >
                                 12 Min
                               </Text>
                               <CapacityIcons opacity={0.6} />
@@ -688,35 +919,93 @@ export default function NavigationPage() {
                     </View>
 
                     {/* Route Details - Expandable */}
-                    <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, alignSelf: 'stretch' }}>
+                    <View
+                      style={{
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        alignSelf: 'stretch',
+                      }}
+                    >
                       <Pressable
                         onPress={() => setRouteExpanded(!routeExpanded)}
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'stretch' }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          alignSelf: 'stretch',
+                        }}
                       >
                         <ChevronExpand expanded={routeExpanded} />
-                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#09090B' }}>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '500',
+                            color: '#09090B',
+                          }}
+                        >
                           Ride 5 stops (9 mins)
                         </Text>
                       </Pressable>
 
                       {routeExpanded && (
                         <>
-                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>LT13</Text>
+                          <View
+                            style={{
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              gap: 10,
+                              paddingHorizontal: 24,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>
+                              LT13
+                            </Text>
                           </View>
-                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>AS5</Text>
+                          <View
+                            style={{
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              gap: 10,
+                              paddingHorizontal: 24,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>
+                              AS5
+                            </Text>
                           </View>
-                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>Opp NUSS</Text>
+                          <View
+                            style={{
+                              flexDirection: 'column',
+                              alignItems: 'flex-start',
+                              gap: 10,
+                              paddingHorizontal: 24,
+                            }}
+                          >
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>
+                              Opp NUSS
+                            </Text>
                           </View>
                         </>
                       )}
                     </View>
 
                     {/* Final Stop */}
-                    <View style={{ height: 36, justifyContent: 'center', alignItems: 'center', gap: 10 }}>
-                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                    <View
+                      style={{
+                        height: 36,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
                         {currentDestination}
                       </Text>
                     </View>
@@ -725,16 +1014,45 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 10,
+                  justifyContent: 'center',
+                }}
+              >
                 <DotDivider />
-                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                <View
+                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 4: Final Walk */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <PersonIcon />
-                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '500',
+                      color: '#211F26',
+                    }}
+                  >
                     Walk 10 min
                   </Text>
                 </View>
@@ -742,16 +1060,45 @@ export default function NavigationPage() {
               </View>
 
               {/* Connecting line */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 10,
+                  justifyContent: 'center',
+                }}
+              >
                 <DotDivider />
-                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                <View
+                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 5: Destination */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
                   <MapPin />
-                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '500',
+                      color: '#211F26',
+                    }}
+                  >
                     {currentDestination}
                   </Text>
                 </View>
@@ -760,15 +1107,37 @@ export default function NavigationPage() {
             </View>
 
             {/* Divider */}
-            <View style={{ width: 390, height: 1, backgroundColor: '#E4E7E7', marginBottom: 16 }} />
+            <View
+              style={{
+                width: 390,
+                height: 1,
+                backgroundColor: '#E4E7E7',
+                marginBottom: 16,
+              }}
+            />
 
             {/* Reminder Toggle */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', alignSelf: 'stretch', marginBottom: 16 }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                alignSelf: 'stretch',
+                marginBottom: 16,
+              }}
+            >
               <Text style={{ fontSize: 14, color: '#09090B' }}>
                 Remind you to leave on time
               </Text>
               <Svg width={44} height={35} viewBox="0 0 44 35" fill="none">
-                <Rect x="8" y="0.00561523" width="36" height="19.9944" rx="9.99719" fill="#D9D9D9" />
+                <Rect
+                  x="8"
+                  y="0.00561523"
+                  width="36"
+                  height="19.9944"
+                  rx="9.99719"
+                  fill="#D9D9D9"
+                />
                 <G filter="url(#filter0_dd_530_1562)">
                   <Circle cx="17.9972" cy="10.0027" r="8.51613" fill="white" />
                 </G>
@@ -789,25 +1158,54 @@ export default function NavigationPage() {
                       values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
                       result="hardAlpha"
                     />
-                    <feMorphology radius="2.96213" operator="erode" in="SourceAlpha" result="effect1_dropShadow_530_1562" />
+                    <feMorphology
+                      radius="2.96213"
+                      operator="erode"
+                      in="SourceAlpha"
+                      result="effect1_dropShadow_530_1562"
+                    />
                     <feOffset dy="2.96213" />
                     <feGaussianBlur stdDeviation="2.2216" />
                     <feComposite in2="hardAlpha" operator="out" />
-                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
-                    <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_530_1562" />
+                    <feColorMatrix
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
+                    />
+                    <feBlend
+                      mode="normal"
+                      in2="BackgroundImageFix"
+                      result="effect1_dropShadow_530_1562"
+                    />
                     <feColorMatrix
                       in="SourceAlpha"
                       type="matrix"
                       values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
                       result="hardAlpha"
                     />
-                    <feMorphology radius="2.2216" operator="erode" in="SourceAlpha" result="effect2_dropShadow_530_1562" />
+                    <feMorphology
+                      radius="2.2216"
+                      operator="erode"
+                      in="SourceAlpha"
+                      result="effect2_dropShadow_530_1562"
+                    />
                     <feOffset dy="7.40533" />
                     <feGaussianBlur stdDeviation="5.554" />
                     <feComposite in2="hardAlpha" operator="out" />
-                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
-                    <feBlend mode="normal" in2="effect1_dropShadow_530_1562" result="effect2_dropShadow_530_1562" />
-                    <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_530_1562" result="shape" />
+                    <feColorMatrix
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
+                    />
+                    <feBlend
+                      mode="normal"
+                      in2="effect1_dropShadow_530_1562"
+                      result="effect2_dropShadow_530_1562"
+                    />
+                    <feBlend
+                      mode="normal"
+                      in="SourceGraphic"
+                      in2="effect2_dropShadow_530_1562"
+                      result="shape"
+                    />
                   </filter>
                 </Defs>
               </Svg>
@@ -835,7 +1233,9 @@ export default function NavigationPage() {
                 flexDirection: 'row',
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26' }}>
+              <Text
+                style={{ fontSize: 14, fontWeight: '500', color: '#211F26' }}
+              >
                 Save as favorite
               </Text>
               <BookmarkIcon />
