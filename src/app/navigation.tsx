@@ -73,7 +73,12 @@ const PersonIcon = () => (
     </G>
     <Defs>
       <ClipPath id="clip0_530_1543">
-        <Rect width="20" height="20" fill="white" transform="translate(0 0.00561523)" />
+        <Rect
+          width="20"
+          height="20"
+          fill="white"
+          transform="translate(0 0.00561523)"
+        />
       </ClipPath>
     </Defs>
   </Svg>
@@ -132,15 +137,18 @@ export default function NavigationPage() {
   const [routeExpanded, setRouteExpanded] = useState(false);
 
   // Get destination from URL parameter or default to "COM3"
-  const currentDestination = typeof destination === 'string' ? destination : 'COM3';
+  const currentDestination =
+    typeof destination === 'string' ? destination : 'COM3';
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
-      
+
       {/* Status Bar */}
       <View className="flex-row items-center justify-between px-6 py-3">
-        <Text className="text-lg font-semibold" style={{ color: '#27272A' }}>9:41</Text>
+        <Text className="text-lg font-semibold" style={{ color: '#27272A' }}>
+          9:41
+        </Text>
         <View className="flex-row items-center gap-2">
           {/* Cellular */}
           <Svg width={19} height={12} viewBox="0 0 20 13" fill="none">
@@ -191,7 +199,10 @@ export default function NavigationPage() {
           {/* Divider with dots */}
           <View className="my-2.5 flex-row items-center gap-5 pl-2">
             <DotDivider />
-            <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+            <View
+              className="h-px flex-1"
+              style={{ backgroundColor: '#E4E7E7' }}
+            />
           </View>
 
           {/* Destination */}
@@ -208,13 +219,19 @@ export default function NavigationPage() {
           {/* Divider with dots */}
           <View className="my-2.5 flex-row items-center gap-5 pl-2">
             <DotDivider />
-            <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+            <View
+              className="h-px flex-1"
+              style={{ backgroundColor: '#E4E7E7' }}
+            />
           </View>
 
           {/* Add Stop */}
           <View className="flex-row items-center gap-1">
             <PlusCircle />
-            <Text className="text-base font-medium" style={{ color: '#274F9C' }}>
+            <Text
+              className="text-base font-medium"
+              style={{ color: '#274F9C' }}
+            >
               Add Stop
             </Text>
           </View>
@@ -225,8 +242,13 @@ export default function NavigationPage() {
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Journey Time Header */}
             <View className="mb-4 flex-row items-center justify-between pb-2">
-              <Text className="text-2xl font-medium text-neutral-900">28 Mins</Text>
-              <View className="flex-row items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm" style={{ width: 154, height: 32 }}>
+              <Text className="text-2xl font-medium text-neutral-900">
+                28 Mins
+              </Text>
+              <View
+                className="flex-row items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
+                style={{ width: 154, height: 32 }}
+              >
                 <Text className="text-sm text-neutral-900">Arrive 9:15PM</Text>
                 <ChevronDown />
               </View>
@@ -248,7 +270,10 @@ export default function NavigationPage() {
               {/* Connecting line */}
               <View className="my-2.5 flex-row items-center gap-5 pl-2">
                 <DotDivider />
-                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+                <View
+                  className="h-px flex-1"
+                  style={{ backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 2: Walk */}
@@ -265,7 +290,10 @@ export default function NavigationPage() {
               {/* Connecting line */}
               <View className="my-2.5 flex-row items-center gap-5 pl-2">
                 <DotDivider />
-                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+                <View
+                  className="h-px flex-1"
+                  style={{ backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 3: Bus Journey */}
@@ -274,7 +302,10 @@ export default function NavigationPage() {
                   <View className="flex-row items-center gap-4">
                     {/* Blue line indicator */}
                     <View className="h-58 w-5 items-center justify-center">
-                      <View className="h-58 w-3 rounded-full" style={{ backgroundColor: '#274F9C' }} />
+                      <View
+                        className="h-58 w-3 rounded-full"
+                        style={{ backgroundColor: '#274F9C' }}
+                      />
                       {/* Bus icons positioned on the line */}
                       <View className="absolute top-4 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
                         <VanIcon />
@@ -287,28 +318,44 @@ export default function NavigationPage() {
                     <View className="flex-1">
                       {/* Ventus */}
                       <View className="mb-4">
-                        <Text className="mb-2 text-base font-medium text-neutral-900">Ventus</Text>
-                        
+                        <Text className="mb-2 text-base font-medium text-neutral-900">
+                          Ventus
+                        </Text>
+
                         {/* Bus Routes */}
                         <View className="gap-2">
                           {/* A1 Route */}
-                          <View className="flex-row rounded-md border-0 overflow-hidden" style={{ height: 37 }}>
-                            <View className="items-center justify-center px-2.5 py-2" style={{ backgroundColor: '#F00', width: 38 }}>
-                              <Text className="text-sm font-semibold text-white">A1</Text>
+                          <View
+                            className="flex-row rounded-md border-0 overflow-hidden"
+                            style={{ height: 37 }}
+                          >
+                            <View
+                              className="items-center justify-center px-2.5 py-2"
+                              style={{ backgroundColor: '#F00', width: 38 }}
+                            >
+                              <Text className="text-sm font-semibold text-white">
+                                A1
+                              </Text>
                             </View>
                             <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
                               <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-900">1 Min</Text>
+                                <Text className="text-sm text-neutral-900">
+                                  1 Min
+                                </Text>
                                 <CapacityIcons />
                               </View>
                               <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-500">5 Min</Text>
+                                <Text className="text-sm text-neutral-500">
+                                  5 Min
+                                </Text>
                                 <View style={{ opacity: 0.6 }}>
                                   <CapacityIcons />
                                 </View>
                               </View>
                               <View className="flex-1 items-center justify-center bg-white">
-                                <Text className="text-sm text-neutral-500">10 Min</Text>
+                                <Text className="text-sm text-neutral-500">
+                                  10 Min
+                                </Text>
                                 <View style={{ opacity: 0.6 }}>
                                   <CapacityIcons />
                                 </View>
@@ -317,23 +364,37 @@ export default function NavigationPage() {
                           </View>
 
                           {/* D2 Route */}
-                          <View className="flex-row rounded-md border-0 overflow-hidden" style={{ height: 37 }}>
-                            <View className="items-center justify-center px-2.5 py-2" style={{ backgroundColor: '#6F1B6F', width: 38 }}>
-                              <Text className="text-sm font-semibold text-white">D2</Text>
+                          <View
+                            className="flex-row rounded-md border-0 overflow-hidden"
+                            style={{ height: 37 }}
+                          >
+                            <View
+                              className="items-center justify-center px-2.5 py-2"
+                              style={{ backgroundColor: '#6F1B6F', width: 38 }}
+                            >
+                              <Text className="text-sm font-semibold text-white">
+                                D2
+                              </Text>
                             </View>
                             <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
                               <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-900">3 Min</Text>
+                                <Text className="text-sm text-neutral-900">
+                                  3 Min
+                                </Text>
                                 <CapacityIcons />
                               </View>
                               <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-500">7 Min</Text>
+                                <Text className="text-sm text-neutral-500">
+                                  7 Min
+                                </Text>
                                 <View style={{ opacity: 0.6 }}>
                                   <CapacityIcons />
                                 </View>
                               </View>
                               <View className="flex-1 items-center justify-center bg-white">
-                                <Text className="text-sm text-neutral-500">12 Min</Text>
+                                <Text className="text-sm text-neutral-500">
+                                  12 Min
+                                </Text>
                                 <View style={{ opacity: 0.6 }}>
                                   <CapacityIcons />
                                 </View>
@@ -345,7 +406,7 @@ export default function NavigationPage() {
 
                       {/* Route Details - Expandable */}
                       <View className="mb-4">
-                        <Pressable 
+                        <Pressable
                           onPress={() => setRouteExpanded(!routeExpanded)}
                           className="flex-row items-center gap-1"
                         >
@@ -354,7 +415,11 @@ export default function NavigationPage() {
                             height={20}
                             viewBox="0 0 20 20"
                             fill="none"
-                            style={{ transform: [{ rotate: routeExpanded ? '180deg' : '0deg' }] }}
+                            style={{
+                              transform: [
+                                { rotate: routeExpanded ? '180deg' : '0deg' },
+                              ],
+                            }}
                           >
                             <Path
                               d="M5 7.50562L10 12.5056L15 7.50562"
@@ -368,19 +433,30 @@ export default function NavigationPage() {
                             Ride 5 stops (9 mins)
                           </Text>
                         </Pressable>
-                        
+
                         {routeExpanded && (
                           <View className="ml-6 mt-2.5 gap-2.5">
-                            <Text className="text-xs text-neutral-600">LT13</Text>
-                            <Text className="text-xs text-neutral-600">AS5</Text>
-                            <Text className="text-xs text-neutral-600">Opp NUSS</Text>
+                            <Text className="text-xs text-neutral-600">
+                              LT13
+                            </Text>
+                            <Text className="text-xs text-neutral-600">
+                              AS5
+                            </Text>
+                            <Text className="text-xs text-neutral-600">
+                              Opp NUSS
+                            </Text>
                           </View>
                         )}
                       </View>
 
                       {/* Final Stop */}
-                      <View className="items-center py-2" style={{ height: 36 }}>
-                        <Text className="text-base font-medium text-neutral-900">{currentDestination}</Text>
+                      <View
+                        className="items-center py-2"
+                        style={{ height: 36 }}
+                      >
+                        <Text className="text-base font-medium text-neutral-900">
+                          {currentDestination}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -390,7 +466,10 @@ export default function NavigationPage() {
               {/* Connecting line */}
               <View className="my-2.5 flex-row items-center gap-5 pl-2">
                 <DotDivider />
-                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+                <View
+                  className="h-px flex-1"
+                  style={{ backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 4: Final Walk */}
@@ -407,21 +486,29 @@ export default function NavigationPage() {
               {/* Connecting line */}
               <View className="my-2.5 flex-row items-center gap-5 pl-2">
                 <DotDivider />
-                <View className="h-px flex-1" style={{ backgroundColor: '#E4E7E7' }} />
+                <View
+                  className="h-px flex-1"
+                  style={{ backgroundColor: '#E4E7E7' }}
+                />
               </View>
 
               {/* Step 5: Destination */}
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center gap-3">
                   <MapPin />
-                  <Text className="text-base font-medium text-neutral-900">{currentDestination}</Text>
+                  <Text className="text-base font-medium text-neutral-900">
+                    {currentDestination}
+                  </Text>
                 </View>
                 <Text className="text-sm text-neutral-600">9:50AM</Text>
               </View>
             </View>
 
             {/* Divider */}
-            <View className="mb-4 h-px" style={{ backgroundColor: '#E4E7E7' }} />
+            <View
+              className="mb-4 h-px"
+              style={{ backgroundColor: '#E4E7E7' }}
+            />
 
             {/* Reminder Toggle */}
             <View className="mb-4 flex-row items-center justify-between">
@@ -438,7 +525,10 @@ export default function NavigationPage() {
             </View>
 
             {/* Save as Favorite Button */}
-            <Pressable className="flex-row items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 shadow-sm" style={{ height: 36 }}>
+            <Pressable
+              className="flex-row items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 shadow-sm"
+              style={{ height: 36 }}
+            >
               <Text className="text-sm font-medium text-neutral-900">
                 Save as favorite
               </Text>
@@ -450,7 +540,10 @@ export default function NavigationPage() {
 
       {/* Home Indicator */}
       <View className="absolute bottom-0 left-0 right-0 items-center pb-2">
-        <View className="h-1.5 w-39 rounded-full opacity-40" style={{ backgroundColor: '#E4E4E7' }} />
+        <View
+          className="h-1.5 w-39 rounded-full opacity-40"
+          style={{ backgroundColor: '#E4E4E7' }}
+        />
       </View>
     </SafeAreaView>
   );
