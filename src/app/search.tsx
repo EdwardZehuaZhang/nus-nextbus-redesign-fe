@@ -37,6 +37,11 @@ const recentSearches: RecentSearchItem[] = [
   { id: '3', title: 'Kent Ridge MRT', icon: Train },
   { id: '4', title: 'UTown', icon: Van },
   { id: '5', title: 'LT27', icon: Van },
+  { id: '6', title: 'COM3', icon: BookOpen },
+  { id: '7', title: 'PGPR', icon: Van },
+  { id: '8', title: 'Science Library', icon: BookOpen },
+  { id: '9', title: 'Engineering Library', icon: BookOpen },
+  { id: '10', title: 'Business School', icon: BookOpen },
 ];
 
 const popularSearches: PopularSearchItem[] = [
@@ -60,31 +65,31 @@ const popularSearches: PopularSearchItem[] = [
   },
   {
     id: '4',
-    title: 'UTown Infinite Pool',
+    title: 'Science Library',
     image:
       'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
   {
     id: '5',
-    title: 'UTown Infinite Pool',
+    title: 'Kent Ridge MRT',
     image:
       'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
   {
     id: '6',
-    title: 'UTown Infinite Pool',
+    title: 'Central Library',
     image:
       'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
   {
     id: '7',
-    title: 'UTown Infinite Pool',
+    title: 'Engineering Library',
     image:
       'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
   {
     id: '8',
-    title: 'UTown Infinite Pool',
+    title: 'COM3 Building',
     image:
       'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
   },
@@ -93,14 +98,19 @@ const popularSearches: PopularSearchItem[] = [
 export default function SearchPage() {
   const router = useRouter();
   const [searchText, setSearchText] = React.useState('');
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [showAllRecent, setShowAllRecent] = React.useState(false);
+  const [showAllPopular, setShowAllPopular] = React.useState(false);
 
   const handleCancel = () => {
     router.back();
   };
 
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+  const toggleRecentExpanded = () => {
+    setShowAllRecent(!showAllRecent);
+  };
+
+  const togglePopularExpanded = () => {
+    setShowAllPopular(!showAllPopular);
   };
 
   const renderRecentItem = ({
@@ -123,18 +133,18 @@ export default function SearchPage() {
     return (
       <View key={item.id}>
         <Pressable
-          className="flex-row items-center gap-2 py-3"
+          className="flex-row items-center gap-2 py-2"
           onPress={handleRecentPress}
         >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100">
-            <IconComponent />
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="w-5 h-5" />
           </View>
           <Text className="flex-1 text-base font-medium text-neutral-900">
             {item.title}
           </Text>
         </Pressable>
         {!isLast && (
-          <View className="h-px bg-neutral-200" style={{ width: 390 }} />
+          <View className="w-full h-px bg-neutral-200 my-2" />
         )}
       </View>
     );
@@ -153,7 +163,7 @@ export default function SearchPage() {
       <Pressable
         key={item.id}
         className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
-        style={{ width: 154, height: 116 }}
+        style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
         onPress={handleNavigationPress}
       >
         <View className="relative h-full w-full">
@@ -162,7 +172,7 @@ export default function SearchPage() {
             className="h-full w-full"
             style={{ resizeMode: 'cover' }}
           />
-          <View className="absolute inset-0 bg-black/25" />
+          <View className="absolute inset-0 bg-black/40" />
           <View className="absolute bottom-0 left-0 right-0 p-3">
             <Text className="text-lg font-bold text-white leading-tight">
               {item.title}
@@ -174,21 +184,27 @@ export default function SearchPage() {
   };
 
   const renderPopularSearches = () => {
-    const displayItems = isExpanded
+    const displayItems = showAllPopular
       ? popularSearches
       : popularSearches.slice(0, 3);
 
-    if (isExpanded) {
+    if (showAllPopular) {
       return (
-        <View
-          style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 8,
-            width: '100%',
-          }}
-        >
-          {displayItems.map((item) => renderPopularItem({ item }))}
+        <View className="w-full" style={{ height: 488, gap: 8 }}>
+          <View className="flex-row w-full" style={{ gap: 8 }}>
+            <View className="flex-1" style={{ gap: 8 }}>
+              {/* Column 1 - Items 1, 3, 5, 7 */}
+              {displayItems
+                .filter((_, index) => index % 2 === 0)
+                .map((item) => renderPopularItem({ item }))}
+            </View>
+            <View className="flex-1" style={{ gap: 8 }}>
+              {/* Column 2 - Items 2, 4, 6, 8 */}
+              {displayItems
+                .filter((_, index) => index % 2 === 1)
+                .map((item) => renderPopularItem({ item }))}
+            </View>
+          </View>
         </View>
       );
     } else {
@@ -248,97 +264,50 @@ export default function SearchPage() {
           </View>
 
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-            {isExpanded ? (
-              <>
-                {/* Popular Searches - Expanded View */}
-                <View className="mb-8">
-                  <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-neutral-500">
-                      Popular Searches
-                    </Text>
-                    <Pressable onPress={toggleExpanded}>
-                      <Text
-                        className="text-sm font-medium"
-                        style={{ color: '#274F9C' }}
-                      >
-                        View Less
-                      </Text>
-                    </Pressable>
-                  </View>
+            {/* Recent Searches Section */}
+            <View className="mb-8">
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-sm font-medium text-neutral-500">
+                  Recents
+                </Text>
+                <Pressable onPress={toggleRecentExpanded}>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: '#274F9C' }}
+                  >
+                    {showAllRecent ? 'View Less' : 'View More'}
+                  </Text>
+                </Pressable>
+              </View>
 
-                  {renderPopularSearches()}
-                </View>
+              <View>
+                {(showAllRecent ? recentSearches : recentSearches.slice(0, 3)).map((item, index, array) =>
+                  renderRecentItem({
+                    item,
+                    isLast: index === array.length - 1,
+                  })
+                )}
+              </View>
+            </View>
 
-                {/* Recent Searches */}
-                <View>
-                  <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-neutral-500">
-                      Recents
-                    </Text>
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: '#274F9C' }}
-                    >
-                      View More
-                    </Text>
-                  </View>
+            {/* Popular Searches Section */}
+            <View>
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-sm font-medium text-neutral-500">
+                  Popular Searches
+                </Text>
+                <Pressable onPress={togglePopularExpanded}>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: '#274F9C' }}
+                  >
+                    {showAllPopular ? 'View Less' : 'View More'}
+                  </Text>
+                </Pressable>
+              </View>
 
-                  <View>
-                    {recentSearches.map((item, index) =>
-                      renderRecentItem({
-                        item,
-                        isLast: index === recentSearches.length - 1,
-                      })
-                    )}
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                {/* Recent Searches */}
-                <View className="mb-8">
-                  <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-neutral-500">
-                      Recents
-                    </Text>
-                    <Text
-                      className="text-sm font-medium"
-                      style={{ color: '#274F9C' }}
-                    >
-                      View More
-                    </Text>
-                  </View>
-
-                  <View>
-                    {recentSearches.map((item, index) =>
-                      renderRecentItem({
-                        item,
-                        isLast: index === recentSearches.length - 1,
-                      })
-                    )}
-                  </View>
-                </View>
-
-                {/* Popular Searches - Normal View */}
-                <View>
-                  <View className="mb-2 flex-row items-center justify-between">
-                    <Text className="text-sm font-medium text-neutral-500">
-                      Popular Searches
-                    </Text>
-                    <Pressable onPress={toggleExpanded}>
-                      <Text
-                        className="text-sm font-medium"
-                        style={{ color: '#274F9C' }}
-                      >
-                        View More
-                      </Text>
-                    </Pressable>
-                  </View>
-
-                  {renderPopularSearches()}
-                </View>
-              </>
-            )}
+              {renderPopularSearches()}
+            </View>
           </ScrollView>
         </View>
       </View>
