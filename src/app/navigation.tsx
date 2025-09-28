@@ -13,7 +13,71 @@ import {
   View,
 } from '@/components/ui';
 
-// SVG Icons from Figma design
+// Status Bar Icons
+const CellularIcon = () => (
+  <Svg width={19} height={12} viewBox="0 0 20 13" fill="none">
+    <Path
+      d="M2.41296 7.90222C3.04622 7.90222 3.56038 8.41546 3.56042 9.04871V11.3417C3.56042 11.975 3.04625 12.4891 2.41296 12.4891H1.26648C0.633276 12.489 0.119995 11.9749 0.119995 11.3417V9.04871C0.120043 8.41552 0.633306 7.90232 1.26648 7.90222H2.41296ZM7.76453 5.60925C8.39775 5.60933 8.91101 6.1225 8.91101 6.75574V11.3417C8.91101 11.9749 8.39775 12.4891 7.76453 12.4891H6.61804C5.98476 12.4891 5.47058 11.975 5.47058 11.3417V6.75574C5.47058 6.12245 5.98476 5.60925 6.61804 5.60925H7.76453ZM13.1151 2.93347C13.7484 2.93347 14.2625 3.44669 14.2626 4.07996V11.3427C14.2623 11.9757 13.7483 12.4891 13.1151 12.4891H11.9686C11.3356 12.489 10.8224 11.9756 10.8221 11.3427V4.07996C10.8222 3.44679 11.3355 2.93363 11.9686 2.93347H13.1151ZM18.4667 0.25769C19.0999 0.257699 19.613 0.770996 19.6132 1.40417V11.3427C19.6129 11.9757 19.0998 12.4891 18.4667 12.4891H17.3202C16.6871 12.4891 16.174 11.9757 16.1737 11.3427V1.40417C16.1738 0.770991 16.687 0.25769 17.3202 0.25769H18.4667Z"
+      fill="#27272A"
+    />
+  </Svg>
+);
+
+const WifiIcon = () => (
+  <Svg width={18} height={13} viewBox="0 0 18 14" fill="none">
+    <Path
+      d="M6.59473 10.535C8.06312 9.29429 10.2132 9.29433 11.6816 10.535C11.7555 10.6018 11.7987 10.6963 11.8008 10.7958C11.8028 10.8952 11.7634 10.9908 11.6924 11.0604L9.39355 13.3798C9.32627 13.4477 9.23432 13.4861 9.13867 13.4862C9.04284 13.4862 8.95021 13.4478 8.88281 13.3798L6.58301 11.0604C6.5122 10.9907 6.47356 10.8951 6.47559 10.7958C6.47769 10.6963 6.52079 10.6017 6.59473 10.535ZM3.52637 7.44226C6.6902 4.50179 11.5891 4.50179 14.7529 7.44226C14.8244 7.51121 14.8652 7.60573 14.8662 7.70496C14.8672 7.80403 14.8286 7.89927 14.7588 7.9696L13.4297 9.31238C13.2927 9.44934 13.0712 9.45162 12.9307 9.31824C11.8918 8.37831 10.5402 7.85828 9.13867 7.85828C7.73798 7.85886 6.3869 8.37885 5.34863 9.31824C5.20814 9.45162 4.9866 9.44933 4.84961 9.31238L3.52148 7.9696C3.45135 7.89933 3.41216 7.8042 3.41309 7.70496C3.41402 7.6057 3.4549 7.51121 3.52637 7.44226ZM0.458008 4.3573C5.31062 -0.288962 12.9659 -0.289159 17.8184 4.3573C17.8886 4.42633 17.9281 4.52059 17.9287 4.61902C17.9293 4.71741 17.8907 4.81188 17.8213 4.88171L16.4902 6.22351C16.3531 6.36122 16.1304 6.363 15.9912 6.22742C14.1425 4.4715 11.6894 3.49228 9.13867 3.49207C6.58748 3.49206 4.13323 4.47118 2.28418 6.22742C2.14504 6.36321 1.92219 6.36143 1.78516 6.22351L0.454102 4.88171C0.384796 4.81184 0.346049 4.71739 0.34668 4.61902C0.347328 4.52058 0.387715 4.42628 0.458008 4.3573Z"
+      fill="#27272A"
+    />
+  </Svg>
+);
+
+const BatteryIcon = () => (
+  <View className="relative">
+    <View
+      style={{
+        width: 25,
+        height: 13,
+        borderRadius: 3,
+        borderWidth: 1,
+        borderColor: '#27272A',
+        opacity: 0.35,
+      }}
+    />
+    <Svg
+      style={{
+        position: 'absolute',
+        right: -2,
+        top: 4,
+        width: 2,
+        height: 5,
+      }}
+      width="2"
+      height="5"
+      viewBox="0 0 2 5"
+      fill="none"
+    >
+      <Path
+        opacity="0.4"
+        d="M0.0354004 0.0799561V4.66662C0.958159 4.27816 1.55822 3.37448 1.55822 2.37329C1.55822 1.3721 0.958159 0.46842 0.0354004 0.0799561Z"
+        fill="#27272A"
+      />
+    </Svg>
+    <View
+      style={{
+        position: 'absolute',
+        left: 2,
+        top: 2,
+        width: 21,
+        height: 8,
+        borderRadius: 1.5,
+        backgroundColor: '#27272A',
+      }}
+    />
+  </View>
+);
+
+// Navigation Icons
 const NavigationArrow = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
     <Path
@@ -110,9 +174,9 @@ const DotDivider = () => (
   </Svg>
 );
 
-// Capacity Icons
-const CapacityIcons = () => (
-  <Svg width={30} height={23} viewBox="0 0 30 23" fill="none">
+// Capacity Icons with people
+const CapacityIcons = ({ opacity = 1 }: { opacity?: number }) => (
+  <Svg width={30} height={23} viewBox="0 0 30 23" fill="none" style={{ opacity }}>
     <Path
       opacity="0.5"
       d="M21.4932 17.075C20.5629 15.6493 19.1978 14.5615 17.6005 13.9727C18.646 13.2684 19.3838 12.1923 19.6638 10.9632C19.9438 9.73412 19.7449 8.44455 19.1076 7.35697C18.4702 6.26939 17.4424 5.46554 16.2333 5.10905C15.0242 4.75256 13.7247 4.87022 12.5993 5.43809C12.5563 5.4603 12.5187 5.49171 12.4891 5.53009C12.4596 5.56846 12.4388 5.61286 12.4284 5.66015C12.4179 5.70743 12.4179 5.75644 12.4285 5.80371C12.439 5.85097 12.4599 5.89534 12.4895 5.93366C13.3263 6.97751 13.8069 8.2619 13.8609 9.59868C13.9148 10.9355 13.5393 12.2544 12.7893 13.3623C12.7408 13.4347 12.7229 13.5233 12.7395 13.6089C12.756 13.6944 12.8057 13.77 12.8777 13.8191C13.8555 14.5015 14.6926 15.3661 15.3432 16.3655C15.6055 16.7673 15.7127 17.2508 15.6446 17.7258C15.637 17.7731 15.6397 17.8214 15.6526 17.8675C15.6654 17.9136 15.6882 17.9564 15.7192 17.9929C15.7502 18.0293 15.7888 18.0586 15.8323 18.0786C15.8757 18.0987 15.923 18.1091 15.9709 18.1091H20.9514C21.0969 18.1091 21.2384 18.0611 21.3538 17.9726C21.4692 17.884 21.5522 17.7598 21.5899 17.6193C21.6128 17.5269 21.6161 17.4306 21.5995 17.3369C21.5828 17.2431 21.5466 17.1539 21.4932 17.075Z"
@@ -130,6 +194,26 @@ const CapacityIcons = () => (
   </Svg>
 );
 
+const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
+  <Svg
+    width={20}
+    height={20}
+    viewBox="0 0 20 20"
+    fill="none"
+    style={{
+      transform: [{ rotate: expanded ? '180deg' : '0deg' }],
+    }}
+  >
+    <Path
+      d="M5 7.50562L10 12.5056L15 7.50562"
+      stroke="#211F26"
+      strokeWidth="1.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export default function NavigationPage() {
   const router = useRouter();
   const { destination } = useLocalSearchParams();
@@ -141,35 +225,34 @@ export default function NavigationPage() {
     typeof destination === 'string' ? destination : 'COM3';
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
+    <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
 
       {/* Status Bar */}
-      <View className="flex-row items-center justify-between px-6 py-3">
-        <Text className="text-lg font-semibold" style={{ color: '#27272A' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 24,
+          paddingTop: 8,
+          height: 50,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 17,
+            fontWeight: '600',
+            color: '#27272A',
+            letterSpacing: -0.344,
+          }}
+        >
           9:41
         </Text>
-        <View className="flex-row items-center gap-2">
-          {/* Cellular */}
-          <Svg width={19} height={12} viewBox="0 0 20 13" fill="none">
-            <Path
-              d="M2.41296 7.90222C3.04622 7.90222 3.56038 8.41546 3.56042 9.04871V11.3417C3.56042 11.975 3.04625 12.4891 2.41296 12.4891H1.26648C0.633276 12.489 0.119995 11.9749 0.119995 11.3417V9.04871C0.120043 8.41552 0.633306 7.90232 1.26648 7.90222H2.41296ZM7.76453 5.60925C8.39775 5.60933 8.91101 6.1225 8.91101 6.75574V11.3417C8.91101 11.9749 8.39775 12.4891 7.76453 12.4891H6.61804C5.98476 12.4891 5.47058 11.975 5.47058 11.3417V6.75574C5.47058 6.12245 5.98476 5.60925 6.61804 5.60925H7.76453ZM13.1151 2.93347C13.7484 2.93347 14.2625 3.44669 14.2626 4.07996V11.3427C14.2623 11.9757 13.7483 12.4891 13.1151 12.4891H11.9686C11.3356 12.489 10.8224 11.9756 10.8221 11.3427V4.07996C10.8222 3.44679 11.3355 2.93363 11.9686 2.93347H13.1151ZM18.4667 0.25769C19.0999 0.257699 19.613 0.770996 19.6132 1.40417V11.3427C19.6129 11.9757 19.0998 12.4891 18.4667 12.4891H17.3202C16.6871 12.4891 16.174 11.9757 16.1737 11.3427V1.40417C16.1738 0.770991 16.687 0.25769 17.3202 0.25769H18.4667Z"
-              fill="#27272A"
-            />
-          </Svg>
-          {/* WiFi */}
-          <Svg width={18} height={13} viewBox="0 0 18 14" fill="none">
-            <Path
-              d="M6.59473 10.535C8.06312 9.29429 10.2132 9.29433 11.6816 10.535C11.7555 10.6018 11.7987 10.6963 11.8008 10.7958C11.8028 10.8952 11.7634 10.9908 11.6924 11.0604L9.39355 13.3798C9.32627 13.4477 9.23432 13.4861 9.13867 13.4862C9.04284 13.4862 8.95021 13.4478 8.88281 13.3798L6.58301 11.0604C6.5122 10.9907 6.47356 10.8951 6.47559 10.7958C6.47769 10.6963 6.52079 10.6017 6.59473 10.535ZM3.52637 7.44226C6.6902 4.50179 11.5891 4.50179 14.7529 7.44226C14.8244 7.51121 14.8652 7.60573 14.8662 7.70496C14.8672 7.80403 14.8286 7.89927 14.7588 7.9696L13.4297 9.31238C13.2927 9.44934 13.0712 9.45162 12.9307 9.31824C11.8918 8.37831 10.5402 7.85828 9.13867 7.85828C7.73798 7.85886 6.3869 8.37885 5.34863 9.31824C5.20814 9.45162 4.9866 9.44933 4.84961 9.31238L3.52148 7.9696C3.45135 7.89933 3.41216 7.8042 3.41309 7.70496C3.41402 7.6057 3.4549 7.51121 3.52637 7.44226ZM0.458008 4.3573C5.31062 -0.288962 12.9659 -0.289159 17.8184 4.3573C17.8886 4.42633 17.9281 4.52059 17.9287 4.61902C17.9293 4.71741 17.8907 4.81188 17.8213 4.88171L16.4902 6.22351C16.3531 6.36122 16.1304 6.363 15.9912 6.22742C14.1425 4.4715 11.6894 3.49228 9.13867 3.49207C6.58748 3.49206 4.13323 4.47118 2.28418 6.22742C2.14504 6.36321 1.92219 6.36143 1.78516 6.22351L0.454102 4.88171C0.384796 4.81184 0.346049 4.71739 0.34668 4.61902C0.347328 4.52058 0.387715 4.42628 0.458008 4.3573Z"
-              fill="#27272A"
-            />
-          </Svg>
-          {/* Battery */}
-          <View className="relative">
-            <View className="w-6 h-3 border border-zinc-800 rounded-sm opacity-35" />
-            <View className="absolute right-0 top-1 w-0.5 h-1 bg-zinc-800 opacity-40" />
-            <View className="absolute left-0.5 top-0.5 w-5 h-2 bg-zinc-800 rounded-sm" />
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <CellularIcon />
+          <WifiIcon />
+          <BatteryIcon />
         </View>
       </View>
 
@@ -184,12 +267,28 @@ export default function NavigationPage() {
         />
 
         {/* Location Input Card */}
-        <View className="mx-2.5 mt-0 rounded-xl border border-neutral-200 bg-white p-3 shadow-sm">
+        <View
+          style={{
+            marginHorizontal: 10,
+            marginTop: 0,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#E5E5E5',
+            backgroundColor: '#FFFFFF',
+            padding: 12,
+            paddingHorizontal: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 2,
+          }}
+        >
           {/* Your Location */}
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <NavigationArrow />
-              <Text className="text-base font-medium text-neutral-900">
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                 Your location
               </Text>
             </View>
@@ -197,19 +296,16 @@ export default function NavigationPage() {
           </View>
 
           {/* Divider with dots */}
-          <View className="my-2.5 flex-row items-center gap-5 pl-2">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
             <DotDivider />
-            <View
-              className="h-px flex-1"
-              style={{ backgroundColor: '#E4E7E7' }}
-            />
+            <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
           </View>
 
           {/* Destination */}
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-3">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <MapPin />
-              <Text className="text-base font-medium text-neutral-900">
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                 {currentDestination}
               </Text>
             </View>
@@ -217,319 +313,529 @@ export default function NavigationPage() {
           </View>
 
           {/* Divider with dots */}
-          <View className="my-2.5 flex-row items-center gap-5 pl-2">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
             <DotDivider />
-            <View
-              className="h-px flex-1"
-              style={{ backgroundColor: '#E4E7E7' }}
-            />
+            <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
           </View>
 
           {/* Add Stop */}
-          <View className="flex-row items-center gap-1">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <PlusCircle />
-            <Text
-              className="text-base font-medium"
-              style={{ color: '#274F9C' }}
-            >
+            <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
               Add Stop
             </Text>
           </View>
         </View>
 
         {/* Journey Details Card */}
-        <View className="absolute bottom-0 left-0 right-0 rounded-t-xl border border-neutral-200 bg-white p-5 shadow-xl">
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            borderWidth: 1,
+            borderColor: '#E5E5E5',
+            backgroundColor: '#FFFFFF',
+            padding: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 3,
+            elevation: 5,
+            height: 744,
+          }}
+        >
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Journey Time Header */}
-            <View className="mb-4 flex-row items-center justify-between pb-2">
-              <Text className="text-2xl font-medium text-neutral-900">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 8, marginBottom: 16 }}>
+              <Text style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}>
                 28 Mins
               </Text>
               <View
-                className="flex-row items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
-                style={{ width: 154, height: 32 }}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: '#E5E5E5',
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 2,
+                  elevation: 1,
+                  width: 154,
+                  height: 32,
+                }}
               >
-                <Text className="text-sm text-neutral-900">Arrive 9:15PM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>Arrive 9:15PM</Text>
                 <ChevronDown />
               </View>
             </View>
 
             {/* Journey Steps */}
-            <View className="mb-6 gap-0">
+            <View style={{ marginBottom: 16 }}>
               {/* Step 1: Your location */}
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <NavigationArrow />
-                  <Text className="text-base font-medium text-neutral-900">
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                     Your location
                   </Text>
                 </View>
-                <Text className="text-sm text-neutral-600">9:44AM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
               </View>
 
               {/* Connecting line */}
-              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
                 <DotDivider />
-                <View
-                  className="h-px flex-1"
-                  style={{ backgroundColor: '#E4E7E7' }}
-                />
+                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 2: Walk */}
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <PersonIcon />
-                  <Text className="text-base font-medium text-neutral-900">
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                     Walk 10 min
                   </Text>
                 </View>
-                <Text className="text-sm text-neutral-600">9:44AM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
               </View>
 
               {/* Connecting line */}
-              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
                 <DotDivider />
-                <View
-                  className="h-px flex-1"
-                  style={{ backgroundColor: '#E4E7E7' }}
-                />
+                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 3: Bus Journey */}
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1">
-                  <View className="flex-row items-center gap-4">
-                    {/* Blue line indicator */}
-                    <View className="h-58 w-5 items-center justify-center">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 }}>
+                  {/* Blue line indicator with bus icons */}
+                  <View style={{ width: 21, height: 230, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+                    <View
+                      style={{
+                        width: 13,
+                        paddingHorizontal: 16,
+                        paddingVertical: 4,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: 58,
+                        backgroundColor: '#274F9C',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 2,
+                        elevation: 1,
+                        alignSelf: 'stretch',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <View
+                      style={{
+                        height: 280,
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        position: 'absolute',
+                        right: -6,
+                        top: -26,
+                      }}
+                    >
                       <View
-                        className="h-58 w-3 rounded-full"
-                        style={{ backgroundColor: '#274F9C' }}
-                      />
-                      {/* Bus icons positioned on the line */}
-                      <View className="absolute top-4 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
+                        style={{
+                          padding: 6,
+                          borderRadius: 97,
+                          borderWidth: 1,
+                          borderColor: '#E5E5E5',
+                          backgroundColor: '#F5F5F5',
+                        }}
+                      >
                         <VanIcon />
                       </View>
-                      <View className="absolute top-16 rounded-full border border-neutral-200 bg-neutral-100 p-1.5">
+                      <View
+                        style={{
+                          padding: 6,
+                          borderRadius: 97,
+                          borderWidth: 1,
+                          borderColor: '#E5E5E5',
+                          backgroundColor: '#F5F5F5',
+                        }}
+                      >
                         <VanIcon />
                       </View>
                     </View>
+                  </View>
 
-                    <View className="flex-1">
-                      {/* Ventus */}
-                      <View className="mb-4">
-                        <Text className="mb-2 text-base font-medium text-neutral-900">
-                          Ventus
-                        </Text>
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 16, flex: 1 }}>
+                    {/* Ventus */}
+                    <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8, alignSelf: 'stretch' }}>
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                        Ventus
+                      </Text>
 
-                        {/* Bus Routes */}
-                        <View className="gap-2">
-                          {/* A1 Route */}
+                      {/* Bus Routes */}
+                      <View style={{ gap: 2 }}>
+                        {/* A1 Route */}
+                        <View style={{ width: 353, height: 37, alignItems: 'center', gap: -0.881, borderRadius: 5.286, borderWidth: 0, borderColor: '#E5E5E5' }}>
                           <View
-                            className="flex-row rounded-md border-0 overflow-hidden"
-                            style={{ height: 37 }}
+                            style={{
+                              width: 38,
+                              height: 37,
+                              paddingHorizontal: 10.572,
+                              paddingVertical: 7.048,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              borderTopLeftRadius: 5.286,
+                              borderBottomLeftRadius: 5.286,
+                              backgroundColor: '#F00',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 0.881 },
+                              shadowOpacity: 0.1,
+                              shadowRadius: 1.762,
+                              elevation: 1,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' }}>
+                              A1
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              flex: 1,
+                              alignSelf: 'stretch',
+                              borderTopRightRadius: 5.286,
+                              borderBottomRightRadius: 5.286,
+                              borderTopWidth: 0.881,
+                              borderRightWidth: 0.881,
+                              borderBottomWidth: 0.881,
+                              borderColor: '#E5E5E5',
+                            }}
                           >
                             <View
-                              className="items-center justify-center px-2.5 py-2"
-                              style={{ backgroundColor: '#F00', width: 38 }}
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderRightWidth: 0.881,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
                             >
-                              <Text className="text-sm font-semibold text-white">
-                                A1
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26', textAlign: 'center' }}>
+                                1 Min
                               </Text>
+                              <CapacityIcons />
                             </View>
-                            <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-900">
-                                  1 Min
-                                </Text>
-                                <CapacityIcons />
-                              </View>
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-500">
-                                  5 Min
-                                </Text>
-                                <View style={{ opacity: 0.6 }}>
-                                  <CapacityIcons />
-                                </View>
-                              </View>
-                              <View className="flex-1 items-center justify-center bg-white">
-                                <Text className="text-sm text-neutral-500">
-                                  10 Min
-                                </Text>
-                                <View style={{ opacity: 0.6 }}>
-                                  <CapacityIcons />
-                                </View>
-                              </View>
+                            <View
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderRightWidth: 0.881,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                                5 Min
+                              </Text>
+                              <CapacityIcons opacity={0.6} />
+                            </View>
+                            <View
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                                10 Min
+                              </Text>
+                              <CapacityIcons opacity={0.6} />
                             </View>
                           </View>
+                        </View>
 
-                          {/* D2 Route */}
+                        {/* D2 Route */}
+                        <View style={{ width: 353, height: 37, alignItems: 'center', gap: -0.881, borderRadius: 5.286, borderWidth: 0, borderColor: '#E5E5E5' }}>
                           <View
-                            className="flex-row rounded-md border-0 overflow-hidden"
-                            style={{ height: 37 }}
+                            style={{
+                              width: 38,
+                              height: 37,
+                              paddingHorizontal: 10.572,
+                              paddingVertical: 7.048,
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                              borderTopLeftRadius: 5.286,
+                              borderBottomLeftRadius: 5.286,
+                              backgroundColor: '#6F1B6F',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 0.881 },
+                              shadowOpacity: 0.1,
+                              shadowRadius: 1.762,
+                              elevation: 1,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: '#FFFFFF', textAlign: 'center' }}>
+                              D2
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              flex: 1,
+                              alignSelf: 'stretch',
+                              borderTopRightRadius: 5.286,
+                              borderBottomRightRadius: 5.286,
+                              borderTopWidth: 0.881,
+                              borderRightWidth: 0.881,
+                              borderBottomWidth: 0.881,
+                              borderColor: '#E5E5E5',
+                            }}
                           >
                             <View
-                              className="items-center justify-center px-2.5 py-2"
-                              style={{ backgroundColor: '#6F1B6F', width: 38 }}
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderRightWidth: 0.881,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
                             >
-                              <Text className="text-sm font-semibold text-white">
-                                D2
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26', textAlign: 'center' }}>
+                                3 Min
                               </Text>
+                              <CapacityIcons />
                             </View>
-                            <View className="flex-1 flex-row border border-neutral-200 border-l-0 rounded-r-md">
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-900">
-                                  3 Min
-                                </Text>
-                                <CapacityIcons />
-                              </View>
-                              <View className="flex-1 items-center justify-center border-r border-neutral-200 bg-white">
-                                <Text className="text-sm text-neutral-500">
-                                  7 Min
-                                </Text>
-                                <View style={{ opacity: 0.6 }}>
-                                  <CapacityIcons />
-                                </View>
-                              </View>
-                              <View className="flex-1 items-center justify-center bg-white">
-                                <Text className="text-sm text-neutral-500">
-                                  12 Min
-                                </Text>
-                                <View style={{ opacity: 0.6 }}>
-                                  <CapacityIcons />
-                                </View>
-                              </View>
+                            <View
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderRightWidth: 0.881,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                                7 Min
+                              </Text>
+                              <CapacityIcons opacity={0.6} />
+                            </View>
+                            <View
+                              style={{
+                                height: 37,
+                                paddingHorizontal: 10.572,
+                                paddingVertical: 7.048,
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flex: 1,
+                                borderBottomWidth: 0.881,
+                                borderColor: '#E5E5E5',
+                                backgroundColor: '#FFFFFF',
+                                flexDirection: 'row',
+                              }}
+                            >
+                              <Text style={{ fontSize: 14, fontWeight: '500', color: '#737373', textAlign: 'center' }}>
+                                12 Min
+                              </Text>
+                              <CapacityIcons opacity={0.6} />
                             </View>
                           </View>
                         </View>
                       </View>
+                    </View>
 
-                      {/* Route Details - Expandable */}
-                      <View className="mb-4">
-                        <Pressable
-                          onPress={() => setRouteExpanded(!routeExpanded)}
-                          className="flex-row items-center gap-1"
-                        >
-                          <Svg
-                            width={20}
-                            height={20}
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            style={{
-                              transform: [
-                                { rotate: routeExpanded ? '180deg' : '0deg' },
-                              ],
-                            }}
-                          >
-                            <Path
-                              d="M5 7.50562L10 12.5056L15 7.50562"
-                              stroke="#211F26"
-                              strokeWidth="1.25"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </Svg>
-                          <Text className="text-xs font-medium text-neutral-900">
-                            Ride 5 stops (9 mins)
-                          </Text>
-                        </Pressable>
-
-                        {routeExpanded && (
-                          <View className="ml-6 mt-2.5 gap-2.5">
-                            <Text className="text-xs text-neutral-600">
-                              LT13
-                            </Text>
-                            <Text className="text-xs text-neutral-600">
-                              AS5
-                            </Text>
-                            <Text className="text-xs text-neutral-600">
-                              Opp NUSS
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Final Stop */}
-                      <View
-                        className="items-center py-2"
-                        style={{ height: 36 }}
+                    {/* Route Details - Expandable */}
+                    <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, alignSelf: 'stretch' }}>
+                      <Pressable
+                        onPress={() => setRouteExpanded(!routeExpanded)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'stretch' }}
                       >
-                        <Text className="text-base font-medium text-neutral-900">
-                          {currentDestination}
+                        <ChevronExpand expanded={routeExpanded} />
+                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#09090B' }}>
+                          Ride 5 stops (9 mins)
                         </Text>
-                      </View>
+                      </Pressable>
+
+                      {routeExpanded && (
+                        <>
+                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>LT13</Text>
+                          </View>
+                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>AS5</Text>
+                          </View>
+                          <View style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 10, paddingHorizontal: 24 }}>
+                            <Text style={{ fontSize: 12, color: '#09090B' }}>Opp NUSS</Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+
+                    {/* Final Stop */}
+                    <View style={{ height: 36, justifyContent: 'center', alignItems: 'center', gap: 10 }}>
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                        {currentDestination}
+                      </Text>
                     </View>
                   </View>
                 </View>
               </View>
 
               {/* Connecting line */}
-              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
                 <DotDivider />
-                <View
-                  className="h-px flex-1"
-                  style={{ backgroundColor: '#E4E7E7' }}
-                />
+                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 4: Final Walk */}
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <PersonIcon />
-                  <Text className="text-base font-medium text-neutral-900">
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                     Walk 10 min
                   </Text>
                 </View>
-                <Text className="text-sm text-neutral-600">9:44AM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
               </View>
 
               {/* Connecting line */}
-              <View className="my-2.5 flex-row items-center gap-5 pl-2">
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, paddingLeft: 9, height: 10, justifyContent: 'center' }}>
                 <DotDivider />
-                <View
-                  className="h-px flex-1"
-                  style={{ backgroundColor: '#E4E7E7' }}
-                />
+                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
               </View>
 
               {/* Step 5: Destination */}
-              <View className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-3">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <MapPin />
-                  <Text className="text-base font-medium text-neutral-900">
+                  <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                     {currentDestination}
                   </Text>
                 </View>
-                <Text className="text-sm text-neutral-600">9:50AM</Text>
+                <Text style={{ fontSize: 14, color: '#09090B' }}>9:50AM</Text>
               </View>
             </View>
 
             {/* Divider */}
-            <View
-              className="mb-4 h-px"
-              style={{ backgroundColor: '#E4E7E7' }}
-            />
+            <View style={{ width: 390, height: 1, backgroundColor: '#E4E7E7', marginBottom: 16 }} />
 
             {/* Reminder Toggle */}
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-sm text-neutral-900">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', alignSelf: 'stretch', marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, color: '#09090B' }}>
                 Remind you to leave on time
               </Text>
-              <Switch
-                value={reminderEnabled}
-                onValueChange={setReminderEnabled}
-                trackColor={{ false: '#D9D9D9', true: '#274F9C' }}
-                thumbColor={'#FFFFFF'}
-                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-              />
+              <Svg width={44} height={35} viewBox="0 0 44 35" fill="none">
+                <Rect x="8" y="0.00561523" width="36" height="19.9944" rx="9.99719" fill="#D9D9D9" />
+                <G filter="url(#filter0_dd_530_1562)">
+                  <Circle cx="17.9972" cy="10.0027" r="8.51613" fill="white" />
+                </G>
+                <Defs>
+                  <filter
+                    id="filter0_dd_530_1562"
+                    x="0.594686"
+                    y="0.00550699"
+                    width="34.805"
+                    height="34.805"
+                    filterUnits="userSpaceOnUse"
+                    colorInterpolationFilters="sRGB"
+                  >
+                    <feFlood floodOpacity="0" result="BackgroundImageFix" />
+                    <feColorMatrix
+                      in="SourceAlpha"
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                      result="hardAlpha"
+                    />
+                    <feMorphology radius="2.96213" operator="erode" in="SourceAlpha" result="effect1_dropShadow_530_1562" />
+                    <feOffset dy="2.96213" />
+                    <feGaussianBlur stdDeviation="2.2216" />
+                    <feComposite in2="hardAlpha" operator="out" />
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
+                    <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_530_1562" />
+                    <feColorMatrix
+                      in="SourceAlpha"
+                      type="matrix"
+                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                      result="hardAlpha"
+                    />
+                    <feMorphology radius="2.2216" operator="erode" in="SourceAlpha" result="effect2_dropShadow_530_1562" />
+                    <feOffset dy="7.40533" />
+                    <feGaussianBlur stdDeviation="5.554" />
+                    <feComposite in2="hardAlpha" operator="out" />
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0" />
+                    <feBlend mode="normal" in2="effect1_dropShadow_530_1562" result="effect2_dropShadow_530_1562" />
+                    <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow_530_1562" result="shape" />
+                  </filter>
+                </Defs>
+              </Svg>
             </View>
 
             {/* Save as Favorite Button */}
             <Pressable
-              className="flex-row items-center justify-center gap-1 rounded-lg border border-neutral-200 bg-white px-4 py-2 shadow-sm"
-              style={{ height: 36 }}
+              style={{
+                height: 36,
+                paddingVertical: 8,
+                paddingLeft: 16,
+                paddingRight: 13,
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: 4,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#E5E5E5',
+                backgroundColor: '#FFFFFF',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 1,
+                flexDirection: 'row',
+              }}
             >
-              <Text className="text-sm font-medium text-neutral-900">
+              <Text style={{ fontSize: 14, fontWeight: '500', color: '#211F26' }}>
                 Save as favorite
               </Text>
               <BookmarkIcon />
@@ -539,12 +845,18 @@ export default function NavigationPage() {
       </View>
 
       {/* Home Indicator */}
-      <View className="absolute bottom-0 left-0 right-0 items-center pb-2">
-        <View
-          className="h-1.5 w-39 rounded-full opacity-40"
-          style={{ backgroundColor: '#E4E4E7' }}
-        />
-      </View>
-    </SafeAreaView>
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 34,
+          left: 138,
+          width: 154,
+          height: 6,
+          borderRadius: 114.667,
+          opacity: 0.4,
+          backgroundColor: '#E4E4E7',
+        }}
+      />
+    </View>
   );
 }
