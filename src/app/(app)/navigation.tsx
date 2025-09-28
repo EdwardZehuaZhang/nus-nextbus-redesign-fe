@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from '@/components/ui';
+import { XIcon } from '@/components/ui/icons/x-icon';
 
 // Status Bar Icons
 const CellularIcon = () => (
@@ -433,6 +434,15 @@ export default function NavigationPage() {
                 </Text>
                 <ChevronDown />
               </View>
+              <Pressable
+                onPress={() => router.push('/(app)/transit')}
+                style={{
+                  marginLeft: 8,
+                  padding: 4,
+                }}
+              >
+                <XIcon width={24} height={24} fill="#09090B" />
+              </Pressable>
             </View>
 
             {/* Journey Steps */}

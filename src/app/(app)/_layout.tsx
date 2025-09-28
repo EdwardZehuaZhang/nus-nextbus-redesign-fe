@@ -60,6 +60,13 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="navigation"
+        options={{
+          title: 'Navigation',
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

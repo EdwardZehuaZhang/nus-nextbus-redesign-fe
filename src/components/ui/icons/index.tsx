@@ -20,4 +20,5 @@ export * from './van';
 export * from './website';
 export * from './map-trifold';
 export * from './check-square';
+export * from './x-icon';
 export * from '../capacity-icons';

@@ -115,7 +115,7 @@ export default function SearchPage() {
     const handleRecentPress = () => {
       // Navigate to navigation page with the selected destination
       router.push({
-        pathname: '/navigation',
+        pathname: '/navigation' as any,
         params: { destination: item.title }
       });
     };
@@ -144,7 +144,7 @@ export default function SearchPage() {
     const handleNavigationPress = () => {
       // Navigate to navigation page with the selected destination
       router.push({
-        pathname: '/navigation',
+        pathname: '/navigation' as any,
         params: { destination: item.title.replace('\n', ' ') }
       });
     };

@@ -123,7 +123,7 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
         className="h-8 items-center justify-center rounded-t-md shadow-sm"
         style={{ backgroundColor: route.color }}
       >
-  <Text className="text-base font-semibold text-black">{route.route}</Text>
+  <Text className="text-base font-semibold" style={{ color: '#FFFFFF' }}>{route.route}</Text>
       </View>
 
       {/* Times List */}
