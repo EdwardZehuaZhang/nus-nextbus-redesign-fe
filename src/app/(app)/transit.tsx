@@ -11,7 +11,7 @@ import {
   Text,
   View,
 } from '@/components/ui';
-import { CheckSquare, MapTrifold, Search as SearchIcon, MinCapacityIcon, AvgCapacityIcon, MaxCapacityIcon, HouseIcon, BriefcaseIcon, PlusIcon } from '@/components/ui/icons';
+import { CaretDown, MapTrifold, Search as SearchIcon, MinCapacityIcon, AvgCapacityIcon, MaxCapacityIcon, HouseIcon, BriefcaseIcon, PlusIcon } from '@/components/ui/icons';
 
 type BusRoute = {
   route: string;
@@ -33,6 +33,12 @@ type FavoriteItem = {
   id: string;
   icon: 'home' | 'work' | 'home-work';
   label: string;
+};
+
+type FilterOption = {
+  id: string;
+  label: string;
+  isSelected: boolean;
 };
 
 const busRoutes: BusRoute[] = [
@@ -179,17 +185,85 @@ const SearchBar = () => {
   );
 };
 
-const ActionButtons = () => {
+const FilterDropdown = () => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [filterOptions, setFilterOptions] = React.useState<FilterOption[]>([
+    { id: 'residences', label: 'Residences', isSelected: true },
+    { id: 'academic', label: 'Academic', isSelected: false },
+    { id: 'bus-stops', label: 'Bus Stops', isSelected: false },
+    { id: 'bus-routes', label: 'Bus Routes', isSelected: false },
+  ]);
+
+  const toggleDropdown = () => {
+    setIsExpanded(!isExpanded);
+  };
+
+  const toggleOption = (optionId: string) => {
+    setFilterOptions(prev =>
+      prev.map(option =>
+        option.id === optionId
+          ? { ...option, isSelected: !option.isSelected }
+          : option
+      )
+    );
+  };
+
+  const renderCheckbox = (isSelected: boolean) => {
+    if (isSelected) {
+      return (
+        <View className="h-4 w-4 items-center justify-center rounded-sm" style={{ backgroundColor: '#274F9C' }}>
+          <Text className="text-white text-xs font-bold">✓</Text>
+        </View>
+      );
+    } else {
+      return (
+        <View className="h-4 w-4 rounded-sm border" style={{ borderColor: '#CDCDCD' }} />
+      );
+    }
+  };
+
   return (
-    <View className="absolute right-5 top-14 flex-col gap-2">
-      <Pressable className="h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <MapTrifold size={28} />
+    <View className="absolute right-5 top-14 items-end">
+      {/* Filter Button */}
+      <Pressable
+        className="h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
+        onPress={toggleDropdown}
+      >
+        <MapTrifold size={20} />
       </Pressable>
-      <Pressable className="h-12 w-12 items-center justify-center rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <CheckSquare size={27} />
-      </Pressable>
+
+      {/* Dropdown Menu */}
+      {isExpanded && (
+        <>
+          {/* Invisible overlay to close dropdown */}
+          <Pressable
+            className="absolute -inset-96 z-0"
+            onPress={() => setIsExpanded(false)}
+          />
+          <View className="mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md z-10">
+            <View className="p-1">
+              {filterOptions.map((option, index) => (
+                <Pressable
+                  key={option.id}
+                  className="flex-row items-center gap-2.5 rounded-sm px-2 py-2"
+                  onPress={() => toggleOption(option.id)}
+                >
+                  <Text className="flex-1 text-sm text-neutral-950" style={{ fontFamily: 'Inter' }}>
+                    {option.label}
+                  </Text>
+                  {renderCheckbox(option.isSelected)}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </>
+      )}
     </View>
   );
+};
+
+const ActionButtons = () => {
+  return <FilterDropdown />;
 };
 
 const TabBar = ({ tabs }: { tabs: TabItem[] }) => {
