@@ -18,6 +18,12 @@ import {
   Train,
   Van,
 } from '@/components/ui/icons';
+import { searchBusStations, BusStation, getBusStationById } from '@/lib/bus-stations';
+import { 
+  getRecentSearches, 
+  addRecentSearch, 
+  RecentSearchItem as StoredRecentSearch 
+} from '@/lib/storage/recent-searches';
 
 type RecentSearchItem = {
   id: string;
@@ -30,19 +36,6 @@ type PopularSearchItem = {
   title: string;
   image: string;
 };
-
-const recentSearches: RecentSearchItem[] = [
-  { id: '1', title: 'Central Library', icon: BookOpen },
-  { id: '2', title: 'University Health Centre', icon: FirstAid },
-  { id: '3', title: 'Kent Ridge MRT', icon: Train },
-  { id: '4', title: 'UTown', icon: Van },
-  { id: '5', title: 'LT27', icon: Van },
-  { id: '6', title: 'COM3', icon: BookOpen },
-  { id: '7', title: 'PGPR', icon: Van },
-  { id: '8', title: 'Science Library', icon: BookOpen },
-  { id: '9', title: 'Engineering Library', icon: BookOpen },
-  { id: '10', title: 'Business School', icon: BookOpen },
-];
 
 const popularSearches: PopularSearchItem[] = [
   {
@@ -98,8 +91,51 @@ const popularSearches: PopularSearchItem[] = [
 export default function SearchPage() {
   const router = useRouter();
   const [searchText, setSearchText] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
+  const [recentSearches, setRecentSearches] = React.useState<RecentSearchItem[]>([]);
   const [showAllRecent, setShowAllRecent] = React.useState(false);
   const [showAllPopular, setShowAllPopular] = React.useState(false);
+
+  // Load recent searches on component mount
+  React.useEffect(() => {
+    const loadRecentSearches = () => {
+      const stored = getRecentSearches();
+      // Convert stored recent searches to UI format
+      const uiRecentSearches: RecentSearchItem[] = stored.map(item => ({
+        id: item.id,
+        title: item.name,
+        icon: getIconForType(item.type),
+      }));
+      setRecentSearches(uiRecentSearches);
+    };
+    
+    loadRecentSearches();
+  }, []);
+
+  // Helper function to get icon component for type
+  const getIconForType = (type: string) => {
+    switch (type) {
+      case 'mrt':
+        return Train;
+      case 'library':
+      case 'academic':
+        return BookOpen;
+      case 'medical':
+        return FirstAid;
+      default:
+        return Van;
+    }
+  };
+
+  // Handle search input changes
+  React.useEffect(() => {
+    if (searchText.trim().length > 0) {
+      const results = searchBusStations(searchText);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchText]);
 
   const handleCancel = () => {
     router.back();
@@ -128,6 +164,12 @@ export default function SearchPage() {
         pathname: '/navigation' as any,
         params: { destination: item.title }
       });
+      
+      // Add to recent searches (this will update the timestamp)
+      const station = getBusStationById(item.id);
+      if (station) {
+        addRecentSearch(station);
+      }
     };
 
     return (
@@ -145,6 +187,52 @@ export default function SearchPage() {
         </Pressable>
         {!isLast && (
           <View className="w-full h-px bg-neutral-200 my-2" />
+        )}
+      </View>
+    );
+  };
+
+  const renderSearchResult = ({ item, isLast }: { item: BusStation; isLast: boolean }) => {
+    const IconComponent = item.icon;
+    
+    const handleSearchResultPress = () => {
+      // Add to recent searches before navigating
+      addRecentSearch(item);
+      
+      // Update local state immediately
+      const newRecentItem: RecentSearchItem = {
+        id: item.id,
+        title: item.name,
+        icon: item.icon,
+      };
+      setRecentSearches(prev => [newRecentItem, ...prev.filter(r => r.id !== item.id)].slice(0, 10));
+      
+      router.push({
+        pathname: '/navigation' as any,
+        params: { destination: item.name }
+      });
+    };
+
+    return (
+      <View key={item.id}>
+        <Pressable
+          className="flex-row items-center gap-2 py-3"
+          onPress={handleSearchResultPress}
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="w-5 h-5" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-medium text-neutral-900">
+              {item.name}
+            </Text>
+            <Text className="text-sm text-neutral-600 mt-1 capitalize">
+              {item.type.replace('_', ' ')} Station
+            </Text>
+          </View>
+        </Pressable>
+        {!isLast && (
+          <View className="w-full h-px bg-neutral-200 my-1" />
         )}
       </View>
     );
@@ -264,50 +352,80 @@ export default function SearchPage() {
           </View>
 
           <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-            {/* Recent Searches Section */}
-            <View className="mb-8">
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-sm font-medium text-neutral-500">
-                  Recents
-                </Text>
-                <Pressable onPress={toggleRecentExpanded}>
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: '#274F9C' }}
-                  >
-                    {showAllRecent ? 'View Less' : 'View More'}
-                  </Text>
-                </Pressable>
-              </View>
-
+            {/* Search Results Section - Show when user is searching */}
+            {searchText.trim().length > 0 ? (
               <View>
-                {(showAllRecent ? recentSearches : recentSearches.slice(0, 3)).map((item, index, array) =>
-                  renderRecentItem({
-                    item,
-                    isLast: index === array.length - 1,
-                  })
+                {searchResults.length > 0 ? (
+                  <View>
+                    <Text className="text-sm font-medium text-neutral-500 mb-3">
+                      Search Results ({searchResults.length})
+                    </Text>
+                    {searchResults.map((item, index, array) =>
+                      renderSearchResult({
+                        item,
+                        isLast: index === array.length - 1,
+                      })
+                    )}
+                  </View>
+                ) : (
+                  <View className="py-8 items-center">
+                    <Text className="text-base text-neutral-500">
+                      No results found for "{searchText}"
+                    </Text>
+                    <Text className="text-sm text-neutral-400 mt-2 text-center">
+                      Try searching with different keywords
+                    </Text>
+                  </View>
                 )}
               </View>
-            </View>
+            ) : (
+              <View>
+                {/* Recent Searches Section */}
+                <View className="mb-8">
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">
+                      Recents
+                    </Text>
+                    <Pressable onPress={toggleRecentExpanded}>
+                      <Text
+                        className="text-sm font-medium"
+                        style={{ color: '#274F9C' }}
+                      >
+                        {showAllRecent ? 'View Less' : 'View More'}
+                      </Text>
+                    </Pressable>
+                  </View>
 
-            {/* Popular Searches Section */}
-            <View>
-              <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-sm font-medium text-neutral-500">
-                  Popular Searches
-                </Text>
-                <Pressable onPress={togglePopularExpanded}>
-                  <Text
-                    className="text-sm font-medium"
-                    style={{ color: '#274F9C' }}
-                  >
-                    {showAllPopular ? 'View Less' : 'View More'}
-                  </Text>
-                </Pressable>
+                  <View>
+                    {(showAllRecent ? recentSearches : recentSearches.slice(0, 3)).map((item, index, array) =>
+                      renderRecentItem({
+                        item,
+                        isLast: index === array.length - 1,
+                      })
+                    )}
+                  </View>
+                </View>
+
+                {/* Popular Searches Section */}
+                <View>
+                  <View className="mb-2 flex-row items-center justify-between">
+                    <Text className="text-sm font-medium text-neutral-500">
+                      Popular Searches
+                    </Text>
+                    <Pressable onPress={togglePopularExpanded}>
+                      <Text
+                        className="text-sm font-medium"
+                        style={{ color: '#274F9C' }}
+                      >
+                        {showAllPopular ? 'View Less' : 'View More'}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {renderPopularSearches()}
+                </View>
               </View>
-
-              {renderPopularSearches()}
-            </View>
+            )}
           </ScrollView>
         </View>
       </View>
