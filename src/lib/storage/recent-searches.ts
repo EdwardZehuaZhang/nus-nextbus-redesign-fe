@@ -1,4 +1,4 @@
-import { storage } from '@/lib/storage';
+import { storage } from '../storage';
 import { BusStation } from '@/lib/bus-stations';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';

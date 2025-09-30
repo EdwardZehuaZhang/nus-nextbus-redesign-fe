@@ -226,9 +226,6 @@ export default function SearchPage() {
             <Text className="text-base font-medium text-neutral-900">
               {item.name}
             </Text>
-            <Text className="text-sm text-neutral-600 mt-1 capitalize">
-              {item.type.replace('_', ' ')} Station
-            </Text>
           </View>
         </Pressable>
         {!isLast && (
