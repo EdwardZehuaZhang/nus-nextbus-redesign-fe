@@ -298,20 +298,20 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
-        <View className="inline-flex items-center gap-2.5 rounded-full bg-neutral-100 p-2">
+        <View className="flex-row items-center gap-2.5 rounded-full bg-neutral-100 p-2">
           <HouseIcon width={20} height={20} fill="#274F9C" />
           <BriefcaseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
     } else if (item.icon === 'home') {
       return (
-        <View className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2">
+        <View className="flex items-center justify-center rounded-full bg-neutral-100 p-2">
           <HouseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
     } else {
       return (
-        <View className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2">
+        <View className="flex items-center justify-center rounded-full bg-neutral-100 p-2">
           <BriefcaseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
