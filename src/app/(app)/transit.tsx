@@ -298,30 +298,30 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
-        <View className="flex-row items-center gap-1 rounded-full bg-neutral-100 p-2">
-          <HouseIcon width={16} height={16} fill="#274F9C" />
-          <BriefcaseIcon width={16} height={16} fill="#274F9C" />
+        <View className="inline-flex items-center gap-2.5 rounded-full bg-neutral-100 p-2">
+          <HouseIcon width={20} height={20} fill="#274F9C" />
+          <BriefcaseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
     } else if (item.icon === 'home') {
       return (
-        <View className="items-center justify-center rounded-full bg-neutral-100 p-2">
-          <HouseIcon width={16} height={16} fill="#274F9C" />
+        <View className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2">
+          <HouseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
     } else {
       return (
-        <View className="items-center justify-center rounded-full bg-neutral-100 p-2">
-          <BriefcaseIcon width={16} height={16} fill="#274F9C" />
+        <View className="inline-flex items-center justify-center rounded-full bg-neutral-100 p-2">
+          <BriefcaseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
     }
   };
 
   return (
-    <Pressable className="min-w-[64px] flex-col items-center gap-1 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+    <Pressable className="min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       {renderIcons()}
-      <Text className="text-center text-xs font-medium leading-tight" style={{ color: '#274F9C' }} numberOfLines={1}>
+      <Text className="text-center text-sm font-medium leading-tight whitespace-nowrap" style={{ color: '#274F9C' }} numberOfLines={1}>
         {item.label}
       </Text>
     </Pressable>
