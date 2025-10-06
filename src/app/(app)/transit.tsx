@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { TextInput } from 'react-native';
 
+import { Frame } from '@/components/frame';
 import {
   FocusAwareStatusBar,
   Image,
@@ -11,16 +12,25 @@ import {
   Text,
   View,
 } from '@/components/ui';
-import { CaretDown, MapTrifold, Search as SearchIcon, MinCapacityIcon, AvgCapacityIcon, MaxCapacityIcon, HouseIcon, BriefcaseIcon, PlusIcon } from '@/components/ui/icons';
+import {
+  AvgCapacityIcon,
+  BriefcaseIcon,
+  HouseIcon,
+  MapTrifold,
+  MaxCapacityIcon,
+  MinCapacityIcon,
+  PlusIcon,
+  Search as SearchIcon,
+} from '@/components/ui/icons';
 
 type BusRoute = {
   route: string;
   color: string;
-  times: Array<{
+  times: {
     time: string;
     crowding: 'low' | 'medium' | 'high';
     textColor?: string;
-  }>;
+  }[];
 };
 
 type TabItem = {
@@ -100,20 +110,24 @@ const favorites: FavoriteItem[] = [
   { id: '3', icon: 'work', label: 'Work' },
 ];
 
-const CrowdingIndicator = ({ crowding }: { crowding: 'low' | 'medium' | 'high' }) => {
+const CrowdingIndicator = ({
+  crowding,
+}: {
+  crowding: 'low' | 'medium' | 'high';
+}) => {
   const getCapacityIcon = () => {
     switch (crowding) {
       case 'low':
-        return <MinCapacityIcon width={20} height={15} />;
+        return <MinCapacityIcon width={32} height={24} />;
       case 'medium':
-        return <AvgCapacityIcon width={20} height={15} />;
+        return <AvgCapacityIcon width={32} height={24} />;
       case 'high':
-        return <MaxCapacityIcon width={20} height={15} />;
+        return <MaxCapacityIcon width={32} height={24} />;
       default:
-        return <MinCapacityIcon width={20} height={15} />;
+        return <MinCapacityIcon width={32} height={24} />;
     }
   };
-  
+
   return (
     <View className="flex-row items-center justify-center">
       {getCapacityIcon()}
@@ -129,11 +143,13 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
         className="h-8 items-center justify-center rounded-t-md shadow-sm"
         style={{ backgroundColor: route.color }}
       >
-  <Text className="text-base font-semibold" style={{ color: '#FFFFFF' }}>{route.route}</Text>
+        <Text className="text-base font-semibold" style={{ color: '#FFFFFF' }}>
+          {route.route}
+        </Text>
       </View>
 
       {/* Times List */}
-      <View className="rounded-b-md border border-neutral-200 border-t-0">
+      <View className="rounded-b-md border border-t-0 border-neutral-200">
         {route.times.map((timeItem, index) => (
           <View key={index}>
             <View className="flex-row items-center justify-between bg-white px-3 py-2">
@@ -158,7 +174,7 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
 const SearchBar = () => {
   const [searchText, setSearchText] = React.useState('');
   const [isFocused, setIsFocused] = React.useState(false);
-  
+
   const handleSearchPress = () => {
     router.push('/search');
   };
@@ -199,8 +215,8 @@ const FilterDropdown = () => {
   };
 
   const toggleOption = (optionId: string) => {
-    setFilterOptions(prev =>
-      prev.map(option =>
+    setFilterOptions((prev) =>
+      prev.map((option) =>
         option.id === optionId
           ? { ...option, isSelected: !option.isSelected }
           : option
@@ -211,13 +227,19 @@ const FilterDropdown = () => {
   const renderCheckbox = (isSelected: boolean) => {
     if (isSelected) {
       return (
-        <View className="h-4 w-4 items-center justify-center rounded-sm" style={{ backgroundColor: '#274F9C' }}>
-          <Text className="text-white text-xs font-bold">✓</Text>
+        <View
+          className="size-4 items-center justify-center rounded-sm"
+          style={{ backgroundColor: '#274F9C' }}
+        >
+          <Text className="text-xs font-bold text-white">✓</Text>
         </View>
       );
     } else {
       return (
-        <View className="h-4 w-4 rounded-sm border" style={{ borderColor: '#CDCDCD' }} />
+        <View
+          className="size-4 rounded-sm border"
+          style={{ borderColor: '#CDCDCD' }}
+        />
       );
     }
   };
@@ -226,7 +248,7 @@ const FilterDropdown = () => {
     <View className="absolute right-5 top-14 items-end">
       {/* Filter Button */}
       <Pressable
-        className="h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
+        className="size-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
         onPress={toggleDropdown}
       >
         <MapTrifold size={20} />
@@ -240,15 +262,18 @@ const FilterDropdown = () => {
             className="absolute -inset-96 z-0"
             onPress={() => setIsExpanded(false)}
           />
-          <View className="mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md z-10">
+          <View className="z-10 mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md">
             <View className="p-1">
               {filterOptions.map((option, index) => (
                 <Pressable
                   key={option.id}
-                  className="flex-row items-center gap-2.5 rounded-sm px-2 py-2"
+                  className="flex-row items-center gap-2.5 rounded-sm p-2"
                   onPress={() => toggleOption(option.id)}
                 >
-                  <Text className="flex-1 text-sm text-neutral-950" style={{ fontFamily: 'Inter' }}>
+                  <Text
+                    className="flex-1 text-sm text-neutral-950"
+                    style={{ fontFamily: 'Inter' }}
+                  >
                     {option.label}
                   </Text>
                   {renderCheckbox(option.isSelected)}
@@ -274,8 +299,8 @@ const TabBar = ({ tabs }: { tabs: TabItem[] }) => {
           <Pressable
             className={`border-neutral-200 px-4 py-2 ${
               tab.isActive
-                ? 'border-b-0 border-l border-r border-t rounded-t-md bg-white'
-                : 'border-b border-r border-t rounded-tr-md bg-white opacity-60'
+                ? 'rounded-t-md border-x border-b-0 border-t bg-white'
+                : 'rounded-tr-md border-y border-r bg-white opacity-60'
             } ${index === 0 ? 'border-l' : ''}`}
           >
             <Text
@@ -321,7 +346,11 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
   return (
     <Pressable className="min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
       {renderIcons()}
-      <Text className="text-center text-sm font-medium leading-tight whitespace-nowrap" style={{ color: '#274F9C' }} numberOfLines={1}>
+      <Text
+        className="whitespace-nowrap text-center text-sm font-medium leading-tight"
+        style={{ color: '#274F9C' }}
+        numberOfLines={1}
+      >
         {item.label}
       </Text>
     </Pressable>
@@ -330,8 +359,8 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
 
 const AddButton = () => {
   return (
-    <Pressable className="h-12 w-12 items-center justify-center">
-      <PlusIcon width={24} height={24} fill="#274F9C" />
+    <Pressable className="size-12 items-center justify-center self-center">
+      <PlusIcon width={20} height={20} fill="#274F9C" />
     </Pressable>
   );
 };
@@ -340,14 +369,14 @@ export default function TransitPage() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-50">
       <FocusAwareStatusBar />
-      
+
       {/* Background Map */}
       <View className="absolute inset-0">
         <Image
           source={{
             uri: 'https://api.builder.io/api/v1/image/assets/TEMP/20a1776d99ec1817a0bf9ffa97a884c7f957dfa7?width=864',
           }}
-          className="h-full w-full"
+          className="size-full"
           style={{ resizeMode: 'cover' }}
         />
       </View>
@@ -356,7 +385,12 @@ export default function TransitPage() {
       <ActionButtons />
 
       {/* Main Card */}
-      <View className="mt-auto rounded-t-xl border border-neutral-200 bg-white p-5 shadow-lg">
+      <View className="mt-auto rounded-t-xl border border-neutral-200 bg-white px-5 pb-5 pt-1 shadow-lg">
+        {/* Drag Handle */}
+        <View className="mb-3 items-center">
+          <Frame />
+        </View>
+
         <SearchBar />
 
         {/* Nearest Stops Section */}
@@ -369,7 +403,7 @@ export default function TransitPage() {
           <TabBar tabs={tabs} />
 
           {/* Bus Routes Grid */}
-          <View className="rounded-b-md border border-neutral-200 border-t-0 bg-white p-2 shadow-sm">
+          <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
             <View className="gap-2">
               {/* First Row */}
               <View className="flex-row gap-2">

@@ -1,18 +1,23 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Switch } from 'react-native';
-import Svg, { Path, Circle, G, ClipPath, Rect, Defs } from 'react-native-svg';
+import { TextInput } from 'react-native';
+import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
+import { BusIndicator } from '@/components/bus-indicator';
+import { Frame } from '@/components/frame';
+import { ToggleSwitch } from '@/components/toggle-switch';
 import {
   FocusAwareStatusBar,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   View,
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
+
+import { CircleIcon } from './circle-icon';
+import { DragIcon } from './drag-icon';
 
 // Status Bar Icons
 const CellularIcon = () => (
@@ -231,6 +236,78 @@ export default function NavigationPage() {
   const currentDestination =
     typeof destination === 'string' ? destination : 'COM3';
 
+  // Manage all locations as a unified list
+  type LocationItem = {
+    id: string;
+    text: string;
+    type: 'origin' | 'stop' | 'destination';
+    isEditable: boolean;
+  };
+
+  const [locations, setLocations] = useState<LocationItem[]>([
+    { id: '1', text: 'Your location', type: 'origin', isEditable: false },
+    {
+      id: '2',
+      text: currentDestination,
+      type: 'destination',
+      isEditable: false,
+    },
+  ]);
+
+  const handleAddStop = () => {
+    const newStop: LocationItem = {
+      id: Date.now().toString(),
+      text: '',
+      type: 'stop',
+      isEditable: true,
+    };
+    // Insert before the last item (destination)
+    setLocations([
+      ...locations.slice(0, -1),
+      newStop,
+      locations[locations.length - 1],
+    ]);
+  };
+
+  const handleRemoveLocation = (id: string) => {
+    setLocations(locations.filter((loc) => loc.id !== id));
+  };
+
+  const handleUpdateLocation = (id: string, text: string) => {
+    setLocations(
+      locations.map((loc) => (loc.id === id ? { ...loc, text } : loc))
+    );
+  };
+
+  const handleMoveUp = (index: number) => {
+    // Can't move if already at top
+    if (index <= 0) return;
+
+    const newLocations = [...locations];
+    // Swap with the item above
+    [newLocations[index], newLocations[index - 1]] = [
+      newLocations[index - 1],
+      newLocations[index],
+    ];
+    setLocations(newLocations);
+  };
+
+  const handleMoveDown = (index: number) => {
+    // Can't move if already at bottom
+    if (index >= locations.length - 1) return;
+
+    const newLocations = [...locations];
+    // Swap with the item below
+    [newLocations[index], newLocations[index + 1]] = [
+      newLocations[index + 1],
+      newLocations[index],
+    ];
+    setLocations(newLocations);
+  };
+
+  // Show X and drag icons when there are 3+ locations (origin + at least 1 stop + destination)
+  const showControls = locations.length >= 3;
+
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
@@ -269,7 +346,7 @@ export default function NavigationPage() {
           source={{
             uri: 'https://api.builder.io/api/v1/image/assets/TEMP/6c3b3b210b3413e5845c48ced02b558bbfe555a7?width=864',
           }}
-          className="absolute inset-0 h-full w-full"
+          className="absolute inset-0 size-full"
           style={{ resizeMode: 'cover' }}
         />
 
@@ -291,28 +368,126 @@ export default function NavigationPage() {
             elevation: 2,
           }}
         >
-          {/* Your Location */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-            >
-              <NavigationArrow />
-              <Text
-                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}
-              >
-                Your location
-              </Text>
-            </View>
-            <MenuIcon />
-          </View>
+          {/* Render All Locations */}
+          {locations.map((location, index) => {
+            const isOrigin = location.type === 'origin';
+            const isDestination = location.type === 'destination';
+            const isLast = index === locations.length - 1;
 
-          {/* Divider with dots */}
+            // Determine icon
+            let LocationIcon = null;
+            if (isOrigin) {
+              LocationIcon = <NavigationArrow />;
+            } else if (isDestination) {
+              LocationIcon = <MapPin />;
+            } else {
+              LocationIcon = <CircleIcon />;
+            }
+
+            return (
+              <React.Fragment key={location.id}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      flex: 1,
+                    }}
+                  >
+                    {LocationIcon}
+                    {location.isEditable ? (
+                      <TextInput
+                        value={location.text}
+                        onChangeText={(text: string) =>
+                          handleUpdateLocation(location.id, text)
+                        }
+                        placeholder="Enter location"
+                        placeholderTextColor="#737373"
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                          flex: 1,
+                          padding: 0,
+                        }}
+                      />
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
+                        {location.text}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Show controls when there are 3+ locations */}
+                  {showControls && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                      }}
+                    >
+                      {/* X button - show for ALL locations */}
+                      <Pressable
+                        onPress={() => handleRemoveLocation(location.id)}
+                      >
+                        <XIcon width={20} height={20} fill="#737373" />
+                      </Pressable>
+
+                      {/* Drag icon - show for ALL locations */}
+                      <Pressable
+                        onPress={() => {
+                          // Tap to swap with above item
+                          handleMoveUp(index);
+                        }}
+                        onLongPress={() => {
+                          // Long press moves down
+                          handleMoveDown(index);
+                        }}
+                      >
+                        <DragIcon />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+
+                {/* Divider - show for all except last location */}
+                {!isLast && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 10,
+                      justifyContent: 'center',
+                      marginVertical: 4,
+                    }}
+                  >
+                    <DotDivider />
+                    <View
+                      style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                    />
+                  </View>
+                )}
+              </React.Fragment>
+            );
+          })}
+
+          {/* Divider before Add Stop button */}
           <View
             style={{
               flexDirection: 'row',
@@ -321,42 +496,7 @@ export default function NavigationPage() {
               paddingLeft: 9,
               height: 10,
               justifyContent: 'center',
-            }}
-          >
-            <DotDivider />
-            <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
-          </View>
-
-          {/* Destination */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <View
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-            >
-              <MapPin />
-              <Text
-                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}
-              >
-                {currentDestination}
-              </Text>
-            </View>
-            <MenuIcon />
-          </View>
-
-          {/* Divider with dots */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 20,
-              paddingLeft: 9,
-              height: 10,
-              justifyContent: 'center',
+              marginVertical: 4,
             }}
           >
             <DotDivider />
@@ -364,12 +504,15 @@ export default function NavigationPage() {
           </View>
 
           {/* Add Stop */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Pressable
+            onPress={handleAddStop}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          >
             <PlusCircle />
             <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
               Add Stop
             </Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Journey Details Card */}
@@ -384,16 +527,22 @@ export default function NavigationPage() {
             borderWidth: 1,
             borderColor: '#E5E5E5',
             backgroundColor: '#FFFFFF',
-            padding: 20,
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            paddingTop: 4,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.1,
             shadowRadius: 3,
             elevation: 5,
-            height: 744,
+            maxHeight: '55%',
           }}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <Frame />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+          >
             {/* Journey Time Header */}
             <View
               style={{
@@ -409,40 +558,44 @@ export default function NavigationPage() {
               >
                 28 Mins
               </Text>
+
               <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: '#E5E5E5',
-                  backgroundColor: '#FFFFFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 2,
-                  elevation: 1,
-                  width: 154,
-                  height: 32,
-                }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
               >
-                <Text style={{ fontSize: 14, color: '#09090B' }}>
-                  Arrive 9:15PM
-                </Text>
-                <ChevronDown />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderRadius: 6,
+                    borderWidth: 1,
+                    borderColor: '#E5E5E5',
+                    backgroundColor: '#FFFFFF',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 1,
+                    width: 154,
+                    height: 32,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, color: '#09090B' }}>
+                    Arrive 9:15PM
+                  </Text>
+                  <ChevronDown />
+                </View>
+                <Pressable
+                  onPress={() => router.push('/(app)/transit')}
+                  style={{
+                    padding: 4,
+                  }}
+                >
+                  <XIcon width={24} height={24} fill="#09090B" />
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => router.push('/(app)/transit')}
-                style={{
-                  marginLeft: 8,
-                  padding: 4,
-                }}
-              >
-                <XIcon width={24} height={24} fill="#09090B" />
-              </Pressable>
             </View>
 
             {/* Journey Steps */}
@@ -483,8 +636,9 @@ export default function NavigationPage() {
                   alignItems: 'center',
                   gap: 20,
                   paddingLeft: 9,
-                  height: 10,
+                  height: 16,
                   justifyContent: 'center',
+                  marginVertical: 8,
                 }}
               >
                 <DotDivider />
@@ -529,8 +683,9 @@ export default function NavigationPage() {
                   alignItems: 'center',
                   gap: 20,
                   paddingLeft: 9,
-                  height: 10,
+                  height: 16,
                   justifyContent: 'center',
+                  marginVertical: 8,
                 }}
               >
                 <DotDivider />
@@ -543,8 +698,8 @@ export default function NavigationPage() {
               <View
                 style={{
                   flexDirection: 'row',
-                  justifyContent: 'space-between',
                   alignItems: 'flex-start',
+                  gap: 16,
                 }}
               >
                 <View
@@ -556,68 +711,7 @@ export default function NavigationPage() {
                   }}
                 >
                   {/* Blue line indicator with bus icons */}
-                  <View
-                    style={{
-                      width: 21,
-                      height: 230,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 13,
-                        paddingHorizontal: 16,
-                        paddingVertical: 4,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: 58,
-                        backgroundColor: '#274F9C',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 2,
-                        elevation: 1,
-                        alignSelf: 'stretch',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <View
-                      style={{
-                        height: 280,
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        position: 'absolute',
-                        right: -6,
-                        top: -26,
-                      }}
-                    >
-                      <View
-                        style={{
-                          padding: 6,
-                          borderRadius: 97,
-                          borderWidth: 1,
-                          borderColor: '#E5E5E5',
-                          backgroundColor: '#F5F5F5',
-                        }}
-                      >
-                        <VanIcon />
-                      </View>
-                      <View
-                        style={{
-                          padding: 6,
-                          borderRadius: 97,
-                          borderWidth: 1,
-                          borderColor: '#E5E5E5',
-                          backgroundColor: '#F5F5F5',
-                        }}
-                      >
-                        <VanIcon />
-                      </View>
-                    </View>
-                  </View>
+                  <BusIndicator />
 
                   <View
                     style={{
@@ -647,17 +741,20 @@ export default function NavigationPage() {
                       </Text>
 
                       {/* Bus Routes */}
-                      <View style={{ gap: 2 }}>
+                      <View
+                        style={{
+                          flexDirection: 'column',
+                          gap: 16,
+                          alignSelf: 'stretch',
+                        }}
+                      >
                         {/* A1 Route */}
                         <View
                           style={{
-                            width: 353,
+                            flexDirection: 'row',
                             height: 37,
                             alignItems: 'center',
-                            gap: -0.881,
                             borderRadius: 5.286,
-                            borderWidth: 0,
-                            borderColor: '#E5E5E5',
                           }}
                         >
                           <View
@@ -712,6 +809,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderRightWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
@@ -739,6 +837,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderRightWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
@@ -766,6 +865,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
                                 backgroundColor: '#FFFFFF',
@@ -790,13 +890,10 @@ export default function NavigationPage() {
                         {/* D2 Route */}
                         <View
                           style={{
-                            width: 353,
+                            flexDirection: 'row',
                             height: 37,
                             alignItems: 'center',
-                            gap: -0.881,
                             borderRadius: 5.286,
-                            borderWidth: 0,
-                            borderColor: '#E5E5E5',
                           }}
                         >
                           <View
@@ -851,6 +948,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderRightWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
@@ -878,6 +976,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderRightWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
@@ -905,6 +1004,7 @@ export default function NavigationPage() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center',
                                 flex: 1,
+                                borderTopWidth: 0.881,
                                 borderBottomWidth: 0.881,
                                 borderColor: '#E5E5E5',
                                 backgroundColor: '#FFFFFF',
@@ -1030,8 +1130,9 @@ export default function NavigationPage() {
                   alignItems: 'center',
                   gap: 20,
                   paddingLeft: 9,
-                  height: 10,
+                  height: 16,
                   justifyContent: 'center',
+                  marginVertical: 8,
                 }}
               >
                 <DotDivider />
@@ -1076,8 +1177,9 @@ export default function NavigationPage() {
                   alignItems: 'center',
                   gap: 20,
                   paddingLeft: 9,
-                  height: 10,
+                  height: 16,
                   justifyContent: 'center',
+                  marginVertical: 8,
                 }}
               >
                 <DotDivider />
@@ -1131,7 +1233,7 @@ export default function NavigationPage() {
               style={{
                 flexDirection: 'row',
                 justifyContent: 'space-between',
-                alignItems: 'flex-start',
+                alignItems: 'center',
                 alignSelf: 'stretch',
                 marginBottom: 16,
               }}
@@ -1139,86 +1241,10 @@ export default function NavigationPage() {
               <Text style={{ fontSize: 14, color: '#09090B' }}>
                 Remind you to leave on time
               </Text>
-              <Svg width={44} height={35} viewBox="0 0 44 35" fill="none">
-                <Rect
-                  x="8"
-                  y="0.00561523"
-                  width="36"
-                  height="19.9944"
-                  rx="9.99719"
-                  fill="#D9D9D9"
-                />
-                <G filter="url(#filter0_dd_530_1562)">
-                  <Circle cx="17.9972" cy="10.0027" r="8.51613" fill="white" />
-                </G>
-                <Defs>
-                  <filter
-                    id="filter0_dd_530_1562"
-                    x="0.594686"
-                    y="0.00550699"
-                    width="34.805"
-                    height="34.805"
-                    filterUnits="userSpaceOnUse"
-                    colorInterpolationFilters="sRGB"
-                  >
-                    <feFlood floodOpacity="0" result="BackgroundImageFix" />
-                    <feColorMatrix
-                      in="SourceAlpha"
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                      result="hardAlpha"
-                    />
-                    <feMorphology
-                      radius="2.96213"
-                      operator="erode"
-                      in="SourceAlpha"
-                      result="effect1_dropShadow_530_1562"
-                    />
-                    <feOffset dy="2.96213" />
-                    <feGaussianBlur stdDeviation="2.2216" />
-                    <feComposite in2="hardAlpha" operator="out" />
-                    <feColorMatrix
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
-                    />
-                    <feBlend
-                      mode="normal"
-                      in2="BackgroundImageFix"
-                      result="effect1_dropShadow_530_1562"
-                    />
-                    <feColorMatrix
-                      in="SourceAlpha"
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                      result="hardAlpha"
-                    />
-                    <feMorphology
-                      radius="2.2216"
-                      operator="erode"
-                      in="SourceAlpha"
-                      result="effect2_dropShadow_530_1562"
-                    />
-                    <feOffset dy="7.40533" />
-                    <feGaussianBlur stdDeviation="5.554" />
-                    <feComposite in2="hardAlpha" operator="out" />
-                    <feColorMatrix
-                      type="matrix"
-                      values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.1 0"
-                    />
-                    <feBlend
-                      mode="normal"
-                      in2="effect1_dropShadow_530_1562"
-                      result="effect2_dropShadow_530_1562"
-                    />
-                    <feBlend
-                      mode="normal"
-                      in="SourceGraphic"
-                      in2="effect2_dropShadow_530_1562"
-                      result="shape"
-                    />
-                  </filter>
-                </Defs>
-              </Svg>
+              <ToggleSwitch
+                value={reminderEnabled}
+                onValueChange={setReminderEnabled}
+              />
             </View>
 
             {/* Save as Favorite Button */}

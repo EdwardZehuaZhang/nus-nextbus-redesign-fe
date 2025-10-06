@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { TextInput } from 'react-native';
 
+import { Frame } from '@/components/frame';
 import {
   FocusAwareStatusBar,
   Image,
@@ -18,11 +19,14 @@ import {
   Train,
   Van,
 } from '@/components/ui/icons';
-import { searchBusStations, BusStation, getBusStationById } from '@/lib/bus-stations';
-import { 
-  getRecentSearches, 
-  addRecentSearch, 
-  RecentSearchItem as StoredRecentSearch 
+import {
+  type BusStation,
+  getBusStationById,
+  searchBusStations,
+} from '@/lib/bus-stations';
+import {
+  addRecentSearch,
+  getRecentSearches,
 } from '@/lib/storage/recent-searches';
 
 type RecentSearchItem = {
@@ -92,7 +96,9 @@ export default function SearchPage() {
   const router = useRouter();
   const [searchText, setSearchText] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
-  const [recentSearches, setRecentSearches] = React.useState<RecentSearchItem[]>([]);
+  const [recentSearches, setRecentSearches] = React.useState<
+    RecentSearchItem[]
+  >([]);
   const [showAllRecent, setShowAllRecent] = React.useState(false);
   const [showAllPopular, setShowAllPopular] = React.useState(false);
 
@@ -101,14 +107,14 @@ export default function SearchPage() {
     const loadRecentSearches = () => {
       const stored = getRecentSearches();
       // Convert stored recent searches to UI format
-      const uiRecentSearches: RecentSearchItem[] = stored.map(item => ({
+      const uiRecentSearches: RecentSearchItem[] = stored.map((item) => ({
         id: item.id,
         title: item.name,
         icon: getIconForType(item.type),
       }));
       setRecentSearches(uiRecentSearches);
     };
-    
+
     loadRecentSearches();
   }, []);
 
@@ -157,14 +163,14 @@ export default function SearchPage() {
     isLast: boolean;
   }) => {
     const IconComponent = item.icon;
-    
+
     const handleRecentPress = () => {
       // Navigate to navigation page with the selected destination
       router.push({
         pathname: '/navigation' as any,
-        params: { destination: item.title }
+        params: { destination: item.title },
       });
-      
+
       // Add to recent searches (this will update the timestamp)
       const station = getBusStationById(item.id);
       if (station) {
@@ -178,38 +184,44 @@ export default function SearchPage() {
           className="flex-row items-center gap-2 py-2"
           onPress={handleRecentPress}
         >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100 p-2">
-            <IconComponent className="w-5 h-5" />
+          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="size-5" />
           </View>
           <Text className="flex-1 text-base font-medium text-neutral-900">
             {item.title}
           </Text>
         </Pressable>
-        {!isLast && (
-          <View className="w-full h-px bg-neutral-200 my-2" />
-        )}
+        {!isLast && <View className="my-2 h-px w-full bg-neutral-200" />}
       </View>
     );
   };
 
-  const renderSearchResult = ({ item, isLast }: { item: BusStation; isLast: boolean }) => {
+  const renderSearchResult = ({
+    item,
+    isLast,
+  }: {
+    item: BusStation;
+    isLast: boolean;
+  }) => {
     const IconComponent = item.icon;
-    
+
     const handleSearchResultPress = () => {
       // Add to recent searches before navigating
       addRecentSearch(item);
-      
+
       // Update local state immediately
       const newRecentItem: RecentSearchItem = {
         id: item.id,
         title: item.name,
         icon: item.icon,
       };
-      setRecentSearches(prev => [newRecentItem, ...prev.filter(r => r.id !== item.id)].slice(0, 10));
-      
+      setRecentSearches((prev) =>
+        [newRecentItem, ...prev.filter((r) => r.id !== item.id)].slice(0, 10)
+      );
+
       router.push({
         pathname: '/navigation' as any,
-        params: { destination: item.name }
+        params: { destination: item.name },
       });
     };
 
@@ -219,8 +231,8 @@ export default function SearchPage() {
           className="flex-row items-center gap-2 py-3"
           onPress={handleSearchResultPress}
         >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-neutral-100 p-2">
-            <IconComponent className="w-5 h-5" />
+          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="size-5" />
           </View>
           <View className="flex-1">
             <Text className="text-base font-medium text-neutral-900">
@@ -228,9 +240,7 @@ export default function SearchPage() {
             </Text>
           </View>
         </Pressable>
-        {!isLast && (
-          <View className="w-full h-px bg-neutral-200 my-1" />
-        )}
+        {!isLast && <View className="my-1 h-px w-full bg-neutral-200" />}
       </View>
     );
   };
@@ -240,7 +250,7 @@ export default function SearchPage() {
       // Navigate to navigation page with the selected destination
       router.push({
         pathname: '/navigation' as any,
-        params: { destination: item.title.replace('\n', ' ') }
+        params: { destination: item.title.replace('\n', ' ') },
       });
     };
 
@@ -251,15 +261,15 @@ export default function SearchPage() {
         style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
         onPress={handleNavigationPress}
       >
-        <View className="relative h-full w-full">
+        <View className="relative size-full">
           <Image
             source={{ uri: item.image }}
-            className="h-full w-full"
+            className="size-full"
             style={{ resizeMode: 'cover' }}
           />
           <View className="absolute inset-0 bg-black/40" />
-          <View className="absolute bottom-0 left-0 right-0 p-3">
-            <Text className="text-lg font-bold text-white leading-tight">
+          <View className="absolute inset-x-0 bottom-0 p-3">
+            <Text className="text-lg font-bold leading-tight text-white">
               {item.title}
             </Text>
           </View>
@@ -276,7 +286,7 @@ export default function SearchPage() {
     if (showAllPopular) {
       return (
         <View className="w-full" style={{ height: 488, gap: 8 }}>
-          <View className="flex-row w-full" style={{ gap: 8 }}>
+          <View className="w-full flex-row" style={{ gap: 8 }}>
             <View className="flex-1" style={{ gap: 8 }}>
               {/* Column 1 - Items 1, 3, 5, 7 */}
               {displayItems
@@ -315,7 +325,7 @@ export default function SearchPage() {
           source={{
             uri: 'https://api.builder.io/api/v1/image/assets/TEMP/6c3b3b210b3413e5845c48ced02b558bbfe555a7?width=864',
           }}
-          className="h-full w-full"
+          className="size-full"
           style={{ resizeMode: 'cover' }}
         />
         <View className="absolute inset-0 bg-black/30" />
@@ -323,7 +333,12 @@ export default function SearchPage() {
 
       {/* Content */}
       <View className="flex-1" style={{ paddingTop: 68 }}>
-        <View className="flex-1 rounded-t-xl border border-neutral-200 bg-white px-5 py-4 shadow-sm">
+        <View className="flex-1 rounded-t-xl border border-neutral-200 bg-white px-5 pb-4 pt-1 shadow-sm">
+          {/* Drag Handle */}
+          <View className="mb-3 items-center">
+            <Frame />
+          </View>
+
           {/* Search Header */}
           <View className="mb-5 flex-row items-center gap-4">
             <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
@@ -354,7 +369,7 @@ export default function SearchPage() {
               <View>
                 {searchResults.length > 0 ? (
                   <View>
-                    <Text className="text-sm font-medium text-neutral-500 mb-3">
+                    <Text className="mb-3 text-sm font-medium text-neutral-500">
                       Search Results ({searchResults.length})
                     </Text>
                     {searchResults.map((item, index, array) =>
@@ -365,11 +380,11 @@ export default function SearchPage() {
                     )}
                   </View>
                 ) : (
-                  <View className="py-8 items-center">
+                  <View className="items-center py-8">
                     <Text className="text-base text-neutral-500">
                       No results found for "{searchText}"
                     </Text>
-                    <Text className="text-sm text-neutral-400 mt-2 text-center">
+                    <Text className="mt-2 text-center text-sm text-neutral-400">
                       Try searching with different keywords
                     </Text>
                   </View>
@@ -394,7 +409,10 @@ export default function SearchPage() {
                   </View>
 
                   <View>
-                    {(showAllRecent ? recentSearches : recentSearches.slice(0, 3)).map((item, index, array) =>
+                    {(showAllRecent
+                      ? recentSearches
+                      : recentSearches.slice(0, 3)
+                    ).map((item, index, array) =>
                       renderRecentItem({
                         item,
                         isLast: index === array.length - 1,
