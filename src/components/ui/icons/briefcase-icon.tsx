@@ -7,10 +7,10 @@ interface BriefcaseIconProps {
   fill?: string;
 }
 
-export const BriefcaseIcon: React.FC<BriefcaseIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#274F9C" 
+export const BriefcaseIcon: React.FC<BriefcaseIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path

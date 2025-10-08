@@ -7,10 +7,10 @@ interface LocationIconProps {
   fill?: string;
 }
 
-export const LocationIcon: React.FC<LocationIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#274F9C" 
+export const LocationIcon: React.FC<LocationIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path
@@ -20,10 +20,10 @@ export const LocationIcon: React.FC<LocationIconProps> = ({
   </Svg>
 );
 
-export const BuildingIcon: React.FC<LocationIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#274F9C" 
+export const BuildingIcon: React.FC<LocationIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path
@@ -33,10 +33,10 @@ export const BuildingIcon: React.FC<LocationIconProps> = ({
   </Svg>
 );
 
-export const DotIcon: React.FC<LocationIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#274F9C" 
+export const DotIcon: React.FC<LocationIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path
@@ -46,10 +46,10 @@ export const DotIcon: React.FC<LocationIconProps> = ({
   </Svg>
 );
 
-export const MenuDotsIcon: React.FC<LocationIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#737373" 
+export const MenuDotsIcon: React.FC<LocationIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#737373',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path

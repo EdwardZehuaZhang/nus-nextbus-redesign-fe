@@ -30,7 +30,9 @@ const _useAuth = create<AuthState>((set, get) => ({
         get().signIn(userToken);
       } else {
         // For development, don't sign out if no token - keep default signIn state
-        console.log('No token found, keeping default signIn state for development');
+        console.log(
+          'No token found, keeping default signIn state for development'
+        );
       }
     } catch (e) {
       // only to remove eslint error, handle the error properly

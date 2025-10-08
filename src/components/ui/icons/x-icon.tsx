@@ -7,10 +7,10 @@ interface XIconProps {
   fill?: string;
 }
 
-export const XIcon: React.FC<XIconProps> = ({ 
-  width = 28, 
-  height = 28, 
-  fill = "#274F9C" 
+export const XIcon: React.FC<XIconProps> = ({
+  width = 28,
+  height = 28,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 28 28" fill="none">
     <Path

@@ -5,7 +5,13 @@ import React from 'react';
 import type { Post } from '@/api';
 import { usePosts } from '@/api';
 import { Card } from '@/components/card';
-import { EmptyList, FocusAwareStatusBar, Pressable, Text, View } from '@/components/ui';
+import {
+  EmptyList,
+  FocusAwareStatusBar,
+  Pressable,
+  Text,
+  View,
+} from '@/components/ui';
 import { Search as SearchIcon } from '@/components/ui/icons';
 
 function SearchBar() {
@@ -19,7 +25,7 @@ function SearchBar() {
     <View className="mx-4 mb-4 mt-2">
       <Pressable
         onPress={handleSearchPress}
-        className="flex-row items-center gap-3 rounded-md border border-neutral-200 bg-white px-3 py-3 shadow-sm"
+        className="flex-row items-center gap-3 rounded-md border border-neutral-200 bg-white p-3 shadow-sm"
       >
         <SearchIcon />
         <Text className="flex-1 text-base text-neutral-500">

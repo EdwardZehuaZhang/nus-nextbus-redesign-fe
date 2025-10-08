@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { TextInput } from 'react-native';
+import { Animated, TextInput } from 'react-native';
 
 import { Frame } from '@/components/frame';
+import { InteractiveMap } from '@/components/interactive-map.web';
 import {
   FocusAwareStatusBar,
-  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -36,7 +36,6 @@ type BusRoute = {
 type TabItem = {
   id: string;
   label: string;
-  isActive: boolean;
 };
 
 type FavoriteItem = {
@@ -51,57 +50,83 @@ type FilterOption = {
   isSelected: boolean;
 };
 
-const busRoutes: BusRoute[] = [
-  {
-    route: 'A1',
-    color: '#FF0000',
-    times: [
-      { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-      { time: '5 Min', crowding: 'low', textColor: '#737373' },
-      { time: '10 Min', crowding: 'low', textColor: '#737373' },
-    ],
-  },
-  {
-    route: 'D2',
-    color: '#6F1B6F',
-    times: [
-      { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-      { time: '5 Min', crowding: 'low', textColor: '#737373' },
-      { time: '10 Min', crowding: 'low', textColor: '#737373' },
-    ],
-  },
-  {
-    route: 'K',
-    color: '#345A9B',
-    times: [
-      { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-      { time: '5 Min', crowding: 'low', textColor: '#737373' },
-      { time: '10 Min', crowding: 'low', textColor: '#737373' },
-    ],
-  },
-  {
-    route: '188',
-    color: '#55DD33',
-    times: [
-      { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-      { time: '5 Min', crowding: 'low', textColor: '#737373' },
-      { time: '10 Min', crowding: 'low', textColor: '#737373' },
-    ],
-  },
-  {
-    route: '27',
-    color: '#55DD33',
-    times: [
-      { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-      { time: '5 Min', crowding: 'low', textColor: '#737373' },
-      { time: '10 Min', crowding: 'low', textColor: '#737373' },
-    ],
-  },
-];
+type BusStopData = {
+  [key: string]: BusRoute[];
+};
+
+const busStopData: BusStopData = {
+  'central-library': [
+    {
+      route: 'A1',
+      color: '#FF0000',
+      times: [
+        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '5 Min', crowding: 'low', textColor: '#737373' },
+        { time: '10 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+    {
+      route: 'D2',
+      color: '#6F1B6F',
+      times: [
+        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '5 Min', crowding: 'low', textColor: '#737373' },
+        { time: '10 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+    {
+      route: 'K',
+      color: '#345A9B',
+      times: [
+        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '5 Min', crowding: 'low', textColor: '#737373' },
+        { time: '10 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+    {
+      route: '188',
+      color: '#55DD33',
+      times: [
+        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '5 Min', crowding: 'low', textColor: '#737373' },
+        { time: '10 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+    {
+      route: '27',
+      color: '#55DD33',
+      times: [
+        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '5 Min', crowding: 'low', textColor: '#737373' },
+        { time: '10 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+  ],
+  'pgp-foryer': [
+    {
+      route: 'A1',
+      color: '#FF0000',
+      times: [
+        { time: '2 Min', crowding: 'high', textColor: '#211F26' },
+        { time: '8 Min', crowding: 'medium', textColor: '#737373' },
+        { time: '15 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+    {
+      route: 'D2',
+      color: '#6F1B6F',
+      times: [
+        { time: '3 Min', crowding: 'medium', textColor: '#211F26' },
+        { time: '7 Min', crowding: 'low', textColor: '#737373' },
+        { time: '12 Min', crowding: 'low', textColor: '#737373' },
+      ],
+    },
+  ],
+};
 
 const tabs: TabItem[] = [
-  { id: '1', label: 'Central Library', isActive: true },
-  { id: '2', label: 'PGP Foryer', isActive: false },
+  { id: 'central-library', label: 'Central Library (3min walk)' },
+  { id: 'pgp-foryer', label: 'PGP Foryer' },
 ];
 
 const favorites: FavoriteItem[] = [
@@ -173,14 +198,12 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
 
 const SearchBar = () => {
   const [searchText, setSearchText] = React.useState('');
-  const [isFocused, setIsFocused] = React.useState(false);
 
   const handleSearchPress = () => {
     router.push('/search');
   };
 
   const handleFocus = () => {
-    setIsFocused(true);
     // Navigate to search page when user focuses on search
     handleSearchPress();
   };
@@ -264,7 +287,7 @@ const FilterDropdown = () => {
           />
           <View className="z-10 mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md">
             <View className="p-1">
-              {filterOptions.map((option, index) => (
+              {filterOptions.map((option) => (
                 <Pressable
                   key={option.id}
                   className="flex-row items-center gap-2.5 rounded-sm p-2"
@@ -288,24 +311,33 @@ const FilterDropdown = () => {
 };
 
 const ActionButtons = () => {
-  return <FilterDropdown />;
+  return null; // MapTypeSelector is now rendered in InteractiveMap component
 };
 
-const TabBar = ({ tabs }: { tabs: TabItem[] }) => {
+const TabBar = ({
+  tabs,
+  activeTab,
+  onTabChange,
+}: {
+  tabs: TabItem[];
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+}) => {
   return (
     <View className="flex-row">
       {tabs.map((tab, index) => (
         <View key={tab.id} className="flex-row">
           <Pressable
             className={`border-neutral-200 px-4 py-2 ${
-              tab.isActive
+              activeTab === tab.id
                 ? 'rounded-t-md border-x border-b-0 border-t bg-white'
                 : 'rounded-tr-md border-y border-r bg-white opacity-60'
             } ${index === 0 ? 'border-l' : ''}`}
+            onPress={() => onTabChange(tab.id)}
           >
             <Text
               className={`text-base ${
-                tab.isActive
+                activeTab === tab.id
                   ? 'font-medium text-neutral-900'
                   : 'font-normal text-neutral-500'
               }`}
@@ -365,79 +397,216 @@ const AddButton = () => {
   );
 };
 
+const NearestStopsSection = ({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+}) => {
+  const currentBusRoutes = busStopData[activeTab] || [];
+
+  return (
+    <View className="mb-6">
+      <Text className="mb-2 text-sm font-medium text-neutral-500">
+        Nearest Stops
+      </Text>
+
+      <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
+
+      <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
+        <View className="gap-2">
+          <View className="flex-row gap-2">
+            {currentBusRoutes.slice(0, 3).map((route) => (
+              <BusRouteCard key={route.route} route={route} />
+            ))}
+            {currentBusRoutes.length < 3 &&
+              Array.from({ length: 3 - currentBusRoutes.length }).map(
+                (_, i) => <View key={`empty-${i}`} className="flex-1" />
+              )}
+          </View>
+          {currentBusRoutes.length > 3 && (
+            <View className="flex-row gap-2">
+              {currentBusRoutes.slice(3, 6).map((route) => (
+                <BusRouteCard key={route.route} route={route} />
+              ))}
+              {currentBusRoutes.length < 6 &&
+                Array.from({
+                  length: 6 - currentBusRoutes.length,
+                }).map((_, i) => (
+                  <View key={`empty-row2-${i}`} className="flex-1" />
+                ))}
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const BottomSheetContent = ({
+  isCollapsed,
+  activeTab,
+  onTabChange,
+  onExpandSheet,
+}: {
+  isCollapsed: boolean;
+  activeTab: string;
+  onTabChange: (tabId: string) => void;
+  onExpandSheet: () => void;
+}) => {
+  return (
+    <>
+      <Pressable onPress={isCollapsed ? onExpandSheet : undefined}>
+        <SearchBar />
+      </Pressable>
+
+      {!isCollapsed && (
+        <>
+          <NearestStopsSection
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+          />
+
+          <View>
+            <Text className="mb-2 text-sm font-medium text-neutral-500">
+              Favourites
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {favorites.map((item) => (
+                <FavoriteButton key={item.id} item={item} />
+              ))}
+              <AddButton />
+            </ScrollView>
+          </View>
+        </>
+      )}
+    </>
+  );
+};
+
+const useDragHandlers = () => {
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+    const threshold = 100; // Reduced threshold for easier dragging
+    const velocityThreshold = 0.3; // Reduced velocity threshold
+
+    console.log(
+      'handleDrag called - dy:',
+      gestureState.dy,
+      'vy:',
+      gestureState.vy
+    );
+
+    if (gestureState.dy > threshold || gestureState.vy > velocityThreshold) {
+      console.log('Collapsing sheet');
+      setIsCollapsed(true);
+      Animated.spring(translateY, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      console.log('Snapping back');
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
+  const handleExpandSheet = () => {
+    console.log('Expanding sheet');
+    setIsCollapsed(false);
+    Animated.spring(translateY, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animatedStyle = {
+    transform: [
+      {
+        translateY: translateY.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 700],
+        }),
+      },
+    ],
+  };
+
+  return { isCollapsed, handleDrag, handleExpandSheet, animatedStyle };
+};
+
 export default function TransitPage() {
+  const [activeTab, setActiveTab] = React.useState<string>('central-library');
+  const { isCollapsed, handleDrag, handleExpandSheet, animatedStyle } =
+    useDragHandlers();
+
   return (
     <SafeAreaView className="flex-1 bg-neutral-50">
       <FocusAwareStatusBar />
 
-      {/* Background Map */}
-      <View className="absolute inset-0">
-        <Image
-          source={{
-            uri: 'https://api.builder.io/api/v1/image/assets/TEMP/20a1776d99ec1817a0bf9ffa97a884c7f957dfa7?width=864',
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        <InteractiveMap
+          initialRegion={{
+            latitude: 1.2976493,
+            longitude: 103.7766916,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
           }}
-          className="size-full"
-          style={{ resizeMode: 'cover' }}
+          style={{ width: '100%', height: '100%' }}
         />
       </View>
 
-      {/* Action Buttons */}
       <ActionButtons />
 
-      {/* Main Card */}
-      <View className="mt-auto rounded-t-xl border border-neutral-200 bg-white px-5 pb-5 pt-1 shadow-lg">
-        {/* Drag Handle */}
+      <Animated.View
+        style={[
+          {
+            marginTop: 'auto',
+            borderTopLeftRadius: 12,
+            borderTopRightRadius: 12,
+            borderWidth: 1,
+            borderColor: '#e5e5e5',
+            backgroundColor: 'white',
+            paddingHorizontal: 20,
+            paddingBottom: 20,
+            paddingTop: 4,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+          },
+          animatedStyle,
+        ]}
+      >
         <View className="mb-3 items-center">
-          <Frame />
+          <Frame onDrag={handleDrag} />
         </View>
 
-        <SearchBar />
-
-        {/* Nearest Stops Section */}
-        <View className="mb-6">
-          <Text className="mb-2 text-sm font-medium text-neutral-500">
-            Nearest Stops
-          </Text>
-
-          {/* Tab Bar */}
-          <TabBar tabs={tabs} />
-
-          {/* Bus Routes Grid */}
-          <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
-            <View className="gap-2">
-              {/* First Row */}
-              <View className="flex-row gap-2">
-                <BusRouteCard route={busRoutes[0]} />
-                <BusRouteCard route={busRoutes[1]} />
-                <BusRouteCard route={busRoutes[2]} />
-              </View>
-              {/* Second Row */}
-              <View className="flex-row gap-2">
-                <BusRouteCard route={busRoutes[3]} />
-                <BusRouteCard route={busRoutes[4]} />
-                <View className="flex-1" />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Favourites Section */}
-        <View>
-          <Text className="mb-2 text-sm font-medium text-neutral-500">
-            Favourites
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            {favorites.map((item) => (
-              <FavoriteButton key={item.id} item={item} />
-            ))}
-            <AddButton />
-          </ScrollView>
-        </View>
-      </View>
+        <BottomSheetContent
+          isCollapsed={isCollapsed}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onExpandSheet={handleExpandSheet}
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 }

@@ -5,10 +5,10 @@ import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import { BusIndicator } from '@/components/bus-indicator';
 import { Frame } from '@/components/frame';
+import { InteractiveMap } from '@/components/interactive-map.web';
 import { ToggleSwitch } from '@/components/toggle-switch';
 import {
   FocusAwareStatusBar,
-  Image,
   Pressable,
   ScrollView,
   Text,
@@ -342,12 +342,8 @@ export default function NavigationPage() {
 
       {/* Map Background */}
       <View className="flex-1">
-        <Image
-          source={{
-            uri: 'https://api.builder.io/api/v1/image/assets/TEMP/6c3b3b210b3413e5845c48ced02b558bbfe555a7?width=864',
-          }}
-          className="absolute inset-0 size-full"
-          style={{ resizeMode: 'cover' }}
+        <InteractiveMap
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         />
 
         {/* Location Input Card */}

@@ -1,5 +1,6 @@
+import { type BusStation } from '@/lib/bus-stations';
+
 import { storage } from '../storage';
-import { BusStation } from '@/lib/bus-stations';
 
 const RECENT_SEARCHES_KEY = 'recent_searches';
 const MAX_RECENT_SEARCHES = 10; // Limit to 10 recent searches
@@ -18,9 +19,9 @@ export const getRecentSearches = (): RecentSearchItem[] => {
   try {
     const stored = storage.getString(RECENT_SEARCHES_KEY);
     if (!stored) return [];
-    
+
     const searches: RecentSearchItem[] = JSON.parse(stored);
-    
+
     // Sort by timestamp (most recent first)
     return searches.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
@@ -36,17 +37,19 @@ export const getRecentSearches = (): RecentSearchItem[] => {
 export const addRecentSearch = (station: BusStation): void => {
   try {
     let recentSearches = getRecentSearches();
-    
+
     // Check if this search already exists
-    const existingIndex = recentSearches.findIndex(item => item.id === station.id);
-    
+    const existingIndex = recentSearches.findIndex(
+      (item) => item.id === station.id
+    );
+
     const searchItem: RecentSearchItem = {
       id: station.id,
       name: station.name,
       type: station.type,
       timestamp: Date.now(),
     };
-    
+
     if (existingIndex >= 0) {
       // Update existing search timestamp and move to top
       recentSearches[existingIndex] = searchItem;
@@ -54,10 +57,10 @@ export const addRecentSearch = (station: BusStation): void => {
       // Add new search to the beginning
       recentSearches.unshift(searchItem);
     }
-    
+
     // Keep only the most recent searches
     recentSearches = recentSearches.slice(0, MAX_RECENT_SEARCHES);
-    
+
     // Save back to storage
     storage.set(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches));
   } catch (error) {
@@ -82,7 +85,7 @@ export const clearRecentSearches = (): void => {
 export const removeRecentSearch = (searchId: string): void => {
   try {
     let recentSearches = getRecentSearches();
-    recentSearches = recentSearches.filter(item => item.id !== searchId);
+    recentSearches = recentSearches.filter((item) => item.id !== searchId);
     storage.set(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches));
   } catch (error) {
     console.error('Error removing recent search:', error);

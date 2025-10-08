@@ -11,7 +11,7 @@ i18n.use(initReactI18next).init({
   resources,
   lng: getLanguage() || Localization.getLocales()[0]?.languageCode || 'en', // TODO: if you are not supporting multiple languages or languages with multiple directions you can set the default value to `en`
   fallbackLng: 'en',
-  compatibilityJSON: 'v3', // By default React Native projects does not support Intl
+  compatibilityJSON: 'v4', // Changed to v4 for better compatibility
 
   // allows integrating dynamic values into translations.
   interpolation: {

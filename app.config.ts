@@ -42,6 +42,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
     },
+    config: {
+      googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
+    },
   },
   experiments: {
     typedRoutes: true,
@@ -52,6 +55,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#2E3C4B',
     },
     package: Env.PACKAGE,
+    config: {
+      googleMaps: {
+        apiKey: Env.GOOGLE_MAPS_API_KEY,
+      },
+    },
   },
   web: {
     favicon: './assets/favicon.png',

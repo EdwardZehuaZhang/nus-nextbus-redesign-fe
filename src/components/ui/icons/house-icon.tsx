@@ -7,10 +7,10 @@ interface HouseIconProps {
   fill?: string;
 }
 
-export const HouseIcon: React.FC<HouseIconProps> = ({ 
-  width = 20, 
-  height = 20, 
-  fill = "#274F9C" 
+export const HouseIcon: React.FC<HouseIconProps> = ({
+  width = 20,
+  height = 20,
+  fill = '#274F9C',
 }) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path

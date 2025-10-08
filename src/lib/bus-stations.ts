@@ -1,6 +1,12 @@
 import { BookOpen, FirstAid, Train, Van } from '@/components/ui/icons';
 
-export type BusStationType = 'mrt' | 'library' | 'residential' | 'academic' | 'medical' | 'general';
+export type BusStationType =
+  | 'mrt'
+  | 'library'
+  | 'residential'
+  | 'academic'
+  | 'medical'
+  | 'general';
 
 export interface BusStation {
   id: string;
@@ -35,7 +41,7 @@ const getIconForType = (type: BusStationType): React.ComponentType<any> => {
 export const BUS_STATIONS: BusStation[] = [
   {
     id: '1',
-    name: 'Prince George\'s Park',
+    name: "Prince George's Park",
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['prince', 'george', 'park', 'pgp', 'residential'],
@@ -70,7 +76,7 @@ export const BUS_STATIONS: BusStation[] = [
   },
   {
     id: '6',
-    name: 'Prince George\'s Park Foyer',
+    name: "Prince George's Park Foyer",
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['prince', 'george', 'park', 'foyer', 'pgp'],
@@ -287,25 +293,25 @@ export const searchBusStations = (query: string): BusStation[] => {
   }
 
   const searchTerm = query.toLowerCase().trim();
-  
+
   return BUS_STATIONS.filter((station) => {
     // Search in station name
     const nameMatch = station.name.toLowerCase().includes(searchTerm);
-    
+
     // Search in keywords
-    const keywordMatch = station.keywords.some(keyword => 
+    const keywordMatch = station.keywords.some((keyword) =>
       keyword.toLowerCase().includes(searchTerm)
     );
-    
+
     return nameMatch || keywordMatch;
   }).sort((a, b) => {
     // Prioritize exact name matches
     const aNameMatch = a.name.toLowerCase().startsWith(searchTerm);
     const bNameMatch = b.name.toLowerCase().startsWith(searchTerm);
-    
+
     if (aNameMatch && !bNameMatch) return -1;
     if (!aNameMatch && bNameMatch) return 1;
-    
+
     // Then sort alphabetically
     return a.name.localeCompare(b.name);
   });
@@ -313,12 +319,12 @@ export const searchBusStations = (query: string): BusStation[] => {
 
 // Get station by ID
 export const getBusStationById = (id: string): BusStation | undefined => {
-  return BUS_STATIONS.find(station => station.id === id);
+  return BUS_STATIONS.find((station) => station.id === id);
 };
 
 // Get station by name
 export const getBusStationByName = (name: string): BusStation | undefined => {
-  return BUS_STATIONS.find(station => 
-    station.name.toLowerCase() === name.toLowerCase()
+  return BUS_STATIONS.find(
+    (station) => station.name.toLowerCase() === name.toLowerCase()
   );
 };
