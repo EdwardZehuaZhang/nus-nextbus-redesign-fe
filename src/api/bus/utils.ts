@@ -10,7 +10,7 @@ export const formatArrivalTime = (seconds: number | string): string => {
     typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
 
   if (numSeconds === -1) {
-    return 'No estimate';
+    return 'N/A';
   }
 
   if (numSeconds < 60) {
