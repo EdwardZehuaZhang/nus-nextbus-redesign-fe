@@ -2,6 +2,13 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Animated, TextInput } from 'react-native';
 
+import {
+  formatArrivalTime,
+  getRouteColor,
+  passengerLoadToCrowding,
+  useServiceDescriptions,
+  useShuttleService,
+} from '@/api';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
 import {
@@ -19,7 +26,6 @@ import {
   BriefcaseIcon,
   FirstAid,
   HouseIcon,
-  MapTrifold,
   MaxCapacityIcon,
   MinCapacityIcon,
   PlusIcon,
@@ -32,6 +38,7 @@ import {
   getBusStationById,
   searchBusStations,
 } from '@/lib/bus-stations';
+import { type FavoriteRoute, getFavorites } from '@/lib/storage/favorites';
 import {
   addRecentSearch,
   getRecentSearches,
@@ -52,22 +59,6 @@ type TabItem = {
   label: string;
 };
 
-type FavoriteItem = {
-  id: string;
-  icon: 'home' | 'work' | 'home-work';
-  label: string;
-};
-
-type FilterOption = {
-  id: string;
-  label: string;
-  isSelected: boolean;
-};
-
-type BusStopData = {
-  [key: string]: BusRoute[];
-};
-
 type RecentSearchItem = {
   id: string;
   title: string;
@@ -80,85 +71,9 @@ type PopularSearchItem = {
   image: string;
 };
 
-const busStopData: BusStopData = {
-  'central-library': [
-    {
-      route: 'A1',
-      color: '#FF0000',
-      times: [
-        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '5 Min', crowding: 'low', textColor: '#737373' },
-        { time: '10 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-    {
-      route: 'D2',
-      color: '#6F1B6F',
-      times: [
-        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '5 Min', crowding: 'low', textColor: '#737373' },
-        { time: '10 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-    {
-      route: 'K',
-      color: '#345A9B',
-      times: [
-        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '5 Min', crowding: 'low', textColor: '#737373' },
-        { time: '10 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-    {
-      route: '188',
-      color: '#55DD33',
-      times: [
-        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '5 Min', crowding: 'low', textColor: '#737373' },
-        { time: '10 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-    {
-      route: '27',
-      color: '#55DD33',
-      times: [
-        { time: '1 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '5 Min', crowding: 'low', textColor: '#737373' },
-        { time: '10 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-  ],
-  'pgp-foryer': [
-    {
-      route: 'A1',
-      color: '#FF0000',
-      times: [
-        { time: '2 Min', crowding: 'high', textColor: '#211F26' },
-        { time: '8 Min', crowding: 'medium', textColor: '#737373' },
-        { time: '15 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-    {
-      route: 'D2',
-      color: '#6F1B6F',
-      times: [
-        { time: '3 Min', crowding: 'medium', textColor: '#211F26' },
-        { time: '7 Min', crowding: 'low', textColor: '#737373' },
-        { time: '12 Min', crowding: 'low', textColor: '#737373' },
-      ],
-    },
-  ],
-};
-
 const tabs: TabItem[] = [
-  { id: 'central-library', label: 'Central Library (3min walk)' },
-  { id: 'pgp-foryer', label: 'PGP Foryer' },
-];
-
-const favorites: FavoriteItem[] = [
-  { id: '1', icon: 'home-work', label: 'Home  -  Work' },
-  { id: '2', icon: 'home', label: 'Home' },
-  { id: '3', icon: 'work', label: 'Work' },
+  { id: 'CENLIB', label: 'Central Library (3min walk)' },
+  { id: 'PGP', label: 'PGP Foyer' },
 ];
 
 const popularSearches: PopularSearchItem[] = [
@@ -301,89 +216,88 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   );
 };
 
-const FilterDropdown = () => {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  const [filterOptions, setFilterOptions] = React.useState<FilterOption[]>([
-    { id: 'residences', label: 'Residences', isSelected: true },
-    { id: 'academic', label: 'Academic', isSelected: false },
-    { id: 'bus-stops', label: 'Bus Stops', isSelected: false },
-    { id: 'bus-routes', label: 'Bus Routes', isSelected: false },
-  ]);
-
-  const toggleDropdown = () => {
-    setIsExpanded(!isExpanded);
-  };
-
-  const toggleOption = (optionId: string) => {
-    setFilterOptions((prev) =>
-      prev.map((option) =>
-        option.id === optionId
-          ? { ...option, isSelected: !option.isSelected }
-          : option
-      )
-    );
-  };
-
-  const renderCheckbox = (isSelected: boolean) => {
-    if (isSelected) {
-      return (
-        <View
-          className="size-4 items-center justify-center rounded-sm"
-          style={{ backgroundColor: '#274F9C' }}
-        >
-          <Text className="text-xs font-bold text-white">✓</Text>
-        </View>
-      );
-    } else {
-      return (
-        <View
-          className="size-4 rounded-sm border"
-          style={{ borderColor: '#CDCDCD' }}
-        />
-      );
-    }
-  };
-
+// Helper components for SearchContent
+const RecentSearchCard = ({
+  item,
+  isLast,
+  onPress,
+}: {
+  item: RecentSearchItem;
+  isLast: boolean;
+  onPress: () => void;
+}) => {
+  const IconComponent = item.icon;
   return (
-    <View className="absolute right-5 top-14 items-end">
-      {/* Filter Button */}
-      <Pressable
-        className="size-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
-        onPress={toggleDropdown}
-      >
-        <MapTrifold size={20} />
+    <View>
+      <Pressable className="flex-row items-center gap-2 py-2" onPress={onPress}>
+        <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+          <IconComponent className="size-5" />
+        </View>
+        <Text className="flex-1 text-base font-medium text-neutral-900">
+          {item.title}
+        </Text>
       </Pressable>
-
-      {/* Dropdown Menu */}
-      {isExpanded && (
-        <>
-          {/* Invisible overlay to close dropdown */}
-          <Pressable
-            className="absolute -inset-96 z-0"
-            onPress={() => setIsExpanded(false)}
-          />
-          <View className="z-10 mt-2 w-40 rounded-md border border-neutral-200 bg-white shadow-md">
-            <View className="p-1">
-              {filterOptions.map((option) => (
-                <Pressable
-                  key={option.id}
-                  className="flex-row items-center gap-2.5 rounded-sm p-2"
-                  onPress={() => toggleOption(option.id)}
-                >
-                  <Text
-                    className="flex-1 text-sm text-neutral-950"
-                    style={{ fontFamily: 'Inter' }}
-                  >
-                    {option.label}
-                  </Text>
-                  {renderCheckbox(option.isSelected)}
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        </>
-      )}
+      {!isLast && <View className="my-2 h-px w-full bg-neutral-200" />}
     </View>
+  );
+};
+
+const SearchResultItem = ({
+  item,
+  isLast,
+  onPress,
+}: {
+  item: BusStation;
+  isLast: boolean;
+  onPress: () => void;
+}) => {
+  const IconComponent = item.icon;
+  return (
+    <View>
+      <Pressable className="flex-row items-center gap-2 py-3" onPress={onPress}>
+        <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+          <IconComponent className="size-5" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-base font-medium text-neutral-900">
+            {item.name}
+          </Text>
+        </View>
+      </Pressable>
+      {!isLast && <View className="my-1 h-px w-full bg-neutral-200" />}
+    </View>
+  );
+};
+
+const PopularSearchCard = ({
+  item,
+  showAllPopular,
+  onPress,
+}: {
+  item: PopularSearchItem;
+  showAllPopular: boolean;
+  onPress: () => void;
+}) => {
+  return (
+    <Pressable
+      className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
+      style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
+      onPress={onPress}
+    >
+      <View className="relative size-full">
+        <Image
+          source={{ uri: item.image }}
+          className="size-full"
+          style={{ resizeMode: 'cover' }}
+        />
+        <View className="absolute inset-0 bg-black/40" />
+        <View className="absolute inset-x-0 bottom-0 p-3">
+          <Text className="text-lg font-bold leading-tight text-white">
+            {item.title}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 };
 
@@ -428,7 +342,7 @@ const TabBar = ({
   );
 };
 
-const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
+const FavoriteButton = ({ item }: { item: FavoriteRoute }) => {
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
@@ -443,37 +357,112 @@ const FavoriteButton = ({ item }: { item: FavoriteItem }) => {
           <HouseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
-    } else {
+    } else if (item.icon === 'work') {
       return (
         <View className="flex items-center justify-center rounded-full bg-neutral-100 p-2">
           <BriefcaseIcon width={20} height={20} fill="#274F9C" />
         </View>
       );
+    } else {
+      // Default icon when no icon is set
+      return (
+        <View className="flex items-center justify-center rounded-full bg-neutral-100 p-2">
+          <Train width={20} height={20} fill="#274F9C" />
+        </View>
+      );
     }
   };
 
+  const handlePress = () => {
+    // Navigate to navigation page with the route
+    router.push({
+      pathname: '/(app)/navigation',
+      params: {
+        from: item.fromId,
+        to: item.toId,
+      },
+    });
+  };
+
   return (
-    <Pressable className="min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+    <Pressable
+      className="min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
+      onPress={handlePress}
+    >
       {renderIcons()}
       <Text
         className="whitespace-nowrap text-center text-sm font-medium leading-tight"
         style={{ color: '#274F9C' }}
         numberOfLines={1}
       >
-        {item.label}
+        {item.from} - {item.to}
       </Text>
     </Pressable>
   );
 };
 
 const AddButton = () => {
+  const handlePress = () => {
+    // TODO: Open a modal to add a new favorite
+    router.push('/search');
+  };
+
   return (
-    <Pressable className="size-12 items-center justify-center self-center">
+    <Pressable
+      className="size-12 items-center justify-center self-center"
+      onPress={handlePress}
+    >
       <PlusIcon width={20} height={20} fill="#274F9C" />
     </Pressable>
   );
 };
 
+const FavoritesSection = () => {
+  const [favorites, setFavorites] = React.useState<FavoriteRoute[]>([]);
+
+  // Load favorites from storage
+  React.useEffect(() => {
+    const loadFavorites = () => {
+      const stored = getFavorites();
+      setFavorites(stored);
+    };
+
+    loadFavorites();
+
+    // Set up an interval to refresh favorites (in case they're added from another screen)
+    const interval = setInterval(loadFavorites, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View>
+      <Text className="mb-2 text-sm font-medium text-neutral-500">
+        Favourites
+      </Text>
+      {favorites.length === 0 ? (
+        <View className="rounded-2xl bg-white p-4">
+          <Text className="text-center text-sm text-neutral-400">
+            No favourites added yet
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: 8 }}
+        >
+          {favorites.map((item) => (
+            <FavoriteButton key={item.id} item={item} />
+          ))}
+          <AddButton />
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+/* eslint-disable max-lines-per-function */
 const NearestStopsSection = ({
   activeTab,
   onTabChange,
@@ -481,7 +470,50 @@ const NearestStopsSection = ({
   activeTab: string;
   onTabChange: (tabId: string) => void;
 }) => {
-  const currentBusRoutes = busStopData[activeTab] || [];
+  // Fetch shuttle service data for the active bus stop
+  const { data: shuttleData, isLoading } = useShuttleService(activeTab);
+
+  // Fetch service descriptions to get route colors
+  const { data: serviceDescriptions } = useServiceDescriptions();
+
+  // Create a color map from service descriptions
+  const colorMap = React.useMemo(() => {
+    if (!serviceDescriptions?.ServiceDescriptionResult?.ServiceDescription) {
+      return {};
+    }
+
+    return serviceDescriptions.ServiceDescriptionResult.ServiceDescription.reduce(
+      (map, service) => {
+        map[service.Route] = service.Color;
+        return map;
+      },
+      {} as Record<string, string>
+    );
+  }, [serviceDescriptions]);
+
+  // Transform API data to match the BusRoute format
+  const currentBusRoutes: BusRoute[] = React.useMemo(() => {
+    if (!shuttleData?.ShuttleServiceResult?.shuttles) {
+      return [];
+    }
+
+    return shuttleData.ShuttleServiceResult.shuttles.map((shuttle) => ({
+      route: shuttle.name,
+      color: getRouteColor(shuttle.name, colorMap[shuttle.name]),
+      times: [
+        {
+          time: formatArrivalTime(shuttle.arrivalTime),
+          crowding: passengerLoadToCrowding(shuttle.passengers),
+          textColor: '#211F26',
+        },
+        {
+          time: formatArrivalTime(shuttle.nextArrivalTime),
+          crowding: passengerLoadToCrowding(shuttle.nextPassengers),
+          textColor: '#737373',
+        },
+      ],
+    }));
+  }, [shuttleData, colorMap]);
 
   return (
     <View className="mb-6">
@@ -492,35 +524,48 @@ const NearestStopsSection = ({
       <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
 
       <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
-        <View className="gap-2">
-          <View className="flex-row gap-2">
-            {currentBusRoutes.slice(0, 3).map((route) => (
-              <BusRouteCard key={route.route} route={route} />
-            ))}
-            {currentBusRoutes.length < 3 &&
-              Array.from({ length: 3 - currentBusRoutes.length }).map(
-                (_, i) => <View key={`empty-${i}`} className="flex-1" />
-              )}
+        {isLoading ? (
+          <View className="items-center py-8">
+            <Text className="text-sm text-neutral-500">
+              Loading bus data...
+            </Text>
           </View>
-          {currentBusRoutes.length > 3 && (
+        ) : currentBusRoutes.length === 0 ? (
+          <View className="items-center py-8">
+            <Text className="text-sm text-neutral-500">No buses available</Text>
+          </View>
+        ) : (
+          <View className="gap-2">
             <View className="flex-row gap-2">
-              {currentBusRoutes.slice(3, 6).map((route) => (
+              {currentBusRoutes.slice(0, 3).map((route) => (
                 <BusRouteCard key={route.route} route={route} />
               ))}
-              {currentBusRoutes.length < 6 &&
-                Array.from({
-                  length: 6 - currentBusRoutes.length,
-                }).map((_, i) => (
-                  <View key={`empty-row2-${i}`} className="flex-1" />
-                ))}
+              {currentBusRoutes.length < 3 &&
+                Array.from({ length: 3 - currentBusRoutes.length }).map(
+                  (_, i) => <View key={`empty-${i}`} className="flex-1" />
+                )}
             </View>
-          )}
-        </View>
+            {currentBusRoutes.length > 3 && (
+              <View className="flex-row gap-2">
+                {currentBusRoutes.slice(3, 6).map((route) => (
+                  <BusRouteCard key={route.route} route={route} />
+                ))}
+                {currentBusRoutes.length < 6 &&
+                  Array.from({
+                    length: 6 - currentBusRoutes.length,
+                  }).map((_, i) => (
+                    <View key={`empty-row2-${i}`} className="flex-1" />
+                  ))}
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
 };
 
+/* eslint-disable max-lines-per-function */
 const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
@@ -590,48 +635,6 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     }
   };
 
-  const renderRecentItem = (item: RecentSearchItem, isLast: boolean) => {
-    const IconComponent = item.icon;
-    return (
-      <View key={item.id}>
-        <Pressable
-          className="flex-row items-center gap-2 py-2"
-          onPress={() => handleRecentPress(item)}
-        >
-          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
-            <IconComponent className="size-5" />
-          </View>
-          <Text className="flex-1 text-base font-medium text-neutral-900">
-            {item.title}
-          </Text>
-        </Pressable>
-        {!isLast && <View className="my-2 h-px w-full bg-neutral-200" />}
-      </View>
-    );
-  };
-
-  const renderSearchResult = (item: BusStation, isLast: boolean) => {
-    const IconComponent = item.icon;
-    return (
-      <View key={item.id}>
-        <Pressable
-          className="flex-row items-center gap-2 py-3"
-          onPress={() => handleResultPress(item)}
-        >
-          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
-            <IconComponent className="size-5" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-base font-medium text-neutral-900">
-              {item.name}
-            </Text>
-          </View>
-        </Pressable>
-        {!isLast && <View className="my-1 h-px w-full bg-neutral-200" />}
-      </View>
-    );
-  };
-
   const renderPopularItem = (item: PopularSearchItem) => {
     const handleNavPress = () => {
       router.push({
@@ -641,26 +644,12 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     };
 
     return (
-      <Pressable
+      <PopularSearchCard
         key={item.id}
-        className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
-        style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
+        item={item}
+        showAllPopular={showAllPopular}
         onPress={handleNavPress}
-      >
-        <View className="relative size-full">
-          <Image
-            source={{ uri: item.image }}
-            className="size-full"
-            style={{ resizeMode: 'cover' }}
-          />
-          <View className="absolute inset-0 bg-black/40" />
-          <View className="absolute inset-x-0 bottom-0 p-3">
-            <Text className="text-lg font-bold leading-tight text-white">
-              {item.title}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
+      />
     );
   };
 
@@ -730,14 +719,19 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
                 <Text className="mb-3 text-sm font-medium text-neutral-500">
                   Search Results ({searchResults.length})
                 </Text>
-                {searchResults.map((item, index, array) =>
-                  renderSearchResult(item, index === array.length - 1)
-                )}
+                {searchResults.map((item, index, array) => (
+                  <SearchResultItem
+                    key={item.id}
+                    item={item}
+                    isLast={index === array.length - 1}
+                    onPress={() => handleResultPress(item)}
+                  />
+                ))}
               </View>
             ) : (
               <View className="items-center py-8">
                 <Text className="text-base text-neutral-500">
-                  No results found for "{searchText}"
+                  No results found for &quot;{searchText}&quot;
                 </Text>
               </View>
             )}
@@ -766,9 +760,14 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
                   {(showAllRecent
                     ? recentSearches
                     : recentSearches.slice(0, 3)
-                  ).map((item, index, array) =>
-                    renderRecentItem(item, index === array.length - 1)
-                  )}
+                  ).map((item, index, array) => (
+                    <RecentSearchCard
+                      key={item.id}
+                      item={item}
+                      isLast={index === array.length - 1}
+                      onPress={() => handleRecentPress(item)}
+                    />
+                  ))}
                 </View>
               </View>
             )}
@@ -831,27 +830,14 @@ const BottomSheetContent = ({
             onTabChange={onTabChange}
           />
 
-          <View>
-            <Text className="mb-2 text-sm font-medium text-neutral-500">
-              Favourites
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {favorites.map((item) => (
-                <FavoriteButton key={item.id} item={item} />
-              ))}
-              <AddButton />
-            </ScrollView>
-          </View>
+          <FavoritesSection />
         </>
       )}
     </>
   );
 };
 
+/* eslint-disable max-lines-per-function */
 const useDragHandlers = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isSearchMode, setIsSearchMode] = React.useState(false);
@@ -924,8 +910,9 @@ const useDragHandlers = () => {
   };
 };
 
+/* eslint-disable max-lines-per-function */
 export default function TransitPage() {
-  const [activeTab, setActiveTab] = React.useState<string>('central-library');
+  const [activeTab, setActiveTab] = React.useState<string>('CENLIB');
   const {
     isCollapsed,
     isSearchMode,

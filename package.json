@@ -1,6 +1,24 @@
 {
-  "name": "obytesapp",
-  "version": "8.0.0",
+  "name": "nus-nextbus-redesign",
+  "version": "1.0.0",
+  "description": "A modern redesign of the NUS Internal Shuttle Bus Service mobile app",
+  "author": "Edward Zehua Zhang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EdwardZehuaZhang/nus-nextbus-redesign-fe.git"
+  },
+  "keywords": [
+    "nus",
+    "nextbus",
+    "shuttle",
+    "bus",
+    "transportation",
+    "react-native",
+    "expo",
+    "typescript",
+    "mobile-app"
+  ],
   "private": true,
   "main": "expo-router/entry",
   "scripts": {

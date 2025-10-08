@@ -11,44 +11,55 @@ const BusIcon = () => (
   </Svg>
 );
 
-export const BusIndicator = () => {
+const BusIconWrapper = () => (
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 6,
+      marginLeft: -5.5,
+      marginRight: -5.5,
+      backgroundColor: '#F5F5F5',
+      borderRadius: 97,
+      borderWidth: 1,
+      borderColor: '#E5E5E5',
+    }}
+  >
+    <View style={{ width: 20, height: 20, aspectRatio: 1 }}>
+      <BusIcon />
+    </View>
+  </View>
+);
+
+type BusIndicatorProps = {
+  expanded?: boolean;
+};
+
+export const BusIndicator = ({ expanded = false }: BusIndicatorProps) => {
+  // Base height: 212 for collapsed, add ~110 for expanded (3 stops at ~30-35 each + spacing)
+  const containerHeight = expanded ? 322 : 212;
+  const lineHeight = expanded ? 263 : 153;
+
   return (
     <View
       style={{
         flexDirection: 'column',
         width: 21,
-        height: 212,
+        height: containerHeight,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
       }}
     >
-      {/* Top Bus Icon with negative margin */}
-      <View
-        style={{
-          marginTop: -2.5,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          padding: 6,
-          marginLeft: -5.5,
-          marginRight: -5.5,
-          backgroundColor: '#F5F5F5',
-          borderRadius: 97,
-          borderWidth: 1,
-          borderColor: '#E5E5E5',
-        }}
-      >
-        <View style={{ width: 20, height: 20, aspectRatio: 1 }}>
-          <BusIcon />
-        </View>
+      <View style={{ marginTop: -2.5 }}>
+        <BusIconWrapper />
       </View>
 
-      {/* Blue vertical line */}
       <View
         style={{
           width: 13,
-          height: 153,
+          height: lineHeight,
           backgroundColor: '#274F9C',
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 1 },
@@ -58,25 +69,8 @@ export const BusIndicator = () => {
         }}
       />
 
-      {/* Bottom Bus Icon with negative margin */}
-      <View
-        style={{
-          marginBottom: -2.5,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 10,
-          padding: 6,
-          marginLeft: -5.5,
-          marginRight: -5.5,
-          backgroundColor: '#F5F5F5',
-          borderRadius: 97,
-          borderWidth: 1,
-          borderColor: '#E5E5E5',
-        }}
-      >
-        <View style={{ width: 20, height: 20, aspectRatio: 1 }}>
-          <BusIcon />
-        </View>
+      <View style={{ marginBottom: -2.5 }}>
+        <BusIconWrapper />
       </View>
     </View>
   );

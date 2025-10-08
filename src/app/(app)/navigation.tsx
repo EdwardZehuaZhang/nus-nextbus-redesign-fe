@@ -15,88 +15,16 @@ import {
   View,
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
+import { addFavorite, isFavorite } from '@/lib/storage/favorites';
 
 import { CircleIcon } from './circle-icon';
 import { DragIcon } from './drag-icon';
-
-// Status Bar Icons
-const CellularIcon = () => (
-  <Svg width={19} height={12} viewBox="0 0 20 13" fill="none">
-    <Path
-      d="M2.41296 7.90222C3.04622 7.90222 3.56038 8.41546 3.56042 9.04871V11.3417C3.56042 11.975 3.04625 12.4891 2.41296 12.4891H1.26648C0.633276 12.489 0.119995 11.9749 0.119995 11.3417V9.04871C0.120043 8.41552 0.633306 7.90232 1.26648 7.90222H2.41296ZM7.76453 5.60925C8.39775 5.60933 8.91101 6.1225 8.91101 6.75574V11.3417C8.91101 11.9749 8.39775 12.4891 7.76453 12.4891H6.61804C5.98476 12.4891 5.47058 11.975 5.47058 11.3417V6.75574C5.47058 6.12245 5.98476 5.60925 6.61804 5.60925H7.76453ZM13.1151 2.93347C13.7484 2.93347 14.2625 3.44669 14.2626 4.07996V11.3427C14.2623 11.9757 13.7483 12.4891 13.1151 12.4891H11.9686C11.3356 12.489 10.8224 11.9756 10.8221 11.3427V4.07996C10.8222 3.44679 11.3355 2.93363 11.9686 2.93347H13.1151ZM18.4667 0.25769C19.0999 0.257699 19.613 0.770996 19.6132 1.40417V11.3427C19.6129 11.9757 19.0998 12.4891 18.4667 12.4891H17.3202C16.6871 12.4891 16.174 11.9757 16.1737 11.3427V1.40417C16.1738 0.770991 16.687 0.25769 17.3202 0.25769H18.4667Z"
-      fill="#27272A"
-    />
-  </Svg>
-);
-
-const WifiIcon = () => (
-  <Svg width={18} height={13} viewBox="0 0 18 14" fill="none">
-    <Path
-      d="M6.59473 10.535C8.06312 9.29429 10.2132 9.29433 11.6816 10.535C11.7555 10.6018 11.7987 10.6963 11.8008 10.7958C11.8028 10.8952 11.7634 10.9908 11.6924 11.0604L9.39355 13.3798C9.32627 13.4477 9.23432 13.4861 9.13867 13.4862C9.04284 13.4862 8.95021 13.4478 8.88281 13.3798L6.58301 11.0604C6.5122 10.9907 6.47356 10.8951 6.47559 10.7958C6.47769 10.6963 6.52079 10.6017 6.59473 10.535ZM3.52637 7.44226C6.6902 4.50179 11.5891 4.50179 14.7529 7.44226C14.8244 7.51121 14.8652 7.60573 14.8662 7.70496C14.8672 7.80403 14.8286 7.89927 14.7588 7.9696L13.4297 9.31238C13.2927 9.44934 13.0712 9.45162 12.9307 9.31824C11.8918 8.37831 10.5402 7.85828 9.13867 7.85828C7.73798 7.85886 6.3869 8.37885 5.34863 9.31824C5.20814 9.45162 4.9866 9.44933 4.84961 9.31238L3.52148 7.9696C3.45135 7.89933 3.41216 7.8042 3.41309 7.70496C3.41402 7.6057 3.4549 7.51121 3.52637 7.44226ZM0.458008 4.3573C5.31062 -0.288962 12.9659 -0.289159 17.8184 4.3573C17.8886 4.42633 17.9281 4.52059 17.9287 4.61902C17.9293 4.71741 17.8907 4.81188 17.8213 4.88171L16.4902 6.22351C16.3531 6.36122 16.1304 6.363 15.9912 6.22742C14.1425 4.4715 11.6894 3.49228 9.13867 3.49207C6.58748 3.49206 4.13323 4.47118 2.28418 6.22742C2.14504 6.36321 1.92219 6.36143 1.78516 6.22351L0.454102 4.88171C0.384796 4.81184 0.346049 4.71739 0.34668 4.61902C0.347328 4.52058 0.387715 4.42628 0.458008 4.3573Z"
-      fill="#27272A"
-    />
-  </Svg>
-);
-
-const BatteryIcon = () => (
-  <View className="relative">
-    <View
-      style={{
-        width: 25,
-        height: 13,
-        borderRadius: 3,
-        borderWidth: 1,
-        borderColor: '#27272A',
-        opacity: 0.35,
-      }}
-    />
-    <Svg
-      style={{
-        position: 'absolute',
-        right: -2,
-        top: 4,
-        width: 2,
-        height: 5,
-      }}
-      width="2"
-      height="5"
-      viewBox="0 0 2 5"
-      fill="none"
-    >
-      <Path
-        opacity="0.4"
-        d="M0.0354004 0.0799561V4.66662C0.958159 4.27816 1.55822 3.37448 1.55822 2.37329C1.55822 1.3721 0.958159 0.46842 0.0354004 0.0799561Z"
-        fill="#27272A"
-      />
-    </Svg>
-    <View
-      style={{
-        position: 'absolute',
-        left: 2,
-        top: 2,
-        width: 21,
-        height: 8,
-        borderRadius: 1.5,
-        backgroundColor: '#27272A',
-      }}
-    />
-  </View>
-);
 
 // Navigation Icons
 const NavigationArrow = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
     <Path
       d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
-      fill="#737373"
-    />
-  </Svg>
-);
-
-const MenuIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-    <Path
-      d="M17.5 10C17.5 10.1658 17.4342 10.3247 17.3169 10.4419C17.1997 10.5592 17.0408 10.625 16.875 10.625H3.125C2.95924 10.625 2.80027 10.5592 2.68306 10.4419C2.56585 10.3247 2.5 10.1658 2.5 10C2.5 9.83424 2.56585 9.67527 2.68306 9.55806C2.80027 9.44085 2.95924 9.375 3.125 9.375H16.875C17.0408 9.375 17.1997 9.44085 17.3169 9.55806C17.4342 9.67527 17.5 9.83424 17.5 10ZM3.125 5.625H16.875C17.0408 5.625 17.1997 5.55915 17.3169 5.44194C17.4342 5.32473 17.5 5.16576 17.5 5C17.5 4.83424 17.4342 4.67527 17.3169 4.55806C17.1997 4.44085 17.0408 4.375 16.875 4.375H3.125C2.95924 4.375 2.80027 4.44085 2.68306 4.55806C2.56585 4.67527 2.5 4.83424 2.5 5C2.5 5.16576 2.56585 5.32473 2.68306 5.44194C2.80027 5.55915 2.95924 5.625 3.125 5.625ZM16.875 14.375H3.125C2.95924 14.375 2.80027 14.4408 2.68306 14.5581C2.56585 14.6753 2.5 14.8342 2.5 15C2.5 15.1658 2.56585 15.3247 2.68306 15.4419C2.80027 15.5592 2.95924 15.625 3.125 15.625H16.875C17.0408 15.625 17.1997 15.5592 17.3169 15.4419C17.4342 15.3247 17.5 15.1658 17.5 15C17.5 14.8342 17.4342 14.6753 17.3169 14.5581C17.1997 14.4408 17.0408 14.375 16.875 14.375Z"
       fill="#737373"
     />
   </Svg>
@@ -151,15 +79,6 @@ const PersonIcon = () => (
         />
       </ClipPath>
     </Defs>
-  </Svg>
-);
-
-const VanIcon = () => (
-  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-    <Path
-      d="M19.8492 8.34297L16.2914 4.19766C16.1741 4.05749 16.0274 3.94476 15.8618 3.86741C15.6962 3.79007 15.5156 3.74999 15.3328 3.75H2.5C2.16848 3.75 1.85054 3.8817 1.61612 4.11612C1.3817 4.35054 1.25 4.66848 1.25 5V13.75C1.25 14.0815 1.3817 14.3995 1.61612 14.6339C1.85054 14.8683 2.16848 15 2.5 15H3.82812C3.96581 15.5378 4.27856 16.0144 4.71707 16.3548C5.15557 16.6952 5.69489 16.8799 6.25 16.8799C6.80511 16.8799 7.34443 16.6952 7.78293 16.3548C8.22144 16.0144 8.53419 15.5378 8.67188 15H12.5781C12.7158 15.5378 13.0286 16.0144 13.4671 16.3548C13.9056 16.6952 14.4449 16.8799 15 16.8799C15.5551 16.8799 16.0944 16.6952 16.5329 16.3548C16.9714 16.0144 17.2842 15.5378 17.4219 15H18.75C19.0815 15 19.3995 14.8683 19.6339 14.6339C19.8683 14.3995 20 14.0815 20 13.75V8.75C20 8.60067 19.9465 8.45628 19.8492 8.34297ZM2.5 8.125V5H6.875V8.125H2.5ZM6.25 15.625C6.00277 15.625 5.7611 15.5517 5.55554 15.4143C5.34998 15.277 5.18976 15.0818 5.09515 14.8534C5.00054 14.6249 4.97579 14.3736 5.02402 14.1311C5.07225 13.8887 5.1913 13.6659 5.36612 13.4911C5.54093 13.3163 5.76366 13.1972 6.00614 13.149C6.24861 13.1008 6.49995 13.1255 6.72835 13.2201C6.95676 13.3148 7.15199 13.475 7.28934 13.6805C7.42669 13.8861 7.5 14.1278 7.5 14.375C7.5 14.7065 7.3683 15.0245 7.13388 15.2589C6.89946 15.4933 6.58152 15.625 6.25 15.625ZM12.5 8.125H8.125V5H12.5V8.125ZM15 15.625C14.7528 15.625 14.5111 15.5517 14.3055 15.4143C14.1 15.277 13.9398 15.0818 13.8451 14.8534C13.7505 14.6249 13.7258 14.3736 13.774 14.1311C13.8222 13.8887 13.9413 13.6659 14.1161 13.4911C14.2909 13.3163 14.5137 13.1972 14.7561 13.149C14.9986 13.1008 15.2499 13.1255 15.4784 13.2201C15.7068 13.3148 15.902 13.475 16.0393 13.6805C16.1767 13.8861 16.25 14.1278 16.25 14.375C16.25 14.7065 16.1183 15.0245 15.8839 15.2589C15.6495 15.4933 15.3315 15.625 15 15.625ZM13.75 8.125V5H15.3328L18.0148 8.125H13.75Z"
-      fill="#274F9C"
-    />
   </Svg>
 );
 
@@ -228,13 +147,34 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
 
 export default function NavigationPage() {
   const router = useRouter();
-  const { destination } = useLocalSearchParams();
+  const { destination, from, to } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
 
   // Get destination from URL parameter or default to "COM3"
   const currentDestination =
     typeof destination === 'string' ? destination : 'COM3';
+
+  // Get from and to for favorites
+  const fromLocation = typeof from === 'string' ? from : 'Your location';
+  const toLocation = typeof to === 'string' ? to : currentDestination;
+
+  // Check if this route is already favorited
+  const [favorited, setFavorited] = useState(() =>
+    isFavorite(fromLocation, toLocation)
+  );
+
+  const handleSaveFavorite = () => {
+    if (!favorited) {
+      addFavorite({
+        from: fromLocation,
+        to: toLocation,
+        fromId: fromLocation,
+        toId: toLocation,
+      });
+      setFavorited(true);
+    }
+  };
 
   // Manage all locations as a unified list
   type LocationItem = {
@@ -312,34 +252,6 @@ export default function NavigationPage() {
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
 
-      {/* Status Bar */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 24,
-          paddingTop: 8,
-          height: 50,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 17,
-            fontWeight: '600',
-            color: '#27272A',
-            letterSpacing: -0.344,
-          }}
-        >
-          9:41
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <CellularIcon />
-          <WifiIcon />
-          <BatteryIcon />
-        </View>
-      </View>
-
       {/* Map Background */}
       <View className="flex-1">
         <InteractiveMap
@@ -350,7 +262,7 @@ export default function NavigationPage() {
         <View
           style={{
             marginHorizontal: 10,
-            marginTop: 0,
+            marginTop: 48,
             borderRadius: 12,
             borderWidth: 1,
             borderColor: '#E5E5E5',
@@ -707,7 +619,7 @@ export default function NavigationPage() {
                   }}
                 >
                   {/* Blue line indicator with bus icons */}
-                  <BusIndicator />
+                  <BusIndicator expanded={routeExpanded} />
 
                   <View
                     style={{
@@ -1245,6 +1157,8 @@ export default function NavigationPage() {
 
             {/* Save as Favorite Button */}
             <Pressable
+              onPress={handleSaveFavorite}
+              disabled={favorited}
               style={{
                 height: 36,
                 paddingVertical: 8,
@@ -1255,40 +1169,31 @@ export default function NavigationPage() {
                 gap: 4,
                 borderRadius: 8,
                 borderWidth: 1,
-                borderColor: '#E5E5E5',
-                backgroundColor: '#FFFFFF',
+                borderColor: favorited ? '#274F9C' : '#E5E5E5',
+                backgroundColor: favorited ? '#F0F4FF' : '#FFFFFF',
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.1,
                 shadowRadius: 2,
                 elevation: 1,
                 flexDirection: 'row',
+                opacity: favorited ? 0.7 : 1,
               }}
             >
               <Text
-                style={{ fontSize: 14, fontWeight: '500', color: '#211F26' }}
+                style={{
+                  fontSize: 14,
+                  fontWeight: '500',
+                  color: favorited ? '#274F9C' : '#211F26',
+                }}
               >
-                Save as favorite
+                {favorited ? 'Saved as favorite' : 'Save as favorite'}
               </Text>
               <BookmarkIcon />
             </Pressable>
           </ScrollView>
         </View>
       </View>
-
-      {/* Home Indicator */}
-      <View
-        style={{
-          position: 'absolute',
-          bottom: 34,
-          left: 138,
-          width: 154,
-          height: 6,
-          borderRadius: 114.667,
-          opacity: 0.4,
-          backgroundColor: '#E4E4E7',
-        }}
-      />
     </View>
   );
 }

@@ -23,10 +23,11 @@ const appIconBadgeConfig: AppIconBadgeConfig = {
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: Env.NAME,
-  description: `${Env.NAME} Mobile App`,
+  description:
+    'A modern redesign of the NUS Internal Shuttle Bus Service mobile app with real-time tracking, route planning, and interactive maps.',
   owner: Env.EXPO_ACCOUNT_OWNER,
   scheme: Env.SCHEME,
-  slug: 'obytesapp',
+  slug: 'nus-nextbus',
   version: Env.VERSION.toString(),
   orientation: 'portrait',
   icon: './assets/icon.png',

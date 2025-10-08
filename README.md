@@ -1,138 +1,312 @@
-<p align="center">
-    <img alt="React Native Template Obytes" src="https://github.com/obytes/react-native-template-obytes/assets/11137944/a8163d23-897a-4efe-91ce-b9bf7348c18f" width="200" />
-</p>
-
 <h1 align="center">
-  React Native Template Obytes
+  🚌 NUS NextBus Redesign
 </h1>
 
-![expo](https://img.shields.io/github/package-json/dependency-version/obytes/react-native-template-obytes/expo?label=expo) ![react-native](https://img.shields.io/github/package-json/dependency-version/obytes/react-native-template-obytes/react-native?label=react-native) ![GitHub Repo stars](https://img.shields.io/github/stars/obytes/react-native-template-obytes) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/obytes/react-native-template-obytes) ![GitHub issues](https://img.shields.io/github/issues/obytes/react-native-template-obytes) ![GitHub closed issues](https://img.shields.io/github/issues-closed-raw/obytes/react-native-template-obytes)
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-blue" alt="Platform" />
+  <img src="https://img.shields.io/badge/Expo-SDK%2052-000020?logo=expo" alt="Expo" />
+  <img src="https://img.shields.io/badge/React%20Native-0.76-61DAFB?logo=react" alt="React Native" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript" alt="TypeScript" />
+</p>
 
-📱 A template for your next React Native project 🚀, Made with developer experience and performance first: Expo, TypeScript, TailwindCSS, Husky, Lint-Staged, expo-router, react-query, react-hook-form, I18n.
+<p align="center">
+  A modern, redesigned mobile app for the NUS Internal Shuttle Bus Service, built with Expo, TypeScript, and TailwindCSS.
+</p>
+---
 
-> Welcome to the Obytes Mobile Tribe's Expo / React Native Starter Kit!
+## 📱 About
 
-## 🚀 Motivation
+NUS NextBus Redesign is a complete overhaul of the NUS Internal Shuttle Bus Service mobile app. This project aims to provide students, staff, and visitors with a modern, intuitive, and feature-rich experience for tracking and planning their bus journeys around the NUS campus.
 
-Our goal with this starter kit was to streamline the process of building React Native apps, both for our own team and for our clients. We wanted to create a resource that would allow us to create high-quality apps faster and with less effort, while ensuring that all of our projects adhere to the same code standards and architectural principles.
+### Key Features
 
-The benefits of using this starter kit are numerous. It helps our team easily switch between projects, as we can rely on a consistent foundation of code. It also allows us to focus on the business logic of each project rather than getting bogged down in boilerplate code. And, because it promotes consistency across projects, it makes it easier to maintain and scale our apps, as well as share code between teams.
+- 🗺️ **Interactive Map**: Real-time bus tracking with Google Maps integration
+- 🚏 **Bus Stop Information**: Comprehensive details about all bus stops and routes
+- ⏱️ **Real-time Arrivals**: Live bus arrival times for all routes (A1, A2, D1, D2, BTC, L, E, K)
+- 🎯 **Route Navigation**: Step-by-step journey planning with walking directions
+- ⭐ **Favorites System**: Save frequently used routes for quick access
+- 🎨 **Route Colors**: Dynamic color-coded routes matching official NUS bus colors
+- 🔍 **Smart Search**: Find destinations and plan routes efficiently
+- 🌐 **Multi-environment Support**: Development and production backend configurations
 
-Overall, our starter kit is designed to facilitate efficient and effective app development, helping us to bring the best possible products to our clients
+---
 
-## ✍️ Philosophy
+## 🚀 Quick Start
 
-When creating this starter kit, we had several guiding principles in mind::
+### Prerequisites
 
-- **🚀 Production-ready**: We wanted to ensure that this starter was ready for real-world use, providing a solid foundation for building production-grade apps.
-- **🥷 Developer experience and productivity**: Our focus was on creating a starter that would enhance the developer experience and increase productivity.
-- **🧩 Minimal code and dependencies**: We aimed to keep the codebase and dependencies as small as possible.
-- **💪 Well-maintained third-party libraries**: We included only well-maintained and reliable third-party libraries, to provide stability and support for our projects.
+- Node.js (v18 or higher)
+- pnpm (recommended) or npm
+- Expo CLI
+- iOS Simulator (Mac only) or Android Emulator
 
-## ⭐ Key Features
+### Installation
 
-- ✅ Latest Expo SDK with Custom Dev Client: Leverage the best of the Expo ecosystem while maintaining full control over your app.
-- 🎉 [TypeScript](https://www.typescriptlang.org/) for enhanced code quality and bug prevention through static type checking.
-- 💅 Minimal UI kit built with [TailwindCSS](https://www.nativewind.dev/), featuring common components essential for your app.
-- ⚙️ Multi-environment build support (Production, Staging, Development) using Expo configuration.
-- 🦊 Husky for Git Hooks: Automate your git hooks and enforce code standards.
-- 💡 Clean project structure with Absolute Imports for easier code navigation and management.
-- 🚫 Lint-staged: Run Eslint and TypeScript checks on Git staged files to maintain code quality.
-- 🗂 VSCode recommended extensions, settings, and snippets for an enhanced developer experience.
-- ☂️ Pre-installed [Expo Router](https://docs.expo.dev/router/introduction/) with examples for comprehensive app navigation.
-- 💫 Auth flow implementation using [Zustand](https://github.com/pmndrs/zustand) for state management and [react-native-mmkv](https://github.com/mrousavy/react-native-mmkv) for secure data storage.
-- 🛠 10+ [Github Actions](https://github.com/features/actions) workflows for building, releasing, testing, and distributing your app.
-- 🔥 [React Query](https://react-query.tanstack.com/) and [axios](https://github.com/axios/axios) for efficient data fetching and state management.
-- 🧵 Robust form handling with [react-hook-form](https://react-hook-form.com/) and [zod](https://github.com/colinhacks/zod) for validation, plus keyboard handling.
-- 🎯 Localization support with [i18next](https://www.i18next.com/), including Eslint for validation.
-- 🧪 Unit testing setup with [Jest](https://jestjs.io/) and [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/).
-- 🔍 E2E testing capabilities with [Maestro](https://maestro.mobile.dev/) for comprehensive app testing.
+1. **Clone the repository**
 
-## Is this starter for me?
+   ```bash
+   git clone https://github.com/EdwardZehuaZhang/nus-nextbus-redesign-fe.git
+   cd nus-nextbus-redesign-fe
+   ```
 
-Yes 😀
+2. **Install dependencies**
 
-This starter kit is designed to benefit a wide range of React Native developers, from beginners to experienced professionals. Here's why it might be a good fit for you:
+   ```bash
+   pnpm install
+   ```
 
-1. **For beginners:** It provides a solid foundation with best practices and common solutions, helping you learn industry-standard approaches to React Native development.
+3. **Start the development server**
 
-2. **For experienced developers:** It offers a well-structured, production-ready setup that can save you time and effort in project initialization and configuration.
+   ```bash
+   # Development (localhost backend)
+   pnpm start
 
-3. **For teams:** It ensures consistency across projects and team members, making it easier to onboard new developers and maintain code quality.
+   # Production (Render.com backend)
+   pnpm run start:production
+   ```
 
-4. **For explorers:** Even if you prefer not to use starter kits, this project can serve as a valuable reference. You can explore the codebase, documentation, and architectural decisions to gain insights and potentially adopt specific solutions for your projects.
+4. **Run on your device**
+   - Scan QR code with Expo Go app
+   - Or press `i` for iOS simulator
+   - Or press `a` for Android emulator
 
-5. **For learners:** The starter kit incorporates up-to-date libraries and patterns, allowing you to familiarize yourself with current best practices in the React Native ecosystem.
+---
 
-6. **For AI-assisted development:** This starter kit works well with AI coding tools. It provides a solid structure and best practices that can guide AI-generated code. This helps ensure that AI assistance leads to high-quality, maintainable code that fits well within your project.
+## 🏗️ Project Structure
 
-Remember, you don't have to use the entire starter kit as-is. Feel free to cherry-pick ideas, configurations, or code snippets that align with your project needs. Whether you're building a new app from scratch or looking to improve your existing development process, this starter kit can provide valuable insights and practical solutions.
+```
+nus-nextbus-redesign-fe/
+├── src/
+│   ├── api/              # API integration & data fetching
+│   │   ├── bus/          # Bus-related API endpoints
+│   │   ├── google-maps/  # Google Maps API integration
+│   │   └── common/       # Shared API utilities
+│   ├── app/              # Expo Router pages
+│   │   ├── (app)/        # Authenticated app screens
+│   │   │   ├── transit.tsx      # Main bus tracking page
+│   │   │   ├── navigation.tsx   # Route navigation page
+│   │   │   └── search.tsx       # Destination search
+│   │   ├── login.tsx     # Login screen
+│   │   └── onboarding.tsx
+│   ├── components/       # Reusable UI components
+│   │   ├── bus-indicator.tsx
+│   │   ├── interactive-map.tsx
+│   │   └── ui/           # Base UI components
+│   ├── lib/              # Utilities & helpers
+│   │   ├── auth/         # Authentication logic
+│   │   ├── storage/      # MMKV storage (favorites)
+│   │   └── hooks/        # Custom React hooks
+│   └── translations/     # i18n language files
+├── .env.development      # Local backend config
+├── .env.production       # Production backend config
+└── app.config.ts         # Expo configuration
+```
 
-## Why Expo and not React Native CLI?
+---
 
-We have been using Expo as our main framework since the introduction of [Continuous Native Generation (CNG)](https://docs.expo.dev/workflow/continuous-native-generation/) concept and we are happy with the experience.
+## 🔧 Configuration
 
-I think this question is not valid anymore, especially after the last React conference when the core React native team recommended using Expo for new projects.
+### Environment Variables
 
-> "As of today, the only recommended community framework for React Native is Expo. Folks at Expo have been investing in the React Native ecosystem since the early days of React Native and as of today, we believe the developer experience offered by Expo is best in class." React native core team
+The app supports multiple environments with different backend configurations:
 
-Still hesitating? Check out this [article](https://reactnative.dev/blog/2024/06/25/use-a-framework-to-build-react-native-apps) or this [video](https://www.youtube.com/watch?v=lifGTznLBcw), maybe this one [video](https://www.youtube.com/watch?v=ek_IdGC0G80) too.
+**Development** (Local Backend)
 
-## 🧑‍💻 Stay up to date
+```bash
+API_URL=http://localhost:3000
+```
 
-We are committed to continually improving our starter kit and providing the best possible resources for building React Native apps. To that end, we regularly add new features and fix any bugs that are discovered.
+**Production** (Render.com)
 
-If you want to stay up to date with the latest developments in our starter kit, you can either watch the repository or hit the "star" button. This will allow you to receive notifications whenever new updates are available.
+```bash
+API_URL=https://nus-nextbus-mock-api.onrender.com
+```
 
-We value the feedback and contributions of our users, and we encourage you to let us know if you have any suggestions for improving our starter kit. We are always looking for ways to make it even more effective and useful for our community. So, please do not hesitate to reach out and share your thoughts with us.
+Switch environments using:
 
-<!-- add a gif image here  -->
+```bash
+pnpm start                    # Development
+pnpm run start:production     # Production
+pnpm run start:staging        # Staging
+```
 
-## 💎 Libraries used
+For detailed environment setup, see [ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)
 
-- [Expo](https://docs.expo.io/)
-- [Expo Router](https://docs.expo.dev/router/introduction/)
-- [Nativewind](https://www.nativewind.dev/v4/overview)
-- [Flash list](https://github.com/Shopify/flash-list)
-- [React Query](https://tanstack.com/query/v4)
-- [Axios](https://axios-http.com/docs/intro)
-- [React Hook Form](https://react-hook-form.com/)
-- [i18next](https://www.i18next.com/)
-- [zustand](https://github.com/pmndrs/zustand)
-- [React Native MMKV](https://github.com/mrousavy/react-native-mmkv)
-- [React Native Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/docs/)
-- [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/docs/)
-- [React Native Svg](https://github.com/software-mansion/react-native-svg)
-- [React Error Boundaries](https://github.com/bvaughn/react-error-boundary)
-- [Expo Image](https://docs.expo.dev/versions/unversioned/sdk/image/)
-- [React Native Keyboard Controller](https://github.com/kirillzyusko/react-native-keyboard-controller)
-- [Moti](https://moti.fyi/)
-- [React Native Safe Area Context](https://github.com/th3rdwave/react-native-safe-area-context)
-- [React Native Screens](https://github.com/software-mansion/react-native-screens)
-- [Tailwind Variants](https://www.tailwind-variants.org/)
-- [Zod](https://zod.dev/)
+### Google Maps API
 
-## Contributors
+Add your Google Maps API key to environment files:
 
-This starter is maintained by [Obytes mobile tribe team](https://www.obytes.com/team) and we welcome new contributors to join us in improving it. If you are interested in getting involved in the project, please don't hesitate to open an issue or submit a pull request.
+```bash
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
+```
 
-In addition to maintaining this starter kit, we are also available to work on custom projects and help you build your dream app. If you are looking for experienced and reliable developers to bring your app vision to life, please visit our website at [obytes.com/contact](https://www.obytes.com/contact) to get in touch with us. We would be happy to discuss your project in more detail and explore how we can help you achieve your goals.
+---
 
-## 🔥 How to contribute?
+## 🚌 Backend API
 
-Thank you for your interest in contributing to our project. Your involvement is greatly appreciated and we welcome your contributions. Here are some ways you can help us improve this project:
+The app connects to the NUS NextBus Mock API which provides:
 
-1. Show your support for the project by giving it a 🌟 on Github. This helps us increase visibility and attract more contributors.
-2. Share your thoughts and ideas with us by opening an issue. If you have any suggestions or feedback about any aspect of the project, we are always eager to hear from you and have a discussion.
-3. If you have any questions about the project, please don't hesitate to ask. Simply open an issue and our team will do our best to provide a helpful and informative response.
-4. If you encounter a bug or typo while using the starter kit or reading the documentation, we would be grateful if you could bring it to our attention. You can open an issue to report the issue, or even better, submit a pull request with a fix.
+- Bus stop locations and information
+- Real-time shuttle service data
+- Route descriptions and colors
+- Active bus tracking
+- Announcements and ticker tapes
 
-We value the input and contributions of our community and look forward to working with you to improve this project.
+**Backend Repository**: [nus-nextbus-mock-api](https://github.com/EdwardZehuaZhang/nus-nextbus-mock-api)
 
-## ❓ FAQ
+**Production API**: https://nus-nextbus-mock-api.onrender.com
 
-If you have any questions about the starter and want answers, please check out the [Discussions](https://github.com/obytes/react-native-template-obytes/discussions) page.
+### Available Endpoints
 
-## 🔖 License
+```
+GET /BusStops              - All bus stops
+GET /ShuttleService        - Bus arrival times
+GET /ServiceDescription    - Route information with colors
+GET /ActiveBus             - Real-time bus locations
+GET /PickupPoint           - Pickup points for routes
+GET /CheckPoint            - Route checkpoints
+GET /Announcements         - Service announcements
+```
 
-This project is MIT licensed.
+---
+
+## 🛠️ Tech Stack
+
+### Core Technologies
+
+- **[Expo SDK 52](https://docs.expo.dev/)** - React Native framework
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe development
+- **[Expo Router](https://docs.expo.dev/router/introduction/)** - File-based navigation
+- **[NativeWind](https://www.nativewind.dev/)** - TailwindCSS for React Native
+
+### Data & State Management
+
+- **[React Query](https://tanstack.com/query/latest)** - Server state & data fetching
+- **[Zustand](https://github.com/pmndrs/zustand)** - Client state management
+- **[React Native MMKV](https://github.com/mrousavy/react-native-mmkv)** - Fast local storage
+- **[Axios](https://axios-http.com/)** - HTTP client
+
+### UI & Animations
+
+- **[React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)** - Smooth animations
+- **[Moti](https://moti.fyi/)** - Declarative animations
+- **[React Native Gesture Handler](https://docs.swmansion.com/react-native-gesture-handler/)** - Touch gestures
+- **[Bottom Sheet](https://github.com/gorhom/react-native-bottom-sheet)** - Native bottom sheets
+
+### Maps & Location
+
+- **[Google Maps API](https://developers.google.com/maps)** - Interactive maps
+- **[Expo Location](https://docs.expo.dev/versions/latest/sdk/location/)** - User location services
+- **[@mapbox/polyline](https://github.com/mapbox/polyline)** - Route polyline decoding
+
+### Forms & Validation
+
+- **[React Hook Form](https://react-hook-form.com/)** - Performant forms
+- **[Zod](https://zod.dev/)** - Schema validation
+
+### Development Tools
+
+- **[ESLint](https://eslint.org/)** - Code linting
+- **[Prettier](https://prettier.io/)** - Code formatting
+- **[Husky](https://typicode.github.io/husky/)** - Git hooks
+- **[Jest](https://jestjs.io/)** - Unit testing
+- **[React Testing Library](https://testing-library.com/react)** - Component testing
+
+---
+
+## 📸 Screenshots
+
+> _Coming soon - Add screenshots of the app here_
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Completed
+
+- [x] Real-time bus tracking with interactive map
+- [x] Multi-route support (A1, A2, D1, D2, BTC, L, E, K)
+- [x] Dynamic route colors from API
+- [x] Favorites system with persistent storage
+- [x] Search and route planning
+- [x] Production backend deployment
+- [x] Multi-environment configuration
+
+### 🚧 In Progress
+
+- [ ] User authentication and profiles
+- [ ] Push notifications for bus arrivals
+- [ ] Offline mode support
+- [ ] Bus crowding indicators
+
+### 📋 Planned
+
+- [ ] Accessibility improvements
+- [ ] Dark mode support
+- [ ] Route history
+- [ ] Share routes with friends
+- [ ] Campus event integration
+- [ ] Estimated walking times
+- [ ] Alternative route suggestions
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! If you'd like to contribute to the NUS NextBus Redesign project:
+
+1. **Fork the repository**
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. **Commit your changes**
+   ```bash
+   git commit -m 'Add some amazing feature'
+   ```
+4. **Push to the branch**
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+5. **Open a Pull Request**
+
+### Development Guidelines
+
+- Follow the existing code style and conventions
+- Write meaningful commit messages
+- Add tests for new features
+- Update documentation as needed
+- Ensure all tests pass before submitting PR
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **NUS Internal Shuttle Bus Service** - For providing the campus transportation service
+- **[Obytes](https://www.obytes.com/)** - For the excellent React Native starter template
+- **NUS Community** - For feedback and testing
+
+---
+
+## 📞 Contact
+
+**Edward Zehua Zhang**
+
+- GitHub: [@EdwardZehuaZhang](https://github.com/EdwardZehuaZhang)
+- Project Link: [https://github.com/EdwardZehuaZhang/nus-nextbus-redesign-fe](https://github.com/EdwardZehuaZhang/nus-nextbus-redesign-fe)
+
+---
+
+## 📚 Related Projects
+
+- [NUS NextBus Mock API](https://github.com/EdwardZehuaZhang/nus-nextbus-mock-api) - Backend API server
+
+---
+
+<p align="center">Made with ❤️ for the NUS Community</p>
