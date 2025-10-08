@@ -57,43 +57,37 @@ interface DropdownProps {
 }
 
 const Dropdown: React.FC<DropdownProps> = ({ selectedMap, onMapChange }) => (
-  <div className="relative flex w-full flex-[0_0_auto] flex-col items-start gap-2.5 self-stretch py-0 pl-0 pr-11">
-    <div className="border-shadcn-ui-app-border bg-shadcn-ui-app-background relative flex w-full flex-[0_0_auto] flex-col items-start self-stretch rounded-md border border-solid shadow-md">
-      <div className="relative flex w-full flex-[0_0_auto] flex-col items-start self-stretch px-[var(--tw-padding-px-1)] pb-[var(--tw-padding-pb-1)] pt-1">
-        {mapOptions.map((option) => (
-          <div
-            key={option.id}
-            className="hover:bg-accent/50 relative flex h-8 w-full cursor-pointer items-center gap-2 self-stretch rounded-[var(--border-radius-rounded-sm)] px-[var(--tw-padding-px-2)] py-[var(--tw-padding-py-1-5)]"
-            onClick={() => onMapChange(option.id)}
-          >
-            <label
-              htmlFor={option.id}
-              className="relative flex flex-1 grow cursor-pointer items-center gap-2.5"
-            >
-              <span className="font-text-sm-regular text-shadcn-ui-app-popover-foreground relative mt-[-1.00px] w-fit text-[length:var(--text-sm-regular-font-size)] font-[number:var(--text-sm-regular-font-weight)] leading-[var(--text-sm-regular-line-height)] tracking-[var(--text-sm-regular-letter-spacing)] [font-style:var(--text-sm-regular-font-style)]">
-                {option.label}
-              </span>
-            </label>
+  <div className="border-shadcn-ui-app-border flex flex-col items-start rounded-md border border-solid bg-white px-4 py-2">
+    {mapOptions.map((option) => (
+      <div
+        key={option.id}
+        className="flex h-8 w-full items-center self-stretch rounded-[var(--border-radius-rounded-sm)] py-[var(--tw-padding-py-1-5)]"
+        onClick={() => onMapChange(option.id)}
+      >
+        <label
+          htmlFor={option.id}
+          className="font-text-sm-regular text-shadcn-ui-app-popover-foreground relative mt-[-1.00px] cursor-pointer whitespace-nowrap text-[length:var(--text-sm-regular-font-size)] font-[number:var(--text-sm-regular-font-weight)] leading-[var(--text-sm-regular-line-height)] tracking-[var(--text-sm-regular-letter-spacing)] [font-style:var(--text-sm-regular-font-style)]"
+        >
+          {option.label}
+        </label>
 
-            <div className="relative">
-              <div
-                className={`border-shadcn-ui-app-border shadow-box-shadow-shadow-xs size-4 rounded-full border border-solid ${
-                  selectedMap === option.id
-                    ? 'border-[#274F9C] bg-[#274F9C]'
-                    : 'bg-shadcn-ui-app-background'
-                }`}
-              >
-                {selectedMap === option.id && (
-                  <div className="flex size-full items-center justify-center">
-                    <div className="size-1.5 rounded-full bg-white" />
-                  </div>
-                )}
+        <div className="relative ml-auto shrink-0 pl-8">
+          <div
+            className={`border-shadcn-ui-app-border shadow-box-shadow-shadow-xs size-4 cursor-pointer rounded-full border border-solid ${
+              selectedMap === option.id
+                ? 'border-[#274F9C] bg-[#274F9C]'
+                : 'bg-shadcn-ui-app-background'
+            }`}
+          >
+            {selectedMap === option.id && (
+              <div className="flex size-full items-center justify-center">
+                <div className="size-1.5 rounded-full bg-white" />
               </div>
-            </div>
+            )}
           </div>
-        ))}
+        </div>
       </div>
-    </div>
+    ))}
   </div>
 );
 
@@ -125,21 +119,21 @@ export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
   };
 
   return (
-    <div className="relative flex w-[162px] flex-col items-end gap-2">
+    <div className="relative flex flex-col items-end gap-2">
       <div className="flex items-center gap-2">
-        <button
-          className="flex size-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
-          onClick={toggleFilter}
-          aria-label="Map layers"
-        >
-          <LayersIcon />
-        </button>
         <button
           className="flex size-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
           onClick={toggleMapType}
           aria-label="Map type"
         >
           <MapIcon />
+        </button>
+        <button
+          className="flex size-9 items-center justify-center rounded-md border border-neutral-200 bg-white shadow-sm"
+          onClick={toggleFilter}
+          aria-label="Map layers"
+        >
+          <LayersIcon />
         </button>
       </div>
 

@@ -6,6 +6,7 @@ import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
 import {
   FocusAwareStatusBar,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,14 +15,27 @@ import {
 } from '@/components/ui';
 import {
   AvgCapacityIcon,
+  BookOpen,
   BriefcaseIcon,
+  FirstAid,
   HouseIcon,
   MapTrifold,
   MaxCapacityIcon,
   MinCapacityIcon,
   PlusIcon,
   Search as SearchIcon,
+  Train,
+  Van,
 } from '@/components/ui/icons';
+import {
+  type BusStation,
+  getBusStationById,
+  searchBusStations,
+} from '@/lib/bus-stations';
+import {
+  addRecentSearch,
+  getRecentSearches,
+} from '@/lib/storage/recent-searches';
 
 type BusRoute = {
   route: string;
@@ -52,6 +66,18 @@ type FilterOption = {
 
 type BusStopData = {
   [key: string]: BusRoute[];
+};
+
+type RecentSearchItem = {
+  id: string;
+  title: string;
+  icon: React.ComponentType<any>;
+};
+
+type PopularSearchItem = {
+  id: string;
+  title: string;
+  image: string;
 };
 
 const busStopData: BusStopData = {
@@ -135,6 +161,57 @@ const favorites: FavoriteItem[] = [
   { id: '3', icon: 'work', label: 'Work' },
 ];
 
+const popularSearches: PopularSearchItem[] = [
+  {
+    id: '1',
+    title: 'UTown\n#NUS Sign',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/b856d37c98b5af1af81ac3776772df08e3da947a?width=308',
+  },
+  {
+    id: '2',
+    title: 'Lee Kong Chian Natural History Museum',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/3a44d7def88d02e89437d93d830cf08200a94a57?width=308',
+  },
+  {
+    id: '3',
+    title: 'UTown Infinite Pool',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '4',
+    title: 'Science Library',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '5',
+    title: 'Kent Ridge MRT',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '6',
+    title: 'Central Library',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '7',
+    title: 'Engineering Library',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+  {
+    id: '8',
+    title: 'COM3 Building',
+    image:
+      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+  },
+];
+
 const CrowdingIndicator = ({
   crowding,
 }: {
@@ -173,9 +250,9 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
         </Text>
       </View>
 
-      {/* Times List */}
+      {/* Times List - Only show first 2 times (next bus and next next bus) */}
       <View className="rounded-b-md border border-t-0 border-neutral-200">
-        {route.times.map((timeItem, index) => (
+        {route.times.slice(0, 2).map((timeItem, index) => (
           <View key={index}>
             <View className="flex-row items-center justify-between bg-white px-3 py-2">
               <Text
@@ -186,9 +263,7 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
               </Text>
               <CrowdingIndicator crowding={timeItem.crowding} />
             </View>
-            {index < route.times.length - 1 && (
-              <View className="h-px bg-neutral-200" />
-            )}
+            {index < 1 && <View className="h-px bg-neutral-200" />}
           </View>
         ))}
       </View>
@@ -196,15 +271,17 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
   );
 };
 
-const SearchBar = () => {
+const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
 
   const handleSearchPress = () => {
-    router.push('/search');
+    if (onSearchPress) {
+      onSearchPress();
+    }
   };
 
   const handleFocus = () => {
-    // Navigate to search page when user focuses on search
+    // Trigger search mode when user focuses on search
     handleSearchPress();
   };
 
@@ -444,21 +521,307 @@ const NearestStopsSection = ({
   );
 };
 
+const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
+  const [searchText, setSearchText] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
+  const [recentSearches, setRecentSearches] = React.useState<
+    RecentSearchItem[]
+  >([]);
+  const [showAllRecent, setShowAllRecent] = React.useState(false);
+  const [showAllPopular, setShowAllPopular] = React.useState(false);
+
+  // Load recent searches on component mount
+  React.useEffect(() => {
+    const loadRecentSearches = () => {
+      const stored = getRecentSearches();
+      const uiRecentSearches: RecentSearchItem[] = stored.map((item) => ({
+        id: item.id,
+        title: item.name,
+        icon: getIconForType(item.type),
+      }));
+      setRecentSearches(uiRecentSearches);
+    };
+
+    loadRecentSearches();
+  }, []);
+
+  // Helper function to get icon component for type
+  const getIconForType = (type: string) => {
+    switch (type) {
+      case 'mrt':
+        return Train;
+      case 'library':
+      case 'academic':
+        return BookOpen;
+      case 'medical':
+        return FirstAid;
+      default:
+        return Van;
+    }
+  };
+
+  // Handle search input changes
+  React.useEffect(() => {
+    if (searchText.trim().length > 0) {
+      const results = searchBusStations(searchText);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchText]);
+
+  const handleResultPress = (item: BusStation) => {
+    addRecentSearch(item);
+    // Navigate to navigation page
+    router.push({
+      pathname: '/navigation' as any,
+      params: { destination: item.name },
+    });
+  };
+
+  const handleRecentPress = (item: RecentSearchItem) => {
+    const station = getBusStationById(item.id);
+    if (station) {
+      addRecentSearch(station);
+      router.push({
+        pathname: '/navigation' as any,
+        params: { destination: item.title },
+      });
+    }
+  };
+
+  const renderRecentItem = (item: RecentSearchItem, isLast: boolean) => {
+    const IconComponent = item.icon;
+    return (
+      <View key={item.id}>
+        <Pressable
+          className="flex-row items-center gap-2 py-2"
+          onPress={() => handleRecentPress(item)}
+        >
+          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="size-5" />
+          </View>
+          <Text className="flex-1 text-base font-medium text-neutral-900">
+            {item.title}
+          </Text>
+        </Pressable>
+        {!isLast && <View className="my-2 h-px w-full bg-neutral-200" />}
+      </View>
+    );
+  };
+
+  const renderSearchResult = (item: BusStation, isLast: boolean) => {
+    const IconComponent = item.icon;
+    return (
+      <View key={item.id}>
+        <Pressable
+          className="flex-row items-center gap-2 py-3"
+          onPress={() => handleResultPress(item)}
+        >
+          <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
+            <IconComponent className="size-5" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-base font-medium text-neutral-900">
+              {item.name}
+            </Text>
+          </View>
+        </Pressable>
+        {!isLast && <View className="my-1 h-px w-full bg-neutral-200" />}
+      </View>
+    );
+  };
+
+  const renderPopularItem = (item: PopularSearchItem) => {
+    const handleNavPress = () => {
+      router.push({
+        pathname: '/navigation' as any,
+        params: { destination: item.title.replace('\n', ' ') },
+      });
+    };
+
+    return (
+      <Pressable
+        key={item.id}
+        className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
+        style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
+        onPress={handleNavPress}
+      >
+        <View className="relative size-full">
+          <Image
+            source={{ uri: item.image }}
+            className="size-full"
+            style={{ resizeMode: 'cover' }}
+          />
+          <View className="absolute inset-0 bg-black/40" />
+          <View className="absolute inset-x-0 bottom-0 p-3">
+            <Text className="text-lg font-bold leading-tight text-white">
+              {item.title}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const renderPopularSearches = () => {
+    const displayItems = showAllPopular
+      ? popularSearches
+      : popularSearches.slice(0, 3);
+
+    if (showAllPopular) {
+      return (
+        <View className="w-full" style={{ gap: 8 }}>
+          <View className="w-full flex-row" style={{ gap: 8 }}>
+            <View className="flex-1" style={{ gap: 8 }}>
+              {displayItems
+                .filter((_, index) => index % 2 === 0)
+                .map((item) => renderPopularItem(item))}
+            </View>
+            <View className="flex-1" style={{ gap: 8 }}>
+              {displayItems
+                .filter((_, index) => index % 2 === 1)
+                .map((item) => renderPopularItem(item))}
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {displayItems.map((item) => renderPopularItem(item))}
+      </ScrollView>
+    );
+  };
+
+  return (
+    <>
+      {/* Search Header */}
+      <View className="mb-5 flex-row items-center gap-4">
+        <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+          <SearchIcon />
+          <TextInput
+            className="flex-1 text-base text-neutral-900"
+            placeholder="Search for location..."
+            placeholderTextColor="#737373"
+            value={searchText}
+            onChangeText={setSearchText}
+            autoFocus={true}
+            style={{ outlineWidth: 0 }}
+          />
+        </View>
+        <Pressable onPress={onCancel}>
+          <Text className="text-base font-medium" style={{ color: '#274F9C' }}>
+            Cancel
+          </Text>
+        </Pressable>
+      </View>
+
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        {searchText.trim().length > 0 ? (
+          <View>
+            {searchResults.length > 0 ? (
+              <View>
+                <Text className="mb-3 text-sm font-medium text-neutral-500">
+                  Search Results ({searchResults.length})
+                </Text>
+                {searchResults.map((item, index, array) =>
+                  renderSearchResult(item, index === array.length - 1)
+                )}
+              </View>
+            ) : (
+              <View className="items-center py-8">
+                <Text className="text-base text-neutral-500">
+                  No results found for "{searchText}"
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View>
+            {/* Recent Searches */}
+            {recentSearches.length > 0 && (
+              <View className="mb-8">
+                <View className="mb-2 flex-row items-center justify-between">
+                  <Text className="text-sm font-medium text-neutral-500">
+                    Recents
+                  </Text>
+                  {recentSearches.length > 3 && (
+                    <Pressable onPress={() => setShowAllRecent(!showAllRecent)}>
+                      <Text
+                        className="text-sm font-medium"
+                        style={{ color: '#274F9C' }}
+                      >
+                        {showAllRecent ? 'View Less' : 'View More'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+                <View>
+                  {(showAllRecent
+                    ? recentSearches
+                    : recentSearches.slice(0, 3)
+                  ).map((item, index, array) =>
+                    renderRecentItem(item, index === array.length - 1)
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Popular Searches */}
+            <View>
+              <View className="mb-2 flex-row items-center justify-between">
+                <Text className="text-sm font-medium text-neutral-500">
+                  Popular Searches
+                </Text>
+                <Pressable onPress={() => setShowAllPopular(!showAllPopular)}>
+                  <Text
+                    className="text-sm font-medium"
+                    style={{ color: '#274F9C' }}
+                  >
+                    {showAllPopular ? 'View Less' : 'View More'}
+                  </Text>
+                </Pressable>
+              </View>
+              {renderPopularSearches()}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+    </>
+  );
+};
+
 const BottomSheetContent = ({
   isCollapsed,
+  isSearchMode,
   activeTab,
   onTabChange,
   onExpandSheet,
+  onSearchPress,
+  onCancelSearch,
 }: {
   isCollapsed: boolean;
+  isSearchMode: boolean;
   activeTab: string;
   onTabChange: (tabId: string) => void;
   onExpandSheet: () => void;
+  onSearchPress: () => void;
+  onCancelSearch: () => void;
 }) => {
+  if (isSearchMode) {
+    return <SearchContent onCancel={onCancelSearch} />;
+  }
+
   return (
     <>
       <Pressable onPress={isCollapsed ? onExpandSheet : undefined}>
-        <SearchBar />
+        <SearchBar onSearchPress={onSearchPress} />
       </Pressable>
 
       {!isCollapsed && (
@@ -491,28 +854,23 @@ const BottomSheetContent = ({
 
 const useDragHandlers = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isSearchMode, setIsSearchMode] = React.useState(false);
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   const handleDrag = (gestureState: { dy: number; vy: number }) => {
-    const threshold = 100; // Reduced threshold for easier dragging
-    const velocityThreshold = 0.3; // Reduced velocity threshold
+    // Don't allow drag collapse when in search mode
+    if (isSearchMode) return;
 
-    console.log(
-      'handleDrag called - dy:',
-      gestureState.dy,
-      'vy:',
-      gestureState.vy
-    );
+    const threshold = 100;
+    const velocityThreshold = 0.3;
 
     if (gestureState.dy > threshold || gestureState.vy > velocityThreshold) {
-      console.log('Collapsing sheet');
       setIsCollapsed(true);
       Animated.spring(translateY, {
         toValue: 1,
         useNativeDriver: true,
       }).start();
     } else {
-      console.log('Snapping back');
       Animated.spring(translateY, {
         toValue: 0,
         useNativeDriver: true,
@@ -521,7 +879,6 @@ const useDragHandlers = () => {
   };
 
   const handleExpandSheet = () => {
-    console.log('Expanding sheet');
     setIsCollapsed(false);
     Animated.spring(translateY, {
       toValue: 0,
@@ -529,24 +886,55 @@ const useDragHandlers = () => {
     }).start();
   };
 
-  const animatedStyle = {
-    transform: [
-      {
-        translateY: translateY.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 700],
-        }),
-      },
-    ],
+  const handleEnterSearchMode = () => {
+    setIsSearchMode(true);
+    setIsCollapsed(false);
+    // Don't animate when entering search mode, let height: 100% handle it
   };
 
-  return { isCollapsed, handleDrag, handleExpandSheet, animatedStyle };
+  const handleExitSearchMode = () => {
+    setIsSearchMode(false);
+    Animated.spring(translateY, {
+      toValue: 0, // Return to normal position
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const animatedStyle = isSearchMode
+    ? {} // No transform when in search mode
+    : {
+        transform: [
+          {
+            translateY: translateY.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 700], // 0 for normal, 700 for collapsed
+            }),
+          },
+        ],
+      };
+
+  return {
+    isCollapsed,
+    isSearchMode,
+    handleDrag,
+    handleExpandSheet,
+    handleEnterSearchMode,
+    handleExitSearchMode,
+    animatedStyle,
+  };
 };
 
 export default function TransitPage() {
   const [activeTab, setActiveTab] = React.useState<string>('central-library');
-  const { isCollapsed, handleDrag, handleExpandSheet, animatedStyle } =
-    useDragHandlers();
+  const {
+    isCollapsed,
+    isSearchMode,
+    handleDrag,
+    handleExpandSheet,
+    handleEnterSearchMode,
+    handleExitSearchMode,
+    animatedStyle,
+  } = useDragHandlers();
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50">
@@ -579,7 +967,6 @@ export default function TransitPage() {
       <Animated.View
         style={[
           {
-            marginTop: 'auto',
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
             borderWidth: 1,
@@ -592,6 +979,8 @@ export default function TransitPage() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
+            height: isSearchMode ? '80%' : '45%',
+            marginTop: isSearchMode ? '20%' : 'auto',
           },
           animatedStyle,
         ]}
@@ -602,9 +991,12 @@ export default function TransitPage() {
 
         <BottomSheetContent
           isCollapsed={isCollapsed}
+          isSearchMode={isSearchMode}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onExpandSheet={handleExpandSheet}
+          onSearchPress={handleEnterSearchMode}
+          onCancelSearch={handleExitSearchMode}
         />
       </Animated.View>
     </SafeAreaView>

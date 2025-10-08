@@ -361,24 +361,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           backgroundColor: '#E8EAF6',
         }}
       />
-      {isMapLoaded && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '56px',
-            right: '20px',
-            zIndex: 1000,
+      {/* Always show controls, not just when map is loaded */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '56px',
+          right: '20px',
+          zIndex: 9999,
+        }}
+      >
+        <MapTypeSelector
+          onMapTypeChange={handleMapTypeChange}
+          onFilterChange={(filters) => {
+            console.log('Filter changes:', filters);
+            // TODO: Implement filter logic for map layers
           }}
-        >
-          <MapTypeSelector
-            onMapTypeChange={handleMapTypeChange}
-            onFilterChange={(filters) => {
-              console.log('Filter changes:', filters);
-              // TODO: Implement filter logic for map layers
-            }}
-          />
-        </div>
-      )}
+        />
+      </div>
     </View>
   );
 };
