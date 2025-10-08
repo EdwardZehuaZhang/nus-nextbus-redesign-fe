@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  A modern, redesigned mobile app for the NUS Internal Shuttle Bus Service, built with Expo, TypeScript, and TailwindCSS.
+  Modern mobile app for NUS Internal Shuttle Bus Service with real-time tracking, route planning, and interactive maps. Built with Expo and TypeScript.
 </p>
 ---
 
