@@ -118,6 +118,57 @@ const createMarker = ({
   return marker;
 };
 
+// Helper to add coordinate listener for development
+const addCoordinateListener = (map: google.maps.Map) => {
+  map.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+    if (event.latLng) {
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      console.log('📍 Right-clicked coordinates:');
+      console.log(`  { lat: ${lat}, lng: ${lng} },`);
+      if (navigator.clipboard) {
+        const coordText = `{ lat: ${lat}, lng: ${lng} },`;
+        navigator.clipboard.writeText(coordText);
+        console.log('✅ Copied to clipboard!');
+      }
+    }
+  });
+};
+
+// Helper to prevent default context menu
+const preventContextMenu = (container: HTMLDivElement) => {
+  container.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault();
+    return false;
+  });
+};
+
+// Helper to create the map instance
+const createMapInstance = (
+  container: HTMLDivElement,
+  initialRegion: { latitude: number; longitude: number }
+): google.maps.Map => {
+  return new google.maps.Map(container, {
+    center: {
+      lat: initialRegion.latitude,
+      lng: initialRegion.longitude,
+    },
+    zoom: 14,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    zoomControl: true,
+    gestureHandling: 'greedy',
+    styles: [
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'on' }],
+      },
+    ],
+  });
+};
+
 // Custom hooks
 const useGoogleMapsInit = (
   mapContainerRef: React.RefObject<HTMLDivElement | null>,
@@ -125,6 +176,7 @@ const useGoogleMapsInit = (
 ) => {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [isLoaded, setIsLoaded] = React.useState(false);
+  const [isMapCreated, setIsMapCreated] = React.useState(false);
 
   useEffect(() => {
     console.log('Starting Google Maps initialization...');
@@ -139,47 +191,447 @@ const useGoogleMapsInit = (
   }, []);
 
   useEffect(() => {
-    console.log('Map initialization effect:', {
-      isLoaded,
-      hasContainer: !!mapContainerRef.current,
-      hasGoogle: !!window.google,
-      hasMap: !!mapRef.current,
-    });
-
     if (!isLoaded || !mapContainerRef.current || !window.google) {
-      console.log('Not ready to initialize map yet');
       return;
     }
 
     if (!mapRef.current) {
       console.log('Creating new Google Map instance...');
       try {
-        mapRef.current = new google.maps.Map(mapContainerRef.current, {
-          center: {
-            lat: initialRegion.latitude,
-            lng: initialRegion.longitude,
-          },
-          zoom: 14, // Good zoom level for NUS campus view
-          mapTypeControl: false, // Disable default controls
-          streetViewControl: false,
-          fullscreenControl: false,
-          zoomControl: true,
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'on' }],
-            },
-          ],
-        });
+        mapRef.current = createMapInstance(
+          mapContainerRef.current,
+          initialRegion
+        );
         console.log('Google Map created successfully!');
+        addCoordinateListener(mapRef.current);
+        if (mapContainerRef.current) {
+          preventContextMenu(mapContainerRef.current);
+        }
+        setIsMapCreated(true);
       } catch (error) {
         console.error('Error creating map:', error);
       }
     }
   }, [isLoaded, initialRegion, mapContainerRef]);
 
-  return mapRef;
+  return { mapRef, isMapCreated };
+};
+
+// Test coordinates - simple flight path to verify polyline works
+const TEST_FLIGHT_PATH = [
+  { lat: 37.772, lng: -122.214 },
+  { lat: 21.291, lng: -157.821 },
+  { lat: -18.142, lng: 178.431 },
+  { lat: -27.467, lng: 153.027 },
+];
+
+// D1 Bus Route coordinates
+const D1_BUS_ROUTE = [
+  { lat: 1.2949541686155464, lng: 103.77491826760742 },
+  { lat: 1.2937561736900154, lng: 103.77551215178298 },
+  { lat: 1.2936869518922478, lng: 103.77529588882628 },
+  { lat: 1.2929602934013178, lng: 103.77501780452884 },
+  { lat: 1.292158989996859, lng: 103.7744551716275 },
+  { lat: 1.2921566965905673, lng: 103.77423303781495 },
+  { lat: 1.2920065310772417, lng: 103.7739353126143 },
+  { lat: 1.2923712187370453, lng: 103.77383875308976 },
+  { lat: 1.292566956791713, lng: 103.77357814080361 },
+  { lat: 1.2929916511433355, lng: 103.77314572241487 },
+  { lat: 1.293229396673516, lng: 103.77267233718433 },
+  { lat: 1.293376880588864, lng: 103.77221367944279 },
+  { lat: 1.2934768636931604, lng: 103.77159448855555 },
+  { lat: 1.293712518448038, lng: 103.77112993804909 },
+  { lat: 1.2939524834386242, lng: 103.77085210563737 },
+  { lat: 1.2942152728796417, lng: 103.77068312646944 },
+  { lat: 1.294439607043673, lng: 103.77061441301814 },
+  { lat: 1.2947453008219179, lng: 103.7705527222108 },
+  { lat: 1.2948438647109488, lng: 103.77054747717735 },
+  { lat: 1.295103921349946, lng: 103.77057098490539 },
+  { lat: 1.2953459044569542, lng: 103.77064155442679 },
+  { lat: 1.2957040001870481, lng: 103.77083869096455 },
+  { lat: 1.296060690757129, lng: 103.77091469489042 },
+  { lat: 1.296275212573389, lng: 103.77095761023466 },
+  { lat: 1.2963891418438507, lng: 103.77095275889945 },
+  { lat: 1.2963489190065125, lng: 103.77136593546682 },
+  { lat: 1.2963517861689915, lng: 103.77171175474223 },
+  { lat: 1.2964642657845618, lng: 103.77205565495309 },
+  { lat: 1.2966278386450367, lng: 103.77224877400216 },
+  { lat: 1.2965847621065358, lng: 103.7722131554766 },
+  { lat: 1.29681738008391, lng: 103.7724538796665 },
+  { lat: 1.2971117604169717, lng: 103.77266682167222 },
+  { lat: 1.297435637718687, lng: 103.77294808010255 },
+  { lat: 1.297845590776186, lng: 103.77310019232586 },
+  { lat: 1.2980797492028047, lng: 103.77339313066791 },
+  { lat: 1.2983881240618946, lng: 103.77380350864719 },
+  { lat: 1.2986095996097373, lng: 103.774010785103 },
+  { lat: 1.2989212228716098, lng: 103.77421879662069 },
+  { lat: 1.2992380572524882, lng: 103.77437591343448 },
+  { lat: 1.2996159704011512, lng: 103.77451167762689 },
+  { lat: 1.29996182939063, lng: 103.77451223685212 },
+  { lat: 1.3002541149098095, lng: 103.77440763070054 },
+  { lat: 1.3004766809246537, lng: 103.77428961350388 },
+  { lat: 1.3005525393881083, lng: 103.77411788162253 },
+  { lat: 1.3008727834412983, lng: 103.77365178756841 },
+  { lat: 1.3010068593233364, lng: 103.77328700714239 },
+  { lat: 1.3010309929813564, lng: 103.77312339239248 },
+  { lat: 1.3011248460936369, lng: 103.77315289669164 },
+  { lat: 1.30116238733759, lng: 103.77332724027761 },
+  { lat: 1.3010524451216123, lng: 103.77362496547826 },
+  { lat: 1.3009264137949659, lng: 103.77393341951498 },
+  { lat: 1.300784293355259, lng: 103.77412653856405 },
+  { lat: 1.3009398213832142, lng: 103.7743893950475 },
+  { lat: 1.3011302091285164, lng: 103.77446449689992 },
+  { lat: 1.3013774609209796, lng: 103.77445951382145 },
+  { lat: 1.3017190067734987, lng: 103.77432732189149 },
+  { lat: 1.3023779219759775, lng: 103.77403172342235 },
+  { lat: 1.3027319968149764, lng: 103.7739530401905 },
+  { lat: 1.3030028298896226, lng: 103.77403350646095 },
+  { lat: 1.3032395038184654, lng: 103.77417333171068 },
+  { lat: 1.3034360912125265, lng: 103.7743634804962 },
+  { lat: 1.303588930054782, lng: 103.77462789346664 },
+  { lat: 1.303629152776793, lng: 103.77510800888031 },
+  { lat: 1.3036895166000186, lng: 103.7754981224966 },
+  { lat: 1.3038261441205856, lng: 103.7755342891918 },
+  { lat: 1.30384893699433, lng: 103.7756603530155 },
+  { lat: 1.3037926251882395, lng: 103.77571667940481 },
+  { lat: 1.3037162020208382, lng: 103.77570326835973 },
+  { lat: 1.3036545271822855, lng: 103.77561341435774 },
+  { lat: 1.3036746385428457, lng: 103.77551149041517 },
+  { lat: 1.3036030770764226, lng: 103.77519594148107 },
+  { lat: 1.3034904534519904, lng: 103.77500550464102 },
+  { lat: 1.303473525743043, lng: 103.77476026220165 },
+  { lat: 1.303418554686064, lng: 103.77449472350918 },
+  { lat: 1.3033139932398916, lng: 103.77427879086929 },
+  { lat: 1.3031054231722363, lng: 103.77409675361957 },
+  { lat: 1.3030088886182452, lng: 103.7740296983942 },
+  { lat: 1.3028412938976746, lng: 103.77400153519955 },
+  { lat: 1.3026031748171862, lng: 103.77398507309651 },
+  { lat: 1.3023886535383127, lng: 103.7740548105309 },
+  { lat: 1.302246619454062, lng: 103.77411691960793 },
+  { lat: 1.3017050465825253, lng: 103.7743688049343 },
+  { lat: 1.3014368948855464, lng: 103.77448145771292 },
+  { lat: 1.3011677447618055, lng: 103.77450439368388 },
+  { lat: 1.3008635864447922, lng: 103.7744072217999 },
+  { lat: 1.3008635864447922, lng: 103.7744072217999 },
+  { lat: 1.3005577756013214, lng: 103.77434316424724 },
+  { lat: 1.3004054640507332, lng: 103.77447926290735 },
+  { lat: 1.3001520605673014, lng: 103.77459862120851 },
+  { lat: 1.2998609293337038, lng: 103.77463830099713 },
+  { lat: 1.2996237843583898, lng: 103.77467516392747 },
+  { lat: 1.2994988447681044, lng: 103.77474069965551 },
+  { lat: 1.2992896862640684, lng: 103.77477288616369 },
+];
+
+// NUS campus boundary coordinates - manually obtained by user
+const NUS_CAMPUS_BOUNDARY = [
+  { lat: 1.2943662309653878, lng: 103.78561449648741 }, // Start - Northeast
+  { lat: 1.295629533832989, lng: 103.78570662970284 }, // East side
+  { lat: 1.2964131927699438, lng: 103.78474048652491 },
+  { lat: 1.2971829857279495, lng: 103.78386032960005 },
+  { lat: 1.2980348448645642, lng: 103.78261664943643 },
+  { lat: 1.299016774461335, lng: 103.78136595028842 }, // East moving north
+  { lat: 1.3029143562052712, lng: 103.77446862100085 }, // North section
+  { lat: 1.303151281280304, lng: 103.77460154905552 },
+  { lat: 1.3034087067348328, lng: 103.77534183874363 },
+  { lat: 1.3035588715711455, lng: 103.77612504377598 },
+  { lat: 1.303773392750353, lng: 103.77621087446445 },
+  { lat: 1.304245339280276, lng: 103.77533110990757 },
+  { lat: 1.3046138571244286, lng: 103.77495691134023 },
+  { lat: 1.3055309346530188, lng: 103.77449557138966 },
+  { lat: 1.3066008972191312, lng: 103.77416548860828 },
+  { lat: 1.3077047227793976, lng: 103.77381428625108 },
+  { lat: 1.3084233674722994, lng: 103.77384647275926 },
+  { lat: 1.3087451486113482, lng: 103.77318128492357 },
+  { lat: 1.3089923524537435, lng: 103.77225779681622 },
+  { lat: 1.3088830354209653, lng: 103.7721214242881 }, // Northernmost
+  { lat: 1.3087339734818089, lng: 103.77190715566871 }, // West side - detailed
+  { lat: 1.3078222601432248, lng: 103.77176768079994 },
+  { lat: 1.3069480876310884, lng: 103.7715799261689 },
+  { lat: 1.3063560101595701, lng: 103.77149302273688 },
+  { lat: 1.3055569194945853, lng: 103.77151984482703 },
+  { lat: 1.304473588120397, lng: 103.77149302273688 },
+  { lat: 1.3037171894968482, lng: 103.77150484046012 },
+  { lat: 1.302750677686299, lng: 103.77118372403778 },
+  { lat: 1.3020698524027086, lng: 103.77099060498871 },
+  { lat: 1.3012472030893474, lng: 103.77056795468503 },
+  { lat: 1.3004963781296934, lng: 103.77021390309507 },
+  { lat: 1.300017465449572, lng: 103.77005612296252 },
+  { lat: 1.2995616072428888, lng: 103.77004002970843 },
+  { lat: 1.299193641975826, lng: 103.7700115678755 },
+  { lat: 1.2981468814221626, lng: 103.76995129279705 },
+  { lat: 1.2973209729406299, lng: 103.7698708265266 },
+  { lat: 1.2966563051388456, lng: 103.76984400443645 },
+  { lat: 1.2961151920525682, lng: 103.76989764861675 },
+  { lat: 1.2954716265086261, lng: 103.76988691978069 },
+  { lat: 1.2950290338877501, lng: 103.76983627542921 },
+  { lat: 1.2946107161234566, lng: 103.76973435148665 },
+  { lat: 1.2940529589970695, lng: 103.76949831709334 },
+  { lat: 1.2934862064901609, lng: 103.76941101238496 },
+  { lat: 1.2929552643776931, lng: 103.76980261490114 },
+  { lat: 1.2926311430419277, lng: 103.77020755977628 },
+  { lat: 1.2924327100773505, lng: 103.77058664571788 },
+  { lat: 1.2924112578640436, lng: 103.77112308752086 },
+  { lat: 1.2923917629470145, lng: 103.7727573735903 },
+  { lat: 1.2922952279841184, lng: 103.77346211262126 },
+  { lat: 1.2919359033677567, lng: 103.77371960468669 },
+  { lat: 1.2916087570310637, lng: 103.77399319000621 },
+  { lat: 1.2910784461615918, lng: 103.7750322099925 },
+  { lat: 1.2906846450955234, lng: 103.77637263420257 },
+  { lat: 1.2905452056098337, lng: 103.77699490669403 },
+  { lat: 1.290390516588578, lng: 103.77721288070991 },
+  { lat: 1.2901116375773143, lng: 103.77799072132423 },
+  { lat: 1.2901623392994492, lng: 103.77831545051404 }, // South section
+  { lat: 1.2904217289875417, lng: 103.77870809330916 },
+  { lat: 1.2909848499678647, lng: 103.7793625523088 },
+  { lat: 1.289969836877281, lng: 103.78045863684501 },
+  { lat: 1.289664414595522, lng: 103.78177655326904 },
+  { lat: 1.2902114465695746, lng: 103.78260267364563 },
+  { lat: 1.2914664018302138, lng: 103.783750659104 },
+  { lat: 1.2921070604282177, lng: 103.7845809194438 },
+  { lat: 1.293134899847743, lng: 103.78561799160155 },
+  { lat: 1.2943662309653878, lng: 103.78561449648741 }, // Close the loop back to start
+];
+
+// Helper function to create test polyline
+const createTestPolyline = (map: google.maps.Map): google.maps.Polyline => {
+  console.log('🎨 Creating test polyline using Google Maps example...');
+  const flightPath = new google.maps.Polyline({
+    path: TEST_FLIGHT_PATH,
+    geodesic: true,
+    strokeColor: '#FF0000',
+    strokeOpacity: 1.0,
+    strokeWeight: 2,
+  });
+  flightPath.setMap(map);
+  console.log(
+    '✅ Test polyline created with',
+    TEST_FLIGHT_PATH.length,
+    'points'
+  );
+  return flightPath;
+};
+
+// Helper to create overlay polygons
+const createOverlayPolygons = (map: google.maps.Map) => {
+  // Top side of campus coordinates (indices 0-24 from NUS_CAMPUS_BOUNDARY)
+  const topCampusBoundary = [
+    { lat: 1.2943662309653878, lng: 103.78561449648741 }, // Start - Northeast
+    { lat: 1.295629533832989, lng: 103.78570662970284 }, // East side
+    { lat: 1.2964131927699438, lng: 103.78474048652491 },
+    { lat: 1.2971829857279495, lng: 103.78386032960005 },
+    { lat: 1.2980348448645642, lng: 103.78261664943643 },
+    { lat: 1.299016774461335, lng: 103.78136595028842 }, // East moving north
+    { lat: 1.3029143562052712, lng: 103.77446862100085 }, // North section
+    { lat: 1.303151281280304, lng: 103.77460154905552 },
+    { lat: 1.3034087067348328, lng: 103.77534183874363 },
+    { lat: 1.3035588715711455, lng: 103.77612504377598 },
+    { lat: 1.303773392750353, lng: 103.77621087446445 },
+    { lat: 1.304245339280276, lng: 103.77533110990757 },
+    { lat: 1.3046138571244286, lng: 103.77495691134023 },
+    { lat: 1.3055309346530188, lng: 103.77449557138966 },
+    { lat: 1.3066008972191312, lng: 103.77416548860828 },
+    { lat: 1.3077047227793976, lng: 103.77381428625108 },
+    { lat: 1.3084233674722994, lng: 103.77384647275926 },
+    { lat: 1.3087451486113482, lng: 103.77318128492357 },
+    { lat: 1.3089923524537435, lng: 103.77225779681622 },
+    { lat: 1.3088830354209653, lng: 103.7721214242881 }, // Northernmost
+    { lat: 1.3087339734818089, lng: 103.77190715566871 }, // West side - detailed
+    { lat: 1.3078222601432248, lng: 103.77176768079994 },
+    { lat: 1.3069480876310884, lng: 103.7715799261689 },
+    { lat: 1.3063560101595701, lng: 103.77149302273688 },
+    { lat: 1.3055569194945853, lng: 103.77151984482703 },
+  ];
+
+  // Close the polygon with corner points
+  const topPath = [
+    ...topCampusBoundary,
+    { lat: 1.314415799754581, lng: 103.76018809355106 },
+    { lat: 0.4330389574208255, lng: 61.93316067193789 },
+    { lat: 53.278578905253895, lng: 57.19774758350203 },
+    { lat: 51.23464389578209, lng: 168.81884133350204 },
+    { lat: 1.142880113710714, lng: 171.45556008350204 },
+    { lat: 1.2924711660087167, lng: 103.79623264668385 },
+    topCampusBoundary[0], // Close back to start
+  ];
+
+  const topOverlay = new google.maps.Polygon({
+    paths: topPath,
+    strokeColor: 'transparent',
+    strokeOpacity: 0,
+    strokeWeight: 0,
+    fillColor: '#000000',
+    fillOpacity: 0.3,
+  });
+  topOverlay.setMap(map);
+
+  console.log('✅ Top overlay polygon created with', topPath.length, 'points');
+
+  // Bottom side of campus coordinates - red polyline for debugging
+  const bottomCampusBoundary = [
+    { lat: 1.305554861947453, lng: 103.77152132256184 },
+    { lat: 1.304473588120397, lng: 103.77149302273688 },
+    { lat: 1.3037171894968482, lng: 103.77150484046012 },
+    { lat: 1.302750677686299, lng: 103.77118372403778 },
+    { lat: 1.3020698524027086, lng: 103.77099060498871 },
+    { lat: 1.3012472030893474, lng: 103.77056795468503 },
+    { lat: 1.3004963781296934, lng: 103.77021390309507 },
+    { lat: 1.300017465449572, lng: 103.77005612296252 },
+    { lat: 1.2995616072428888, lng: 103.77004002970843 },
+    { lat: 1.299193641975826, lng: 103.7700115678755 },
+    { lat: 1.2981468814221626, lng: 103.76995129279705 },
+    { lat: 1.2973209729406299, lng: 103.7698708265266 },
+    { lat: 1.2966563051388456, lng: 103.76984400443645 },
+    { lat: 1.2961151920525682, lng: 103.76989764861675 },
+    { lat: 1.2954716265086261, lng: 103.76988691978069 },
+    { lat: 1.2950290338877501, lng: 103.76983627542921 },
+    { lat: 1.2946107161234566, lng: 103.76973435148665 },
+    { lat: 1.2940529589970695, lng: 103.76949831709334 },
+    { lat: 1.2934862064901609, lng: 103.76941101238496 },
+    { lat: 1.2929552643776931, lng: 103.76980261490114 },
+    { lat: 1.2926311430419277, lng: 103.77020755977628 },
+    { lat: 1.2924327100773505, lng: 103.77058664571788 },
+    { lat: 1.2924112578640436, lng: 103.77112308752086 },
+    { lat: 1.2923917629470145, lng: 103.7727573735903 },
+    { lat: 1.2922952279841184, lng: 103.77346211262126 },
+    { lat: 1.2919359033677567, lng: 103.77371960468669 },
+    { lat: 1.2916087570310637, lng: 103.77399319000621 },
+    { lat: 1.2910784461615918, lng: 103.7750322099925 },
+    { lat: 1.2906846450955234, lng: 103.77637263420257 },
+    { lat: 1.2905452056098337, lng: 103.77699490669403 },
+    { lat: 1.290390516588578, lng: 103.77721288070991 },
+    { lat: 1.2901116375773143, lng: 103.77799072132423 },
+    { lat: 1.2901623392994492, lng: 103.77831545051404 },
+    { lat: 1.2904217289875417, lng: 103.77870809330916 },
+    { lat: 1.2909848499678647, lng: 103.7793625523088 },
+    { lat: 1.289969836877281, lng: 103.78045863684501 },
+    { lat: 1.289664414595522, lng: 103.78177655326904 },
+    { lat: 1.2902114465695746, lng: 103.78260267364563 },
+    { lat: 1.2914664018302138, lng: 103.783750659104 },
+    { lat: 1.2921070604282177, lng: 103.7845809194438 },
+    { lat: 1.293134899847743, lng: 103.78561799160155 },
+    { lat: 1.2943662309653878, lng: 103.78561449648741 },
+  ];
+
+  // Create red polyline for bottom boundary with connection points
+  const bottomPolylinePath = [
+    ...bottomCampusBoundary,
+    { lat: 1.2924711660087167, lng: 103.79623264668385 },
+    { lat: 1.142880113710714, lng: 171.45556008350204 },
+    { lat: -61.06998094801668, lng: 167.55930473224873 },
+    { lat: -57.10164716693408, lng: 64.90305473224875 },
+    { lat: 0.4330389574208255, lng: 61.93316067193789 },
+    { lat: 1.314415799754581, lng: 103.76018809355106 },
+    { lat: 1.305554861947453, lng: 103.77152132256184 }, // Close the loop
+  ];
+
+  // Create bottom polygon with gray overlay
+  const bottomOverlay = new google.maps.Polygon({
+    paths: bottomPolylinePath,
+    strokeColor: 'transparent',
+    strokeOpacity: 0,
+    strokeWeight: 0,
+    fillColor: '#000000',
+    fillOpacity: 0.3,
+  });
+  bottomOverlay.setMap(map);
+
+  console.log(
+    '✅ Bottom overlay polygon created with',
+    bottomPolylinePath.length,
+    'points'
+  );
+};
+
+// Helper function to create D1 bus route polyline
+const createD1BusRoute = (map: google.maps.Map): google.maps.Polyline => {
+  console.log('🚌 Creating D1 bus route...');
+  const d1Route = new google.maps.Polyline({
+    path: D1_BUS_ROUTE,
+    geodesic: true,
+    strokeColor: '#C77DE2', // D1 light purple color
+    strokeOpacity: 1.0,
+    strokeWeight: 4,
+  });
+  d1Route.setMap(map);
+  console.log('✅ D1 bus route created with', D1_BUS_ROUTE.length, 'points');
+  return d1Route;
+};
+
+// Helper function to create campus border with gray overlay outside
+const createCampusBorderPolyline = (
+  map: google.maps.Map
+): { border: google.maps.Polyline; overlay: google.maps.Polygon | null } => {
+  console.log('🎨 Creating NUS campus border...');
+
+  const campusBorder = new google.maps.Polyline({
+    path: NUS_CAMPUS_BOUNDARY,
+    geodesic: true,
+    strokeColor: '#808080',
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+  });
+  campusBorder.setMap(map);
+
+  createOverlayPolygons(map);
+
+  console.log('✅ Campus border and split overlays created');
+  return { border: campusBorder, overlay: null };
+};
+
+// Hook to add NUS campus border and bus routes
+const useNUSCampusHighlight = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapLoaded: boolean
+) => {
+  const testPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const campusBorderRef = useRef<google.maps.Polyline | null>(null);
+  const campusOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const d1RouteRef = useRef<google.maps.Polyline | null>(null);
+
+  useEffect(() => {
+    const map = mapRef.current;
+
+    console.log('🗺️ Polyline Hook - State:', {
+      hasMap: !!map,
+      isMapLoaded,
+      hasGoogle: !!(typeof window !== 'undefined' && window.google),
+      testPolylineExists: !!testPolylineRef.current,
+      campusBorderExists: !!campusBorderRef.current,
+      campusOverlayExists: !!campusOverlayRef.current,
+      d1RouteExists: !!d1RouteRef.current,
+    });
+
+    if (
+      !map ||
+      !isMapLoaded ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      console.log('⏸️ Not ready to create polyline');
+      return;
+    }
+
+    if (
+      testPolylineRef.current &&
+      campusBorderRef.current &&
+      campusOverlayRef.current &&
+      d1RouteRef.current
+    ) {
+      console.log('✅ Polylines and overlay already exist');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (map) {
+        const { border } = createCampusBorderPolyline(map);
+        campusBorderRef.current = border;
+        campusOverlayRef.current = null; // Overlays created separately
+        d1RouteRef.current = createD1BusRoute(map);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [mapRef, isMapLoaded]);
 };
 
 const addMarkersAndFitBounds = ({
@@ -326,18 +778,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   style,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [isMapLoaded, setIsMapLoaded] = React.useState(false);
-  const mapRef = useGoogleMapsInit(mapContainerRef, initialRegion);
-
-  // Check if map is loaded
-  useEffect(() => {
-    if (mapRef.current) {
-      setIsMapLoaded(true);
-    }
-  }, [mapRef]);
+  const { mapRef, isMapCreated } = useGoogleMapsInit(
+    mapContainerRef,
+    initialRegion
+  );
 
   useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
   useMapPolyline(mapRef, routePolyline);
+  useNUSCampusHighlight(mapRef, isMapCreated);
 
   const handleMapTypeChange = (mapType: google.maps.MapTypeId) => {
     if (mapRef.current) {
@@ -347,7 +795,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      {!isMapLoaded && (
+      {!isMapCreated && (
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading Map...</Text>
         </View>

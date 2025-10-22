@@ -841,24 +841,41 @@ const BottomSheetContent = ({
 const useDragHandlers = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isSearchMode, setIsSearchMode] = React.useState(false);
+  const [containerHeight, setContainerHeight] = React.useState(45); // Start at 45%
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   const handleDrag = (gestureState: { dy: number; vy: number }) => {
-    // Don't allow drag collapse when in search mode
+    // Don't allow drag when in search mode
     if (isSearchMode) return;
 
     const threshold = 100;
     const velocityThreshold = 0.3;
 
+    // Dragging down - collapse
     if (gestureState.dy > threshold || gestureState.vy > velocityThreshold) {
       setIsCollapsed(true);
+      setContainerHeight(45);
       Animated.spring(translateY, {
         toValue: 1,
         useNativeDriver: true,
       }).start();
-    } else {
+    }
+    // Dragging up - expand
+    else if (
+      gestureState.dy < -threshold ||
+      gestureState.vy < -velocityThreshold
+    ) {
+      setIsCollapsed(false);
+      setContainerHeight(80); // Expand to 80%
       Animated.spring(translateY, {
         toValue: 0,
+        useNativeDriver: true,
+      }).start();
+    }
+    // Small drag - return to current state
+    else {
+      Animated.spring(translateY, {
+        toValue: isCollapsed ? 1 : 0,
         useNativeDriver: true,
       }).start();
     }
@@ -866,6 +883,7 @@ const useDragHandlers = () => {
 
   const handleExpandSheet = () => {
     setIsCollapsed(false);
+    setContainerHeight(45); // Default expanded state
     Animated.spring(translateY, {
       toValue: 0,
       useNativeDriver: true,
@@ -875,13 +893,14 @@ const useDragHandlers = () => {
   const handleEnterSearchMode = () => {
     setIsSearchMode(true);
     setIsCollapsed(false);
-    // Don't animate when entering search mode, let height: 100% handle it
+    setContainerHeight(80);
   };
 
   const handleExitSearchMode = () => {
     setIsSearchMode(false);
+    setContainerHeight(45); // Return to normal size
     Animated.spring(translateY, {
-      toValue: 0, // Return to normal position
+      toValue: 0,
       useNativeDriver: true,
     }).start();
   };
@@ -902,6 +921,7 @@ const useDragHandlers = () => {
   return {
     isCollapsed,
     isSearchMode,
+    containerHeight,
     handleDrag,
     handleExpandSheet,
     handleEnterSearchMode,
@@ -916,6 +936,7 @@ export default function TransitPage() {
   const {
     isCollapsed,
     isSearchMode,
+    containerHeight,
     handleDrag,
     handleExpandSheet,
     handleEnterSearchMode,
@@ -966,8 +987,8 @@ export default function TransitPage() {
             shadowOffset: { width: 0, height: -2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
-            height: isSearchMode ? '80%' : '45%',
-            marginTop: isSearchMode ? '20%' : 'auto',
+            height: `${containerHeight}%`,
+            marginTop: 'auto',
           },
           animatedStyle,
         ]}

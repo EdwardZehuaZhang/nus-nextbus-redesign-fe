@@ -1147,7 +1147,7 @@ export default function NavigationPage() {
               }}
             >
               <Text style={{ fontSize: 14, color: '#09090B' }}>
-                Remind you to leave on time
+                Remind me to leave on time
               </Text>
               <ToggleSwitch
                 value={reminderEnabled}
