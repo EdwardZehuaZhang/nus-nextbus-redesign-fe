@@ -133,21 +133,54 @@ const CrowdingIndicator = ({
   crowding: 'low' | 'medium' | 'high';
 }) => {
   const getCapacityIcon = () => {
+    // Use fixed size - icons will scale naturally with flex
+    const iconWidth = 32;
+    const iconHeight = 24;
+
     switch (crowding) {
       case 'low':
-        return <MinCapacityIcon width={32} height={24} />;
+        return <MinCapacityIcon width={iconWidth} height={iconHeight} />;
       case 'medium':
-        return <AvgCapacityIcon width={32} height={24} />;
+        return <AvgCapacityIcon width={iconWidth} height={iconHeight} />;
       case 'high':
-        return <MaxCapacityIcon width={32} height={24} />;
+        return <MaxCapacityIcon width={iconWidth} height={iconHeight} />;
       default:
-        return <MinCapacityIcon width={32} height={24} />;
+        return <MinCapacityIcon width={iconWidth} height={iconHeight} />;
     }
   };
 
   return (
-    <View className="flex-row items-center justify-center">
+    <View
+      className="flex-row items-center justify-center"
+      style={{ flexShrink: 0, minWidth: 32 }}
+    >
       {getCapacityIcon()}
+    </View>
+  );
+};
+
+// Dynamic font size component for bus timing
+const DynamicBusTime = ({
+  time,
+  textColor,
+}: {
+  time: string;
+  textColor?: string;
+}) => {
+  return (
+    <View style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.65}
+        className="font-medium"
+        style={{
+          color: textColor,
+          fontSize: 16, // Base size (text-base)
+        }}
+      >
+        {time}
+      </Text>
     </View>
   );
 };
@@ -170,12 +203,7 @@ const BusRouteCard = ({ route }: { route: BusRoute }) => {
         {route.times.slice(0, 2).map((timeItem, index) => (
           <View key={index}>
             <View className="flex-row items-center justify-between bg-white px-3 py-2">
-              <Text
-                className="text-base font-medium"
-                style={{ color: timeItem.textColor }}
-              >
-                {timeItem.time}
-              </Text>
+              <DynamicBusTime time={timeItem.time} textColor={timeItem.textColor} />
               <CrowdingIndicator crowding={timeItem.crowding} />
             </View>
             {index < 1 && <View className="h-px bg-neutral-200" />}
