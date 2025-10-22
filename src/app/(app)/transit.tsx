@@ -159,6 +159,20 @@ const CrowdingIndicator = ({
   );
 };
 
+// Calculate optimal font size based on text length and container width
+const calculateFontSize = (
+  textLength: number,
+  containerWidth: number,
+  currentFontSize: number
+): number => {
+  const estimatedTextWidth = textLength * currentFontSize * 0.6;
+  if (estimatedTextWidth > containerWidth * 0.95) {
+    const scale = (containerWidth * 0.95) / estimatedTextWidth;
+    return Math.max(10.4, Math.min(16, currentFontSize * scale));
+  }
+  return currentFontSize < 16 ? 16 : currentFontSize;
+};
+
 // Dynamic font size component for bus timing
 const DynamicBusTime = ({
   time,
@@ -167,16 +181,57 @@ const DynamicBusTime = ({
   time: string;
   textColor?: string;
 }) => {
+  const [fontSize, setFontSize] = React.useState(16);
+  const containerRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    if (containerRef.current && typeof window !== 'undefined') {
+      const measureContainer = () => {
+        try {
+          containerRef.current?.measure?.(
+            (_x: number, _y: number, width: number) => {
+              if (width > 0) {
+                const newSize = calculateFontSize(time.length, width, fontSize);
+                if (newSize !== fontSize) {
+                  setFontSize(newSize);
+                }
+              }
+            }
+          );
+        } catch {
+          const element = containerRef.current as HTMLElement;
+          if (element?.offsetWidth) {
+            const newSize = calculateFontSize(
+              time.length,
+              element.offsetWidth,
+              fontSize
+            );
+            if (newSize !== fontSize) {
+              setFontSize(newSize);
+            }
+          }
+        }
+      };
+
+      const timer = setTimeout(measureContainer, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [time, fontSize]);
+
   return (
-    <View style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}>
+    <View
+      ref={containerRef}
+      style={{
+        flex: 1,
+        maxWidth: '100%',
+        minWidth: 0,
+      }}
+    >
       <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.65}
-        className="font-medium"
         style={{
           color: textColor,
-          fontSize: 16, // Base size (text-base)
+          fontSize: fontSize,
+          fontWeight: '500',
         }}
       >
         {time}
@@ -185,32 +240,62 @@ const DynamicBusTime = ({
   );
 };
 
-const BusRouteCard = ({ route }: { route: BusRoute }) => {
+const BusRouteCard = ({
+  route,
+  isSelected = false,
+  onPress,
+}: {
+  route: BusRoute;
+  isSelected?: boolean;
+  onPress?: () => void;
+}) => {
   return (
-    <View className="flex-1">
-      {/* Route Header */}
+    <Pressable
+      onPress={onPress}
+      style={{
+        flex: 1,
+        transform: isSelected ? [{ scale: 1.05 }] : [{ scale: 1 }],
+      }}
+    >
       <View
-        className="h-8 items-center justify-center rounded-t-md shadow-sm"
-        style={{ backgroundColor: route.color }}
+        className="flex-1"
+        style={{
+          borderWidth: isSelected ? 3 : 0,
+          borderColor: isSelected ? route.color : 'transparent',
+          borderRadius: 6,
+          overflow: 'hidden',
+        }}
       >
-        <Text className="text-base font-semibold" style={{ color: '#FFFFFF' }}>
-          {route.route}
-        </Text>
-      </View>
+        {/* Route Header */}
+        <View
+          className="h-8 items-center justify-center shadow-sm"
+          style={{ backgroundColor: route.color }}
+        >
+          <Text
+            className="text-base font-semibold"
+            style={{ color: '#FFFFFF' }}
+          >
+            {route.route}
+          </Text>
+        </View>
 
-      {/* Times List - Only show first 2 times (next bus and next next bus) */}
-      <View className="rounded-b-md border border-t-0 border-neutral-200">
-        {route.times.slice(0, 2).map((timeItem, index) => (
-          <View key={index}>
-            <View className="flex-row items-center justify-between bg-white px-3 py-2">
-              <DynamicBusTime time={timeItem.time} textColor={timeItem.textColor} />
-              <CrowdingIndicator crowding={timeItem.crowding} />
+        {/* Times List - Only show first 2 times (next bus and next next bus) */}
+        <View className="border border-t-0 border-neutral-200">
+          {route.times.slice(0, 2).map((timeItem, index) => (
+            <View key={index}>
+              <View className="flex-row items-center justify-between bg-white px-3 py-2">
+                <DynamicBusTime
+                  time={timeItem.time}
+                  textColor={timeItem.textColor}
+                />
+                <CrowdingIndicator crowding={timeItem.crowding} />
+              </View>
+              {index < 1 && <View className="h-px bg-neutral-200" />}
             </View>
-            {index < 1 && <View className="h-px bg-neutral-200" />}
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -494,9 +579,13 @@ const FavoritesSection = () => {
 const NearestStopsSection = ({
   activeTab,
   onTabChange,
+  selectedRoute,
+  onRouteClick,
 }: {
   activeTab: string;
   onTabChange: (tabId: string) => void;
+  selectedRoute: string | null;
+  onRouteClick: (routeName: string) => void;
 }) => {
   // Fetch shuttle service data for the active bus stop
   const { data: shuttleData, isLoading } = useShuttleService(activeTab);
@@ -566,7 +655,12 @@ const NearestStopsSection = ({
           <View className="gap-2">
             <View className="flex-row gap-2">
               {currentBusRoutes.slice(0, 3).map((route) => (
-                <BusRouteCard key={route.route} route={route} />
+                <BusRouteCard
+                  key={route.route}
+                  route={route}
+                  isSelected={selectedRoute === route.route}
+                  onPress={() => onRouteClick(route.route)}
+                />
               ))}
               {currentBusRoutes.length < 3 &&
                 Array.from({ length: 3 - currentBusRoutes.length }).map(
@@ -576,7 +670,12 @@ const NearestStopsSection = ({
             {currentBusRoutes.length > 3 && (
               <View className="flex-row gap-2">
                 {currentBusRoutes.slice(3, 6).map((route) => (
-                  <BusRouteCard key={route.route} route={route} />
+                  <BusRouteCard
+                    key={route.route}
+                    route={route}
+                    isSelected={selectedRoute === route.route}
+                    onPress={() => onRouteClick(route.route)}
+                  />
                 ))}
                 {currentBusRoutes.length < 6 &&
                   Array.from({
@@ -832,6 +931,8 @@ const BottomSheetContent = ({
   onExpandSheet,
   onSearchPress,
   onCancelSearch,
+  selectedRoute,
+  onRouteClick,
 }: {
   isCollapsed: boolean;
   isSearchMode: boolean;
@@ -840,6 +941,8 @@ const BottomSheetContent = ({
   onExpandSheet: () => void;
   onSearchPress: () => void;
   onCancelSearch: () => void;
+  selectedRoute: string | null;
+  onRouteClick: (routeName: string) => void;
 }) => {
   if (isSearchMode) {
     return <SearchContent onCancel={onCancelSearch} />;
@@ -856,6 +959,8 @@ const BottomSheetContent = ({
           <NearestStopsSection
             activeTab={activeTab}
             onTabChange={onTabChange}
+            selectedRoute={selectedRoute}
+            onRouteClick={onRouteClick}
           />
 
           <FavoritesSection />
@@ -874,7 +979,7 @@ const useDragHandlers = () => {
   const translateY = React.useRef(new Animated.Value(0)).current;
   const startHeight = React.useRef(45);
 
-  const MIN_HEIGHT = 15; // Minimum height - just search bar visible
+  const MIN_HEIGHT = 10; // Minimum height - just search bar visible
   const MAX_HEIGHT = 85; // Maximum height - like search mode
   const DEFAULT_HEIGHT = 45; // Default state
 
@@ -889,7 +994,8 @@ const useDragHandlers = () => {
 
     // Convert dy (pixels) to percentage of screen height
     // Assuming average screen height ~800px, so 1% = 8px
-    const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const screenHeight =
+      typeof window !== 'undefined' ? window.innerHeight : 800;
     const heightChange = (dy / screenHeight) * 100;
 
     // Calculate new height (dragging down increases dy, so we subtract)
@@ -928,7 +1034,7 @@ const useDragHandlers = () => {
     setTempHeight(null);
   };
 
-  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+  const handleDrag = (_gestureState: { dy: number; vy: number }) => {
     // This is called on drag end, but we're using handleDragEnd instead
     // Keep for backward compatibility
     handleDragEnd();
@@ -988,6 +1094,7 @@ const useDragHandlers = () => {
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
   const [activeTab, setActiveTab] = React.useState<string>('CENLIB');
+  const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const {
     isCollapsed,
     isSearchMode,
@@ -1000,6 +1107,10 @@ export default function TransitPage() {
     handleExitSearchMode,
     animatedStyle,
   } = useDragHandlers();
+
+  const handleRouteClick = (routeName: string) => {
+    setSelectedRoute((prev) => (prev === routeName ? null : routeName));
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-neutral-50">
@@ -1024,6 +1135,7 @@ export default function TransitPage() {
             longitudeDelta: 0.01,
           }}
           style={{ width: '100%', height: '100%' }}
+          showD1Route={selectedRoute === 'D1'}
         />
       </View>
 
@@ -1066,6 +1178,8 @@ export default function TransitPage() {
           onExpandSheet={handleExpandSheet}
           onSearchPress={handleEnterSearchMode}
           onCancelSearch={handleExitSearchMode}
+          selectedRoute={selectedRoute}
+          onRouteClick={handleRouteClick}
         />
       </Animated.View>
     </SafeAreaView>

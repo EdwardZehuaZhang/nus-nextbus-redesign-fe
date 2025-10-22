@@ -99,6 +99,88 @@ const DotDivider = () => (
   </Svg>
 );
 
+// Helper function to calculate optimal font size
+const calculateFontSize = (
+  textLength: number,
+  containerWidth: number,
+  currentFontSize: number
+): number => {
+  const estimatedTextWidth = textLength * currentFontSize * 0.6;
+  if (estimatedTextWidth > containerWidth * 0.95) {
+    const scale = (containerWidth * 0.95) / estimatedTextWidth;
+    return Math.max(10.4, Math.min(14, currentFontSize * scale));
+  }
+  return currentFontSize < 14 ? 14 : currentFontSize;
+};
+
+// Dynamic font size component for bus timing
+const DynamicBusTime = ({
+  time,
+  textColor,
+}: {
+  time: string;
+  textColor?: string;
+}) => {
+  const [fontSize, setFontSize] = React.useState(14);
+  const containerRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    if (containerRef.current && typeof window !== 'undefined') {
+      const measureContainer = () => {
+        try {
+          containerRef.current?.measure?.(
+            (_x: number, _y: number, width: number) => {
+              if (width > 0) {
+                const newSize = calculateFontSize(time.length, width, fontSize);
+                if (newSize !== fontSize) {
+                  setFontSize(newSize);
+                }
+              }
+            }
+          );
+        } catch {
+          const element = containerRef.current as HTMLElement;
+          if (element?.offsetWidth) {
+            const newSize = calculateFontSize(
+              time.length,
+              element.offsetWidth,
+              fontSize
+            );
+            if (newSize !== fontSize) {
+              setFontSize(newSize);
+            }
+          }
+        }
+      };
+
+      const timer = setTimeout(measureContainer, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [time, fontSize]);
+
+  return (
+    <View
+      ref={containerRef}
+      style={{
+        flex: 1,
+        maxWidth: '100%',
+        minWidth: 0,
+      }}
+    >
+      <Text
+        style={{
+          color: textColor,
+          fontSize: fontSize,
+          fontWeight: '500',
+          textAlign: 'center',
+        }}
+      >
+        {time}
+      </Text>
+    </View>
+  );
+};
+
 // Capacity Icons with people
 const CapacityIcons = ({ opacity = 1 }: { opacity?: number }) => (
   <Svg
@@ -725,16 +807,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#211F26',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                1 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="1 Min"
+                                textColor="#211F26"
+                              />
                               <CapacityIcons />
                             </View>
                             <View
@@ -753,16 +829,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#737373',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                5 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="5 Min"
+                                textColor="#737373"
+                              />
                               <CapacityIcons opacity={0.6} />
                             </View>
                             <View
@@ -780,16 +850,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#737373',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                10 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="10 Min"
+                                textColor="#737373"
+                              />
                               <CapacityIcons opacity={0.6} />
                             </View>
                           </View>
@@ -864,16 +928,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#211F26',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                3 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="3 Min"
+                                textColor="#211F26"
+                              />
                               <CapacityIcons />
                             </View>
                             <View
@@ -892,16 +950,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#737373',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                7 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="7 Min"
+                                textColor="#737373"
+                              />
                               <CapacityIcons opacity={0.6} />
                             </View>
                             <View
@@ -919,16 +971,10 @@ export default function NavigationPage() {
                                 flexDirection: 'row',
                               }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 14,
-                                  fontWeight: '500',
-                                  color: '#737373',
-                                  textAlign: 'center',
-                                }}
-                              >
-                                12 Min
-                              </Text>
+                              <DynamicBusTime
+                                time="12 Min"
+                                textColor="#737373"
+                              />
                               <CapacityIcons opacity={0.6} />
                             </View>
                           </View>

@@ -22,6 +22,7 @@ interface InteractiveMapProps {
     longitudeDelta: number;
   };
   style?: any;
+  showD1Route?: boolean; // Control D1 bus route visibility
 }
 
 const DEFAULT_REGION = {
@@ -154,10 +155,12 @@ const createMapInstance = (
       lng: initialRegion.longitude,
     },
     zoom: 14,
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-    zoomControl: true,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      zoomControl: false, // disables zoom buttons
+      rotateControl: false, // disables camera control
+      tiltControl: false, // disables camera tilt
     gestureHandling: 'greedy',
     styles: [
       {
@@ -320,6 +323,7 @@ const D1_BUS_ROUTE = [
   { lat: 1.2996237843583898, lng: 103.77467516392747 },
   { lat: 1.2994988447681044, lng: 103.77474069965551 },
   { lat: 1.2992896862640684, lng: 103.77477288616369 },
+  { lat: 1.2992376778515882, lng: 103.77464139390793 },{ lat: 1.2992023711240488, lng: 103.77450594235268 },{ lat: 1.2991433776946506, lng: 103.77441742945518 },{ lat: 1.2988533483799471, lng: 103.77426680045423 },{ lat: 1.2987063663315235, lng: 103.77417203546094 },{ lat: 1.2985240229640997, lng: 103.77401110292004 },{ lat: 1.2982780546546064, lng: 103.7737248383048 },{ lat: 1.2981463680081078, lng: 103.7735306553492 },{ lat: 1.2978755344123467, lng: 103.77317123934121 },{ lat: 1.2978755344123467, lng: 103.77317123934121 },{ lat: 1.2974253952461479, lng: 103.77297552166989 },{ lat: 1.296984141988323, lng: 103.77275089330755 },{ lat: 1.2966248180364428, lng: 103.77247666956511 },{ lat: 1.296375784471599, lng: 103.7721067872154 },{ lat: 1.296251253552375, lng: 103.771722723362 },{ lat: 1.2962673426880174, lng: 103.77108703982547 },{ lat: 1.2961788524407367, lng: 103.77097975146488 },{ lat: 1.2957724010832452, lng: 103.77090080678208 },{ lat: 1.2956595034812397, lng: 103.7708731088678 },{ lat: 1.2953473990741131, lng: 103.7707094941179 },{ lat: 1.2951409217506769, lng: 103.77060757017533 },{ lat: 1.295009332061492, lng: 103.77062069349252 },{ lat: 1.2948993895779914, lng: 103.77073602848016 },{ lat: 1.2947995028429624, lng: 103.77075204722705 },{ lat: 1.2944669938263527, lng: 103.77079228036227 },{ lat: 1.294349796625622, lng: 103.7708236767887 },{ lat: 1.2941307944675133, lng: 103.77091730179104 },{ lat: 1.2938143745144493, lng: 103.77130353988919 },{ lat: 1.2938143745144493, lng: 103.77130353988919 },{ lat: 1.2935755154858273, lng: 103.77217628419358 },{ lat: 1.2934339041367455, lng: 103.7721964479735 },{ lat: 1.2932843067076605, lng: 103.7725896212637 },{ lat: 1.2931917940674906, lng: 103.77282565565702 },{ lat: 1.2932104591923195, lng: 103.77320137608498 },{ lat: 1.2932104591923195, lng: 103.77320137608498 },{ lat: 1.2927787334967482, lng: 103.77354469883889 },{ lat: 1.292730045671177, lng: 103.77346989226791 },{ lat: 1.2923903959903105, lng: 103.77386085395541 },{ lat: 1.2923179947684342, lng: 103.77403653864589 },{ lat: 1.2922241413296127, lng: 103.77421758775439 },{ lat: 1.2922241413296127, lng: 103.77421758775439 },{ lat: 1.292512844821077, lng: 103.77468678676368 },{ lat: 1.2928666775438622, lng: 103.77492104279938 },{ lat: 1.2929843602452984, lng: 103.77499272581862 },{ lat: 1.2936859324952368, lng: 103.7752584200203 },{ lat: 1.2937607775220779, lng: 103.77534787113605 },{ lat: 1.2937607775220779, lng: 103.77534787113605 },{ lat: 1.2937953690843786, lng: 103.77545907054424 },{ lat: 1.2949434575337568, lng: 103.7749126471301 },
 ];
 
 // NUS campus boundary coordinates - manually obtained by user
@@ -581,7 +585,8 @@ const createCampusBorderPolyline = (
 // Hook to add NUS campus border and bus routes
 const useNUSCampusHighlight = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
-  isMapLoaded: boolean
+  isMapLoaded: boolean,
+  showD1Route: boolean = false
 ) => {
   const testPolylineRef = useRef<google.maps.Polyline | null>(null);
   const campusBorderRef = useRef<google.maps.Polyline | null>(null);
@@ -599,6 +604,7 @@ const useNUSCampusHighlight = (
       campusBorderExists: !!campusBorderRef.current,
       campusOverlayExists: !!campusOverlayRef.current,
       d1RouteExists: !!d1RouteRef.current,
+      showD1Route,
     });
 
     if (
@@ -611,27 +617,44 @@ const useNUSCampusHighlight = (
       return;
     }
 
+    // Create campus border if it doesn't exist
+    if (!campusBorderRef.current) {
+      const timer = setTimeout(() => {
+        if (map) {
+          const { border } = createCampusBorderPolyline(map);
+          campusBorderRef.current = border;
+          campusOverlayRef.current = null;
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [mapRef, isMapLoaded]);
+
+  // Separate effect for D1 route visibility
+  useEffect(() => {
+    const map = mapRef.current;
+
     if (
-      testPolylineRef.current &&
-      campusBorderRef.current &&
-      campusOverlayRef.current &&
-      d1RouteRef.current
+      !map ||
+      !isMapLoaded ||
+      typeof window === 'undefined' ||
+      !window.google
     ) {
-      console.log('✅ Polylines and overlay already exist');
       return;
     }
 
-    const timer = setTimeout(() => {
-      if (map) {
-        const { border } = createCampusBorderPolyline(map);
-        campusBorderRef.current = border;
-        campusOverlayRef.current = null; // Overlays created separately
-        d1RouteRef.current = createD1BusRoute(map);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [mapRef, isMapLoaded]);
+    if (showD1Route && !d1RouteRef.current) {
+      // Create and show D1 route
+      d1RouteRef.current = createD1BusRoute(map);
+      console.log('✅ D1 route shown');
+    } else if (!showD1Route && d1RouteRef.current) {
+      // Hide D1 route
+      d1RouteRef.current.setMap(null);
+      d1RouteRef.current = null;
+      console.log('❌ D1 route hidden');
+    }
+  }, [mapRef, isMapLoaded, showD1Route]);
 };
 
 const addMarkersAndFitBounds = ({
@@ -776,6 +799,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMarkerPress,
   initialRegion = DEFAULT_REGION,
   style,
+  showD1Route = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { mapRef, isMapCreated } = useGoogleMapsInit(
@@ -785,7 +809,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
   useMapPolyline(mapRef, routePolyline);
-  useNUSCampusHighlight(mapRef, isMapCreated);
+  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
 
   const handleMapTypeChange = (mapType: google.maps.MapTypeId) => {
     if (mapRef.current) {

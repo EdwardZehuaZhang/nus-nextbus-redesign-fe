@@ -9,7 +9,12 @@ interface FrameProps {
   onDragEnd?: () => void;
 }
 
-export const Frame = ({ onDrag, onDragMove, onDragEnd }: FrameProps) => {
+// Hook to manage drag handlers
+const useDragHandlers = (
+  onDrag?: (gestureState: { dy: number; vy: number }) => void,
+  onDragMove?: (dy: number) => void,
+  onDragEnd?: () => void
+) => {
   const startY = React.useRef(0);
   const startTime = React.useRef(0);
   const isDragging = React.useRef(false);
@@ -59,26 +64,46 @@ export const Frame = ({ onDrag, onDragMove, onDragEnd }: FrameProps) => {
     }
   };
 
+  return { cursor, handleTouchStart, handleTouchMove, handleTouchEnd };
+};
+
+export const Frame = ({ onDrag, onDragMove, onDragEnd }: FrameProps) => {
+  const { cursor, handleTouchStart, handleTouchMove, handleTouchEnd } =
+    useDragHandlers(onDrag, onDragMove, onDragEnd);
+
   // Use native div for web to ensure mouse events work
   if (Platform.OS === 'web') {
     return (
       <div
         style={{
+          position: 'relative',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: 10,
-          cursor: cursor,
-          userSelect: 'none',
         }}
-        onMouseDown={handleTouchStart}
-        onMouseMove={handleTouchMove}
-        onMouseUp={handleTouchEnd}
-        onMouseLeave={handleTouchEnd}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
+        {/* Invisible expanded hit area */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '-30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '100vw',
+            height: '60px',
+            cursor: cursor,
+            userSelect: 'none',
+            zIndex: 10,
+          }}
+          onMouseDown={handleTouchStart}
+          onMouseMove={handleTouchMove}
+          onMouseUp={handleTouchEnd}
+          onMouseLeave={handleTouchEnd}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
+        {/* Visible bar */}
         <View
           className="h-1 w-[52px] rounded-[48px]"
           style={{ backgroundColor: '#b6b6b6' }}
