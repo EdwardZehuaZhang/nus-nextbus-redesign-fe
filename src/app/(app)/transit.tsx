@@ -870,43 +870,68 @@ const useDragHandlers = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isSearchMode, setIsSearchMode] = React.useState(false);
   const [containerHeight, setContainerHeight] = React.useState(45); // Start at 45%
+  const [tempHeight, setTempHeight] = React.useState<number | null>(null);
   const translateY = React.useRef(new Animated.Value(0)).current;
+  const startHeight = React.useRef(45);
 
-  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+  const MIN_HEIGHT = 15; // Minimum height - just search bar visible
+  const MAX_HEIGHT = 85; // Maximum height - like search mode
+  const DEFAULT_HEIGHT = 45; // Default state
+
+  const handleDragMove = (dy: number) => {
     // Don't allow drag when in search mode
     if (isSearchMode) return;
 
-    const threshold = 100;
-    const velocityThreshold = 0.3;
+    // Store the starting height when drag begins
+    if (tempHeight === null) {
+      startHeight.current = containerHeight;
+    }
 
-    // Dragging down - collapse
-    if (gestureState.dy > threshold || gestureState.vy > velocityThreshold) {
-      setIsCollapsed(true);
-      setContainerHeight(45);
-      Animated.spring(translateY, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
+    // Convert dy (pixels) to percentage of screen height
+    // Assuming average screen height ~800px, so 1% = 8px
+    const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const heightChange = (dy / screenHeight) * 100;
+
+    // Calculate new height (dragging down increases dy, so we subtract)
+    let newHeight = startHeight.current - heightChange;
+
+    // Clamp between MIN and MAX
+    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+
+    setTempHeight(newHeight);
+    setContainerHeight(newHeight);
+  };
+
+  const handleDragEnd = () => {
+    // Snap to nearest state
+    const currentHeight = tempHeight ?? containerHeight;
+
+    let targetHeight = DEFAULT_HEIGHT;
+    let collapsed = false;
+
+    if (currentHeight < 30) {
+      // Snap to collapsed (minimum)
+      targetHeight = MIN_HEIGHT;
+      collapsed = true;
+    } else if (currentHeight > 65) {
+      // Snap to expanded (like search mode)
+      targetHeight = MAX_HEIGHT;
+      collapsed = false;
+    } else {
+      // Snap to default
+      targetHeight = DEFAULT_HEIGHT;
+      collapsed = false;
     }
-    // Dragging up - expand
-    else if (
-      gestureState.dy < -threshold ||
-      gestureState.vy < -velocityThreshold
-    ) {
-      setIsCollapsed(false);
-      setContainerHeight(80); // Expand to 80%
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-      }).start();
-    }
-    // Small drag - return to current state
-    else {
-      Animated.spring(translateY, {
-        toValue: isCollapsed ? 1 : 0,
-        useNativeDriver: true,
-      }).start();
-    }
+
+    setContainerHeight(targetHeight);
+    setIsCollapsed(collapsed);
+    setTempHeight(null);
+  };
+
+  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+    // This is called on drag end, but we're using handleDragEnd instead
+    // Keep for backward compatibility
+    handleDragEnd();
   };
 
   const handleExpandSheet = () => {
@@ -921,12 +946,12 @@ const useDragHandlers = () => {
   const handleEnterSearchMode = () => {
     setIsSearchMode(true);
     setIsCollapsed(false);
-    setContainerHeight(80);
+    setContainerHeight(MAX_HEIGHT); // Use MAX_HEIGHT constant
   };
 
   const handleExitSearchMode = () => {
     setIsSearchMode(false);
-    setContainerHeight(45); // Return to normal size
+    setContainerHeight(DEFAULT_HEIGHT); // Return to normal size
     Animated.spring(translateY, {
       toValue: 0,
       useNativeDriver: true,
@@ -951,6 +976,8 @@ const useDragHandlers = () => {
     isSearchMode,
     containerHeight,
     handleDrag,
+    handleDragMove,
+    handleDragEnd,
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
@@ -966,6 +993,8 @@ export default function TransitPage() {
     isSearchMode,
     containerHeight,
     handleDrag,
+    handleDragMove,
+    handleDragEnd,
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
@@ -1022,7 +1051,11 @@ export default function TransitPage() {
         ]}
       >
         <View className="mb-3 items-center">
-          <Frame onDrag={handleDrag} />
+          <Frame
+            onDrag={handleDrag}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          />
         </View>
 
         <BottomSheetContent
