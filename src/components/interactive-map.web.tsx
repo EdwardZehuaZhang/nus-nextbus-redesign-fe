@@ -2,8 +2,20 @@ import polyline from '@mapbox/polyline';
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import type { ActiveBus, RouteCode } from '@/api/bus';
+import {
+  useActiveBuses,
+  useCheckpoints,
+  useServiceDescriptions,
+} from '@/api/bus';
 import type { LatLng } from '@/api/google-maps';
+import { createBusMarkerSVG, svgToDataURL } from '@/components/bus-marker-icon';
+import {
+  getLandmarkMarkerSVG,
+  NUS_LANDMARKS,
+} from '@/components/landmark-marker-icons';
 import { MapTypeSelector } from '@/components/map-type-selector';
+import routeCheckpointsData from '@/data/route-checkpoints.json';
 import { Env } from '@/lib/env';
 
 interface InteractiveMapProps {
@@ -23,11 +35,15 @@ interface InteractiveMapProps {
   };
   style?: any;
   showD1Route?: boolean; // Control D1 bus route visibility
+  activeRoute?: RouteCode | null; // Active route code to show live buses
 }
 
+// Use a campus-centered starting point. The user provided a screen-centered
+// coordinate to try first so the map appears higher on the screen (accounts
+// for the bottom panel overlay).
 const DEFAULT_REGION = {
-  latitude: 1.2976493, // NUS coordinates (exact center)
-  longitude: 103.7766916,
+  latitude: 1.3965033959396037,
+  longitude: 103.77708613739266,
   latitudeDelta: 0.01,
   longitudeDelta: 0.01,
 };
@@ -119,6 +135,22 @@ const createMarker = ({
   return marker;
 };
 
+// Create SVG for user location marker with directional arrow
+const createUserLocationSVG = (heading: number = 0): string => {
+  return `
+    <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <!-- Outer glow -->
+      <circle cx="24" cy="24" r="20" fill="#4285F4" opacity="0.2"/>
+      <!-- Main circle -->
+      <circle cx="24" cy="24" r="12" fill="#4285F4" stroke="white" stroke-width="3"/>
+      <!-- Directional arrow -->
+      <g transform="rotate(${heading} 24 24)">
+        <path d="M 24 8 L 28 18 L 24 16 L 20 18 Z" fill="white"/>
+      </g>
+    </svg>
+  `;
+};
+
 // Helper to add coordinate listener for development
 const addCoordinateListener = (map: google.maps.Map) => {
   map.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
@@ -149,18 +181,19 @@ const createMapInstance = (
   container: HTMLDivElement,
   initialRegion: { latitude: number; longitude: number }
 ): google.maps.Map => {
-  return new google.maps.Map(container, {
+  const options: any = {
     center: {
       lat: initialRegion.latitude,
       lng: initialRegion.longitude,
     },
-    zoom: 14,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      zoomControl: false, // disables zoom buttons
-      rotateControl: false, // disables camera control
-      tiltControl: false, // disables camera tilt
+    // Increase default zoom to show a campus-centered view (matches screenshot)
+    zoom: 16,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    zoomControl: false, // disables zoom buttons
+    rotateControl: false, // disables camera control
+    tiltControl: false, // disables camera tilt
     gestureHandling: 'greedy',
     styles: [
       {
@@ -169,7 +202,50 @@ const createMapInstance = (
         stylers: [{ visibility: 'on' }],
       },
     ],
-  });
+  };
+
+  return new google.maps.Map(container, options);
+};
+
+// Apply a vertical pixel offset so that a given LatLng appears higher on the
+// viewport (useful when a bottom panel / sheet covers the lower portion of
+// the screen). This uses an OverlayView projection to convert between
+// container pixels and LatLngs. Positive `offsetY` moves the map content down
+// so the target point appears higher; typical values: 80..160.
+const applyVerticalOffset = (
+  map: google.maps.Map,
+  target: { lat: number; lng: number },
+  offsetY: number = 120
+) => {
+  try {
+    const ov = new google.maps.OverlayView();
+    ov.onAdd = function () {};
+    ov.draw = function () {
+      const proj: any = ov.getProjection?.();
+      if (!proj) return;
+      // fromLatLngToContainerPixel / fromContainerPixelToLatLng exist on the
+      // projection; cast to any to avoid TS issues in this file.
+      const point = proj.fromLatLngToContainerPixel(
+        new google.maps.LatLng(target.lat, target.lng)
+      );
+      const shiftedPoint = new google.maps.Point(point.x, point.y + offsetY);
+      const newCenter = proj.fromContainerPixelToLatLng(shiftedPoint);
+      if (newCenter) {
+        map.setCenter(newCenter);
+      }
+      // remove the overlay once done
+      ov.setMap(null);
+    };
+    ov.setMap(map);
+  } catch (err) {
+    // If projection utilities aren't available for some reason, fall back to
+    // a simple pixel pan which is less accurate but often good enough.
+    try {
+      map.panBy(0, offsetY);
+    } catch (e) {
+      // ignore
+    }
+  }
 };
 
 // Custom hooks
@@ -207,6 +283,17 @@ const useGoogleMapsInit = (
         );
         console.log('Google Map created successfully!');
         addCoordinateListener(mapRef.current);
+        // Move the chosen target slightly upward on the viewport so it isn't
+        // obscured by the bottom panel. Offset value can be tuned if needed.
+        try {
+          applyVerticalOffset(
+            mapRef.current,
+            { lat: initialRegion.latitude, lng: initialRegion.longitude },
+            200 // increase offset so the focal point appears higher on the viewport
+          );
+        } catch (e) {
+          // ignore
+        }
         if (mapContainerRef.current) {
           preventContextMenu(mapContainerRef.current);
         }
@@ -216,6 +303,18 @@ const useGoogleMapsInit = (
       }
     }
   }, [isLoaded, initialRegion, mapContainerRef]);
+
+  // Pan to new center when initialRegion changes (after map is already created)
+  useEffect(() => {
+    if (mapRef.current && isMapCreated) {
+      console.log('Panning map to new center:', initialRegion);
+      mapRef.current.panTo({
+        lat: initialRegion.latitude,
+        lng: initialRegion.longitude,
+      });
+      mapRef.current.setZoom(15); // Zoom level for city-scale view
+    }
+  }, [initialRegion.latitude, initialRegion.longitude, isMapCreated]);
 
   return { mapRef, isMapCreated };
 };
@@ -791,6 +890,333 @@ const useMapPolyline = (
   }, [routePolyline, mapRef]);
 };
 
+// Hook to render real-time bus location markers
+const useBusMarkers = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  activeBuses: ActiveBus[],
+  routeColor: string = '#274F9C'
+) => {
+  const busMarkersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    if (!mapRef.current || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    // Remove existing bus markers
+    busMarkersRef.current.forEach((marker) => marker.setMap(null));
+    busMarkersRef.current = [];
+
+    // Create new markers for each active bus
+    activeBuses.forEach((bus) => {
+      const { lat, lng, veh_plate, direction } = bus;
+
+      // Use horizontal flip for reverse direction instead of rotation
+      const flipHorizontal = direction === 2;
+
+      // Create SVG icon for bus marker with route color
+      const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal);
+      const iconUrl = svgToDataURL(iconSvg);
+
+      // Create marker
+      const marker = new google.maps.Marker({
+        position: { lat, lng },
+        map,
+        icon: {
+          url: iconUrl,
+          scaledSize: new google.maps.Size(32, 32),
+          anchor: new google.maps.Point(16, 16), // Center the icon
+        },
+        title: `Bus ${veh_plate}`,
+        zIndex: 1000, // Ensure buses appear above routes
+      });
+
+      // Add info window with bus details
+      const infoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; font-family: sans-serif;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">
+              🚌 Bus ${veh_plate}
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              Direction: ${direction === 1 ? 'Forward' : 'Reverse'}
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              Speed: ${bus.speed} km/h
+            </div>
+          </div>
+        `,
+      });
+
+      // Show info window on click
+      marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+      });
+
+      busMarkersRef.current.push(marker);
+    });
+
+    console.log(`🚌 Rendered ${activeBuses.length} bus markers on map`);
+  }, [mapRef, activeBuses, routeColor]);
+
+  return busMarkersRef;
+};
+
+/**
+ * Custom hook to draw route polyline from checkpoint data
+ */
+const useRouteCheckpoints = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  routeCode: RouteCode | null,
+  routeColor: string
+) => {
+  const polylineRef = useRef<google.maps.Polyline | null>(null);
+
+  // Fetch checkpoints for the active route (only if routeCode exists)
+  const { data: checkpointsData } = useCheckpoints(routeCode as RouteCode);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing polyline
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+
+    // If no route, return
+    if (!routeCode) {
+      return;
+    }
+
+    // Try to get checkpoints from API first, fallback to local data
+    let checkpoints =
+      checkpointsData?.CheckPointResult?.CheckPoint ||
+      (routeCheckpointsData as Record<string, any>)[routeCode];
+
+    // If no checkpoints available, return
+    if (!checkpoints || checkpoints.length === 0) {
+      console.warn(`⚠️ No checkpoint data found for ${routeCode}`);
+      return;
+    }
+
+    // Convert checkpoints to Google Maps LatLng format
+    const path = checkpoints.map((point: any) => ({
+      lat: point.latitude,
+      lng: point.longitude,
+    }));
+
+    // Create polyline
+    const polyline = new google.maps.Polyline({
+      path,
+      geodesic: true,
+      strokeColor: routeColor,
+      strokeOpacity: 0.8,
+      strokeWeight: 4,
+      map,
+    });
+
+    polylineRef.current = polyline;
+
+    const dataSource = checkpointsData?.CheckPointResult?.CheckPoint
+      ? 'API'
+      : 'Local';
+    console.log(
+      `🛣️ Drew ${routeCode} route with ${checkpoints.length} checkpoints (${dataSource})`
+    );
+
+    // Cleanup
+    return () => {
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+      }
+    };
+  }, [mapRef, routeCode, checkpointsData, routeColor]);
+
+  return polylineRef;
+};
+
+/**
+ * Custom hook to render landmark markers (hospital, MRT, library, bus terminal)
+ */
+const useLandmarkMarkers = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  isMapCreated: boolean
+) => {
+  const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapCreated || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    // Remove existing landmark markers
+    landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
+    landmarkMarkersRef.current = [];
+
+    // Create markers for each landmark
+    NUS_LANDMARKS.forEach((landmark) => {
+      const marker = new google.maps.Marker({
+        position: landmark.coordinates,
+        map,
+        icon: {
+          url: getLandmarkMarkerSVG(landmark.type),
+          scaledSize: new google.maps.Size(40, 52),
+          anchor: new google.maps.Point(20, 52),
+        },
+        title: landmark.name,
+        zIndex: 500, // Below buses but above routes
+      });
+
+      // Add info window with landmark details
+      const infoWindow = new google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; font-family: sans-serif; max-width: 200px;">
+            <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">
+              ${landmark.name}
+            </div>
+            <div style="font-size: 12px; color: #666;">
+              ${landmark.address}
+            </div>
+          </div>
+        `,
+      });
+
+      marker.addListener('click', () => {
+        infoWindow.open(map, marker);
+      });
+
+      landmarkMarkersRef.current.push(marker);
+    });
+
+    console.log(`📍 Rendered ${NUS_LANDMARKS.length} landmark markers on map`);
+
+    // Cleanup
+    return () => {
+      landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
+    };
+  }, [mapRef, isMapCreated]);
+
+  return landmarkMarkersRef;
+};
+
+// Hook to track and display user location with heading
+const useUserLocationMarker = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapCreated: boolean
+) => {
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const headingRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    // Function to update marker position and rotation
+    const updateUserMarker = (lat: number, lng: number, heading: number) => {
+      const iconSvg = createUserLocationSVG(heading);
+      const iconUrl = svgToDataURL(iconSvg);
+
+      if (userMarkerRef.current) {
+        // Update existing marker
+        userMarkerRef.current.setPosition({ lat, lng });
+        userMarkerRef.current.setIcon({
+          url: iconUrl,
+          scaledSize: new google.maps.Size(48, 48),
+          anchor: new google.maps.Point(24, 24),
+        });
+      } else {
+        // Create new marker
+        userMarkerRef.current = new google.maps.Marker({
+          position: { lat, lng },
+          map,
+          icon: {
+            url: iconUrl,
+            scaledSize: new google.maps.Size(48, 48),
+            anchor: new google.maps.Point(24, 24),
+          },
+          title: 'Your Location',
+          zIndex: 1000, // On top of everything
+        });
+      }
+    };
+
+    // Handle device orientation for heading
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      if (event.alpha !== null) {
+        // alpha is the compass heading (0-360)
+        // Convert to match map north (0 = north)
+        const heading = event.webkitCompassHeading || event.alpha || 0;
+        headingRef.current = heading;
+      }
+    };
+
+    // Request orientation permission (iOS 13+)
+    const requestOrientationPermission = async () => {
+      if (
+        typeof (DeviceOrientationEvent as any).requestPermission === 'function'
+      ) {
+        try {
+          const permission = await (
+            DeviceOrientationEvent as any
+          ).requestPermission();
+          if (permission === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+          }
+        } catch (error) {
+          console.log('Orientation permission denied:', error);
+        }
+      } else {
+        // Non-iOS devices
+        window.addEventListener('deviceorientation', handleOrientation);
+      }
+    };
+
+    // Start watching user location
+    if (navigator.geolocation) {
+      // Start orientation tracking
+      requestOrientationPermission();
+
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          updateUserMarker(latitude, longitude, headingRef.current);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 5000,
+        }
+      );
+    }
+
+    // Cleanup
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+      if (userMarkerRef.current) {
+        userMarkerRef.current.setMap(null);
+        userMarkerRef.current = null;
+      }
+      window.removeEventListener('deviceorientation', handleOrientation);
+    };
+  }, [mapRef, isMapCreated]);
+
+  return userMarkerRef;
+};
+
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   origin,
   destination,
@@ -800,6 +1226,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   initialRegion = DEFAULT_REGION,
   style,
   showD1Route = false,
+  activeRoute = null,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { mapRef, isMapCreated } = useGoogleMapsInit(
@@ -807,9 +1234,52 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     initialRegion
   );
 
+  // Fetch active buses for the selected route
+  const { data: activeBusesData } = useActiveBuses(
+    activeRoute as RouteCode,
+    !!activeRoute
+  );
+  const activeBuses = activeBusesData?.ActiveBusResult?.activebus || [];
+
+  // Fetch service descriptions to get actual route colors from API
+  const { data: serviceDescriptions } = useServiceDescriptions();
+
+  // Get route color from API or use fallback
+  const routeColor = React.useMemo(() => {
+    if (!activeRoute) return '#274F9C';
+
+    // Try to get color from API
+    const serviceDesc = serviceDescriptions?.ServiceDescriptionResult?.ServiceDescription?.find(
+      (s) => s.Route === activeRoute
+    );
+
+    if (serviceDesc?.Color) {
+      // API returns hex without #, so add it
+      return `#${serviceDesc.Color}`;
+    }
+
+    // Fallback colors (must match getRouteColor in utils.ts)
+    const fallbackColors: Record<string, string> = {
+      A1: '#FF0000', // Red
+      A2: '#E3CE0B', // Yellow
+      D1: '#C77DE2', // Light Purple
+      D2: '#6F1B6F', // Dark Purple
+      BTC: '#EF8136', // Orange
+      L: '#BFBFBF', // Gray
+      E: '#00B050', // Green
+      K: '#345A9B', // Blue
+    };
+
+    return fallbackColors[activeRoute] || '#274F9C';
+  }, [activeRoute, serviceDescriptions]);
+
   useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
   useMapPolyline(mapRef, routePolyline);
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
+  useBusMarkers(mapRef, activeBuses, routeColor);
+  useRouteCheckpoints(mapRef, activeRoute, routeColor);
+  useLandmarkMarkers(mapRef, isMapCreated);
+  useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
 
   const handleMapTypeChange = (mapType: google.maps.MapTypeId) => {
     if (mapRef.current) {

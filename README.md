@@ -112,15 +112,19 @@ The app supports multiple environments with different backend configurations:
 
 **Development** (Local Backend)
 
-```bash
-API_URL=http://localhost:3000
-```
-
-**Production** (Render.com)
+**Development** (Actual NUS NextBus API)
 
 ```bash
-API_URL=https://nus-nextbus-mock-api.onrender.com
+API_URL=https://nnextbus.nus.edu.sg
 ```
+
+**Production** (Actual NUS NextBus API)
+
+```bash
+API_URL=https://nnextbus.nus.edu.sg
+```
+
+**Note**: The app now uses the official NUS NextBus API with HTTP Basic Authentication. Credentials are configured in the API client.
 
 Switch environments using:
 
@@ -144,17 +148,17 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
 
 ## 🚌 Backend API
 
-The app connects to the NUS NextBus Mock API which provides:
+The app connects to the official NUS NextBus API which provides:
 
 - Bus stop locations and information
 - Real-time shuttle service data
 - Route descriptions and colors
-- Active bus tracking
+- Active bus tracking (live GPS locations)
 - Announcements and ticker tapes
 
-**Backend Repository**: [nus-nextbus-mock-api](https://github.com/EdwardZehuaZhang/nus-nextbus-mock-api)
+**API Base URL**: https://nnextbus.nus.edu.sg
 
-**Production API**: https://nus-nextbus-mock-api.onrender.com
+**Authentication**: HTTP Basic Auth (configured in client)
 
 ### Available Endpoints
 
@@ -162,10 +166,12 @@ The app connects to the NUS NextBus Mock API which provides:
 GET /BusStops              - All bus stops
 GET /ShuttleService        - Bus arrival times
 GET /ServiceDescription    - Route information with colors
-GET /ActiveBus             - Real-time bus locations
+GET /ActiveBus             - Real-time bus GPS locations
 GET /PickupPoint           - Pickup points for routes
 GET /CheckPoint            - Route checkpoints
 GET /Announcements         - Service announcements
+GET /BusLocation           - Specific bus location by plate
+GET /RouteMinMaxTime       - Route operating hours
 ```
 
 ---

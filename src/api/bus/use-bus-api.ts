@@ -143,5 +143,6 @@ export const useCheckpoints = (routeCode: RouteCode) => {
     queryKey: ['checkpoints', routeCode],
     queryFn: () => getCheckpoints(routeCode),
     staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: false, // Disable API call, use local data instead
   });
 };

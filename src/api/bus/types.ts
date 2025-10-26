@@ -1,6 +1,6 @@
-// API Response Types for NUS NextBus Mock API
+// API Response Types for NUS NextBus API
 
-export type PassengerLoad = 'Low' | 'Medium' | 'High' | '';
+export type PassengerLoad = 'Low' | 'Medium' | 'High' | '-' | '';
 
 export type DayType = 'Mon-Fri' | 'Sat' | 'Sun/PH';
 
@@ -52,10 +52,10 @@ export type PublicityResponse = {
 
 // 2. Bus Stop Types
 export type BusStop = {
-  name: string;
-  caption: string;
-  ShortName: string;
-  LongName: string;
+  name: string; // API code for ShuttleService (e.g., 'YIH', 'CLB', 'UHC-OPP') - USE THIS for API calls
+  caption: string; // Display name (e.g., 'Yusof Ishak House', 'Central Library') - USE THIS for UI
+  ShortName: string; // Short display name with spaces (e.g., 'YIH', 'Opp UHC') - DO NOT use for API
+  LongName: string; // Full display name
   latitude: number;
   longitude: number;
 };

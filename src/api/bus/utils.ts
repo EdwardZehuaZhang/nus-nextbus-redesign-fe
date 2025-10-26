@@ -1,37 +1,48 @@
 import type { CrowdingLevel, PassengerLoad } from './types';
 
 /**
- * Convert arrival time in seconds to human-readable format
- * @param seconds - Arrival time in seconds (-1 for no estimate)
+ * Convert arrival time to human-readable format
+ * @param time - Arrival time in minutes (string or number), or "-" for no estimate
  * @returns Formatted time string
  */
-export const formatArrivalTime = (seconds: number | string): string => {
-  const numSeconds =
-    typeof seconds === 'string' ? parseInt(seconds, 10) : seconds;
-
-  if (numSeconds === -1) {
+export const formatArrivalTime = (time: number | string): string => {
+  // Handle "-" or empty string
+  if (time === '-' || time === '' || time === null || time === undefined) {
     return 'N/A';
   }
 
-  if (numSeconds < 60) {
+  const minutes = typeof time === 'string' ? parseInt(time, 10) : time;
+
+  // Handle invalid numbers
+  if (isNaN(minutes) || minutes < 0) {
+    return 'N/A';
+  }
+
+  // Less than 1 minute
+  if (minutes < 1) {
     return 'Arr';
   }
 
-  const minutes = Math.floor(numSeconds / 60);
-
+  // 1 minute
   if (minutes === 1) {
     return '1 Min';
   }
 
+  // Multiple minutes
   return `${minutes} Min`;
 };
 
 /**
  * Convert passenger load to crowding level
- * @param load - Passenger load from API
+ * @param load - Passenger load from API (can be "Low", "Medium", "High", "-", or undefined)
  * @returns Crowding level for UI
  */
 export const passengerLoadToCrowding = (load: PassengerLoad): CrowdingLevel => {
+  // Handle "-" or undefined passengers (unknown capacity)
+  if (!load || load === '-') {
+    return 'low'; // Default to low when unknown
+  }
+
   switch (load) {
     case 'Low':
       return 'low';
@@ -116,12 +127,16 @@ export const sortShuttlesByArrival = <T extends { arrivalTime: string }>(
   shuttles: T[]
 ): T[] => {
   return [...shuttles].sort((a, b) => {
+    // Handle "-" or invalid values - put them at the end
+    if (a.arrivalTime === '-' || !a.arrivalTime) return 1;
+    if (b.arrivalTime === '-' || !b.arrivalTime) return 1;
+
     const timeA = parseInt(a.arrivalTime, 10);
     const timeB = parseInt(b.arrivalTime, 10);
 
-    // Handle -1 (no estimate) - put them at the end
-    if (timeA === -1) return 1;
-    if (timeB === -1) return -1;
+    // Handle NaN or negative values - put them at the end
+    if (isNaN(timeA) || timeA < 0) return 1;
+    if (isNaN(timeB) || timeB < 0) return -1;
 
     return timeA - timeB;
   });
@@ -152,4 +167,69 @@ export const getBusStopCode = (name: string): string => {
   };
 
   return codeMap[name] || name;
+};
+
+/**
+ * Calculate distance between two coordinates using Haversine formula
+ * @param params - Coordinates object
+ * @param params.lat1 - Latitude of first point
+ * @param params.lon1 - Longitude of first point
+ * @param params.lat2 - Latitude of second point
+ * @param params.lon2 - Longitude of second point
+ * @returns Distance in kilometers
+ */
+export const calculateDistance = ({
+  lat1,
+  lon1,
+  lat2,
+  lon2,
+}: {
+  lat1: number;
+  lon1: number;
+  lat2: number;
+  lon2: number;
+}): number => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+
+  return distance;
+};
+
+/**
+ * Convert degrees to radians
+ * @param degrees - Angle in degrees
+ * @returns Angle in radians
+ */
+const toRadians = (degrees: number): number => {
+  return degrees * (Math.PI / 180);
+};
+
+/**
+ * Format distance for display as walking time
+ * @param distanceKm - Distance in kilometers
+ * @returns Formatted walking time string
+ */
+export const formatDistance = (distanceKm: number): string => {
+  // Average walking speed: 5 km/h = 83.33 meters/min
+  const walkingSpeedKmPerHour = 5;
+  const walkingTimeMinutes = (distanceKm / walkingSpeedKmPerHour) * 60;
+
+  const roundedMinutes = Math.round(walkingTimeMinutes);
+
+  if (roundedMinutes < 1) {
+    return '< 1 min walk';
+  }
+
+  return `${roundedMinutes} min${roundedMinutes > 1 ? 's' : ''} walk`;
 };

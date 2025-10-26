@@ -1,8 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TextInput } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
+import {
+  getTransitRoute,
+  type Route,
+  type RouteStep,
+  type Waypoint,
+  durationToMinutes,
+  formatTime,
+} from '@/api';
 import { BusIndicator } from '@/components/bus-indicator';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
@@ -184,24 +192,25 @@ const DynamicBusTime = ({
 // Capacity Icons with people
 const CapacityIcons = ({ opacity = 1 }: { opacity?: number }) => (
   <Svg
-    width={30}
-    height={23}
-    viewBox="0 0 30 23"
+    width={33}
+    height={24}
+    viewBox="0 0 33 24"
     fill="none"
     style={{ opacity }}
   >
     <Path
       opacity="0.5"
-      d="M21.4932 17.075C20.5629 15.6493 19.1978 14.5615 17.6005 13.9727C18.646 13.2684 19.3838 12.1923 19.6638 10.9632C19.9438 9.73412 19.7449 8.44455 19.1076 7.35697C18.4702 6.26939 17.4424 5.46554 16.2333 5.10905C15.0242 4.75256 13.7247 4.87022 12.5993 5.43809C12.5563 5.4603 12.5187 5.49171 12.4891 5.53009C12.4596 5.56846 12.4388 5.61286 12.4284 5.66015C12.4179 5.70743 12.4179 5.75644 12.4285 5.80371C12.439 5.85097 12.4599 5.89534 12.4895 5.93366C13.3263 6.97751 13.8069 8.2619 13.8609 9.59868C13.9148 10.9355 13.5393 12.2544 12.7893 13.3623C12.7408 13.4347 12.7229 13.5233 12.7395 13.6089C12.756 13.6944 12.8057 13.77 12.8777 13.8191C13.8555 14.5015 14.6926 15.3661 15.3432 16.3655C15.6055 16.7673 15.7127 17.2508 15.6446 17.7258C15.637 17.7731 15.6397 17.8214 15.6526 17.8675C15.6654 17.9136 15.6882 17.9564 15.7192 17.9929C15.7502 18.0293 15.7888 18.0586 15.8323 18.0786C15.8757 18.0987 15.923 18.1091 15.9709 18.1091H20.9514C21.0969 18.1091 21.2384 18.0611 21.3538 17.9726C21.4692 17.884 21.5522 17.7598 21.5899 17.6193C21.6128 17.5269 21.6161 17.4306 21.5995 17.3369C21.5828 17.2431 21.5466 17.1539 21.4932 17.075Z"
-      fill="#211F26"
-    />
-    <Path
-      d="M14.0481 17.0884C14.1131 17.1881 14.15 17.3035 14.1548 17.4225C14.1597 17.5414 14.1323 17.6594 14.0756 17.7641C14.0189 17.8687 13.935 17.9561 13.8328 18.017C13.7305 18.078 13.6137 18.1101 13.4947 18.1101H1.30851C1.18949 18.1101 1.07268 18.078 0.970423 18.017C0.868168 17.9561 0.784265 17.8687 0.727579 17.7641C0.670892 17.6594 0.643528 17.5414 0.648376 17.4225C0.653224 17.3035 0.690104 17.1881 0.755121 17.0884C1.68523 15.6567 3.05334 14.5642 4.65529 13.9737C3.76969 13.3842 3.09734 12.5252 2.73766 11.524C2.37798 10.5227 2.35006 9.43233 2.65803 8.41399C2.96601 7.39564 3.59352 6.50344 4.44778 5.86932C5.30204 5.2352 6.3377 4.89282 7.40159 4.89282C8.46548 4.89282 9.50114 5.2352 10.3554 5.86932C11.2097 6.50344 11.8372 7.39564 12.1451 8.41399C12.4531 9.43233 12.4252 10.5227 12.0655 11.524C11.7058 12.5252 11.0335 13.3842 10.1479 13.9737C11.7498 14.5642 13.1179 15.6567 14.0481 17.0884Z"
+      d="M23.6606 18.3262C22.6046 16.708 21.0552 15.4732 19.2422 14.8049C20.4289 14.0056 21.2663 12.7841 21.5841 11.389C21.9019 9.99396 21.6761 8.53024 20.9528 7.29578C20.2294 6.06132 19.0628 5.14891 17.6904 4.74428C16.318 4.33965 14.843 4.4732 13.5656 5.11775C13.5168 5.14297 13.4741 5.17862 13.4405 5.22218C13.407 5.26574 13.3835 5.31613 13.3716 5.3698C13.3597 5.42347 13.3597 5.4791 13.3717 5.53275C13.3837 5.5864 13.4073 5.63675 13.4409 5.68025C14.3908 6.86507 14.9363 8.32291 14.9975 9.84023C15.0588 11.3576 14.6325 12.8546 13.7813 14.1121C13.7262 14.1943 13.7059 14.2949 13.7247 14.392C13.7435 14.4891 13.7999 14.5748 13.8816 14.6306C14.9915 15.4052 15.9416 16.3865 16.68 17.5209C16.9778 17.9769 17.0994 18.5258 17.0222 19.0649C17.0135 19.1186 17.0166 19.1735 17.0312 19.2258C17.0458 19.2781 17.0716 19.3266 17.1068 19.368C17.142 19.4094 17.1858 19.4426 17.2352 19.4654C17.2845 19.4882 17.3382 19.5 17.3925 19.4999H23.0456C23.2108 19.5 23.3713 19.4455 23.5024 19.345C23.6334 19.2445 23.7276 19.1035 23.7703 18.944C23.7964 18.8391 23.8001 18.7299 23.7812 18.6234C23.7623 18.517 23.7212 18.4157 23.6606 18.3262Z"
       fill="#211F26"
     />
     <Path
       opacity="0.5"
-      d="M29.103 17.075C28.1726 15.6493 26.8076 14.5615 25.2102 13.9727C26.2557 13.2684 26.9936 12.1923 27.2735 10.9632C27.5535 9.73412 27.3546 8.44455 26.7173 7.35697C26.08 6.26939 25.0522 5.46554 23.8431 5.10905C22.634 4.75256 21.3345 4.87022 20.2091 5.43809C20.166 5.4603 20.1284 5.49171 20.0989 5.53009C20.0693 5.56846 20.0486 5.61286 20.0381 5.66015C20.0276 5.70743 20.0277 5.75644 20.0382 5.80371C20.0488 5.85097 20.0696 5.89534 20.0992 5.93366C20.9361 6.97751 21.4167 8.2619 21.4706 9.59868C21.5246 10.9355 21.149 12.2544 20.3991 13.3623C20.3506 13.4347 20.3327 13.5233 20.3492 13.6089C20.3658 13.6944 20.4154 13.77 20.4874 13.8191C21.4653 14.5015 22.3024 15.3661 22.9529 16.3655C23.2153 16.7673 23.3224 17.2508 23.2544 17.7258C23.2467 17.7731 23.2494 17.8214 23.2623 17.8675C23.2752 17.9136 23.2979 17.9564 23.3289 17.9929C23.36 18.0293 23.3985 18.0586 23.442 18.0786C23.4855 18.0987 23.5328 18.1091 23.5806 18.1091H28.5612C28.7067 18.1091 28.8481 18.0611 28.9635 17.9726C29.079 17.884 29.162 17.7598 29.1996 17.6193C29.2226 17.5269 29.2259 17.4306 29.2092 17.3369C29.1926 17.2431 29.1564 17.1539 29.103 17.075Z"
+      d="M15.2099 18.3415C15.2837 18.4547 15.3256 18.5856 15.3311 18.7206C15.3366 18.8556 15.3055 18.9896 15.2412 19.1084C15.1768 19.2272 15.0816 19.3264 14.9655 19.3955C14.8495 19.4647 14.7169 19.5012 14.5818 19.5012H0.749908C0.614811 19.5012 0.482226 19.4647 0.366162 19.3955C0.250097 19.3264 0.154864 19.2272 0.0905218 19.1084C0.0261802 18.9896 -0.00488012 18.8556 0.000622504 18.7206C0.00612513 18.5856 0.0479864 18.4547 0.121783 18.3415C1.17751 16.7165 2.73037 15.4763 4.54866 14.8062C3.54347 14.137 2.78032 13.1621 2.37206 12.0256C1.96381 10.8891 1.93212 9.65146 2.28168 8.49559C2.63125 7.33972 3.3435 6.32703 4.31313 5.60727C5.28276 4.88751 6.45827 4.4989 7.66585 4.4989C8.87342 4.4989 10.0489 4.88751 11.0186 5.60727C11.9882 6.32703 12.7004 7.33972 13.05 8.49559C13.3996 9.65146 13.3679 10.8891 12.9596 12.0256C12.5514 13.1621 11.7882 14.137 10.783 14.8062C12.6013 15.4763 14.1542 16.7165 15.2099 18.3415Z"
+      fill="#211F26"
+    />
+    <Path
+      opacity="0.08"
+      d="M32.298 18.3262C31.2419 16.708 29.6926 15.4732 27.8795 14.8049C29.0662 14.0056 29.9037 12.7841 30.2214 11.389C30.5392 9.99396 30.3135 8.53024 29.5901 7.29578C28.8667 6.06132 27.7001 5.14891 26.3277 4.74428C24.9553 4.33965 23.4803 4.4732 22.203 5.11775C22.1541 5.14297 22.1114 5.17862 22.0779 5.22218C22.0443 5.26574 22.0208 5.31613 22.0089 5.3698C21.997 5.42347 21.997 5.4791 22.009 5.53275C22.021 5.5864 22.0447 5.63675 22.0783 5.68025C23.0281 6.86507 23.5736 8.32291 23.6348 9.84023C23.6961 11.3576 23.2699 12.8546 22.4186 14.1121C22.3636 14.1943 22.3432 14.2949 22.362 14.392C22.3808 14.4891 22.4372 14.5748 22.5189 14.6306C23.6288 15.4052 24.5789 16.3865 25.3173 17.5209C25.6151 17.9769 25.7368 18.5258 25.6595 19.0649C25.6508 19.1186 25.6539 19.1735 25.6685 19.2258C25.6831 19.2781 25.7089 19.3266 25.7441 19.368C25.7794 19.4094 25.8232 19.4426 25.8725 19.4654 25.9218 19.4882 25.9755 19.5 26.0298 19.4999H31.683C31.8481 19.5 32.0087 19.4455 32.1397 19.345C32.2707 19.2445 32.3649 19.1035 32.4076 18.944C32.4337 18.8391 32.4374 18.7299 32.4185 18.6234C32.3996 18.517 32.3586 18.4157 32.298 18.3262Z"
       fill="#211F26"
     />
   </Svg>
@@ -232,6 +241,10 @@ export default function NavigationPage() {
   const { destination, from, to } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
+  const [routes, setRoutes] = useState<Route[]>([]);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Get destination from URL parameter or default to "COM3"
   const currentDestination =
@@ -257,6 +270,103 @@ export default function NavigationPage() {
       setFavorited(true);
     }
   };
+
+  // Helper to map destination names to coordinates (simplified for now)
+  const getDestinationCoordinates = (dest: string): { lat: number; lng: number } | null => {
+    const destinations: Record<string, { lat: number; lng: number }> = {
+      'COM1': { lat: 1.29453, lng: 103.77397 },
+      'COM2': { lat: 1.29453, lng: 103.77397 },
+      'COM3': { lat: 1.29453, lng: 103.77397 }, // Using COM2 as proxy
+      'PGP': { lat: 1.29289, lng: 103.78004 },
+      'KRB': { lat: 1.29481, lng: 103.76986 },
+      'LT13': { lat: 1.29464, lng: 103.77131 },
+      'AS5': { lat: 1.29364, lng: 103.77253 },
+      'BIZ2': { lat: 1.29363, lng: 103.77534 },
+      'TCOMS': { lat: 1.29289, lng: 103.77657 },
+      'YIHHT': { lat: 1.29869, lng: 103.77463 },
+      'MUSEUM': { lat: 1.30120, lng: 103.77372 },
+      'UTOWN': { lat: 1.30373, lng: 103.77434 },
+    };
+    return destinations[dest.toUpperCase()] || null;
+  };
+
+  // Fetch routes when destination changes
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      const destCoords = getDestinationCoordinates(currentDestination);
+      if (!destCoords) {
+        setRouteError('Destination coordinates not found');
+        return;
+      }
+
+      setIsLoadingRoutes(true);
+      setRouteError(null);
+
+      try {
+        // Get user's current location (or use NUS campus center as fallback)
+        let originLatLng = { latitude: 1.2976493, longitude: 103.7766916 }; // Default: NUS center
+
+        try {
+          const position =
+            await new Promise<GeolocationPosition>((resolve, reject) => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 5000,
+                  maximumAge: 0,
+                });
+              } else {
+                reject(new Error('Geolocation not supported'));
+              }
+            });
+          originLatLng = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          setUserLocation(originLatLng); // Save user location for map centering
+          console.log('📍 Using user location:', originLatLng);
+        } catch (geoError) {
+          console.log(
+            '⚠️ Geolocation failed, using NUS campus center:',
+            geoError
+          );
+        }
+
+        const origin: Waypoint = {
+          location: {
+            latLng: originLatLng,
+          },
+        };
+
+        const dest: Waypoint = {
+          location: {
+            latLng: {
+              latitude: destCoords.lat,
+              longitude: destCoords.lng,
+            },
+          },
+        };
+
+        // Call Google Routes API
+        const result = await getTransitRoute(origin, dest);
+
+        if (result && result.routes && result.routes.length > 0) {
+          console.log('✅ Routes fetched:', result.routes.length, 'routes');
+          console.log('First route:', result.routes[0]);
+          setRoutes(result.routes);
+        } else {
+          console.log('❌ No routes found');
+          setRouteError('No routes found');
+        }
+      } catch (error) {
+        console.error('Error fetching routes:', error);
+        setRouteError(error instanceof Error ? error.message : 'Failed to fetch routes');
+      } finally {
+        setIsLoadingRoutes(false);
+      }
+    };
+
+    fetchRoutes();
+  }, [currentDestination]);
 
   // Manage all locations as a unified list
   type LocationItem = {
@@ -338,6 +448,17 @@ export default function NavigationPage() {
       <View className="flex-1">
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          routePolyline={routes[0]?.polyline?.encodedPolyline}
+          initialRegion={
+            userLocation
+              ? {
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }
+              : undefined
+          }
         />
 
         {/* Location Input Card */}
@@ -590,136 +711,37 @@ export default function NavigationPage() {
 
             {/* Journey Steps */}
             <View style={{ marginBottom: 16 }}>
-              {/* Step 1: Your location */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <NavigationArrow />
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '500',
-                      color: '#211F26',
-                    }}
-                  >
-                    Your location
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
-              </View>
+              {/* Loading/Error States */}
+              {isLoadingRoutes && (
+                <Text style={{ fontSize: 14, color: '#666', padding: 16 }}>
+                  Loading route...
+                </Text>
+              )}
+              {routeError && (
+                <Text style={{ fontSize: 14, color: '#F00', padding: 16 }}>
+                  Error: {routeError}
+                </Text>
+              )}
 
-              {/* Connecting line */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 20,
-                  paddingLeft: 9,
-                  height: 16,
-                  justifyContent: 'center',
-                  marginVertical: 8,
-                }}
-              >
-                <DotDivider />
-                <View
-                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
-                />
-              </View>
-
-              {/* Step 2: Walk */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <PersonIcon />
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '500',
-                      color: '#211F26',
-                    }}
-                  >
-                    Walk 10 min
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
-              </View>
-
-              {/* Connecting line */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 20,
-                  paddingLeft: 9,
-                  height: 16,
-                  justifyContent: 'center',
-                  marginVertical: 8,
-                }}
-              >
-                <DotDivider />
-                <View
-                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
-                />
-              </View>
-
-              {/* Step 3: Bus Journey */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  gap: 16,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 16,
-                    flex: 1,
-                  }}
-                >
-                  {/* Blue line indicator with bus icons */}
-                  <BusIndicator expanded={routeExpanded} />
-
+              {/* Render Dynamic Route Steps */}
+              {!isLoadingRoutes && !routeError && routes.length > 0 && routes[0].legs && (
+                <>
+                  {/* Step 1: Your location */}
                   <View
                     style={{
-                      flexDirection: 'column',
-                      alignItems: 'flex-start',
-                      gap: 16,
-                      flex: 1,
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                     }}
                   >
-                    {/* Ventus */}
                     <View
                       style={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: 8,
-                        alignSelf: 'stretch',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
                       }}
                     >
+                      <NavigationArrow />
                       <Text
                         style={{
                           fontSize: 16,
@@ -727,342 +749,254 @@ export default function NavigationPage() {
                           color: '#211F26',
                         }}
                       >
-                        Ventus
+                        Your location
                       </Text>
-
-                      {/* Bus Routes */}
-                      <View
-                        style={{
-                          flexDirection: 'column',
-                          gap: 16,
-                          alignSelf: 'stretch',
-                        }}
-                      >
-                        {/* A1 Route */}
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            height: 37,
-                            alignItems: 'center',
-                            borderRadius: 5.286,
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 38,
-                              height: 37,
-                              paddingHorizontal: 10.572,
-                              paddingVertical: 7.048,
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              borderTopLeftRadius: 5.286,
-                              borderBottomLeftRadius: 5.286,
-                              backgroundColor: '#F00',
-                              shadowColor: '#000',
-                              shadowOffset: { width: 0, height: 0.881 },
-                              shadowOpacity: 0.1,
-                              shadowRadius: 1.762,
-                              elevation: 1,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: '600',
-                                color: '#FFFFFF',
-                                textAlign: 'center',
-                              }}
-                            >
-                              A1
-                            </Text>
-                          </View>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              flex: 1,
-                              alignSelf: 'stretch',
-                              borderTopRightRadius: 5.286,
-                              borderBottomRightRadius: 5.286,
-                              borderTopWidth: 0.881,
-                              borderRightWidth: 0.881,
-                              borderBottomWidth: 0.881,
-                              borderColor: '#E5E5E5',
-                            }}
-                          >
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderRightWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="1 Min"
-                                textColor="#211F26"
-                              />
-                              <CapacityIcons />
-                            </View>
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderRightWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="5 Min"
-                                textColor="#737373"
-                              />
-                              <CapacityIcons opacity={0.6} />
-                            </View>
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="10 Min"
-                                textColor="#737373"
-                              />
-                              <CapacityIcons opacity={0.6} />
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* D2 Route */}
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            height: 37,
-                            alignItems: 'center',
-                            borderRadius: 5.286,
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 38,
-                              height: 37,
-                              paddingHorizontal: 10.572,
-                              paddingVertical: 7.048,
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              borderTopLeftRadius: 5.286,
-                              borderBottomLeftRadius: 5.286,
-                              backgroundColor: '#6F1B6F',
-                              shadowColor: '#000',
-                              shadowOffset: { width: 0, height: 0.881 },
-                              shadowOpacity: 0.1,
-                              shadowRadius: 1.762,
-                              elevation: 1,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontWeight: '600',
-                                color: '#FFFFFF',
-                                textAlign: 'center',
-                              }}
-                            >
-                              D2
-                            </Text>
-                          </View>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              flex: 1,
-                              alignSelf: 'stretch',
-                              borderTopRightRadius: 5.286,
-                              borderBottomRightRadius: 5.286,
-                              borderTopWidth: 0.881,
-                              borderRightWidth: 0.881,
-                              borderBottomWidth: 0.881,
-                              borderColor: '#E5E5E5',
-                            }}
-                          >
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderRightWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="3 Min"
-                                textColor="#211F26"
-                              />
-                              <CapacityIcons />
-                            </View>
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderRightWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="7 Min"
-                                textColor="#737373"
-                              />
-                              <CapacityIcons opacity={0.6} />
-                            </View>
-                            <View
-                              style={{
-                                height: 37,
-                                paddingHorizontal: 10.572,
-                                paddingVertical: 7.048,
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flex: 1,
-                                borderTopWidth: 0.881,
-                                borderBottomWidth: 0.881,
-                                borderColor: '#E5E5E5',
-                                backgroundColor: '#FFFFFF',
-                                flexDirection: 'row',
-                              }}
-                            >
-                              <DynamicBusTime
-                                time="12 Min"
-                                textColor="#737373"
-                              />
-                              <CapacityIcons opacity={0.6} />
-                            </View>
-                          </View>
-                        </View>
-                      </View>
                     </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {routes[0].legs[0]?.steps?.[0]?.transitDetails?.stopDetails?.departureTime
+                        ? formatTime(routes[0].legs[0].steps[0].transitDetails.stopDetails.departureTime)
+                        : ''}
+                    </Text>
+                  </View>
+                </>
+              )}
 
-                    {/* Route Details - Expandable */}
-                    <View
+              {/* Fallback for no data */}
+              {!isLoadingRoutes && !routeError && routes.length === 0 && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <NavigationArrow />
+                    <Text
                       style={{
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: 10,
-                        alignSelf: 'stretch',
+                        fontSize: 16,
+                        fontWeight: '500',
+                        color: '#211F26',
                       }}
                     >
-                      <Pressable
-                        onPress={() => setRouteExpanded(!routeExpanded)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          alignSelf: 'stretch',
-                        }}
-                      >
-                        <ChevronExpand expanded={routeExpanded} />
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '500',
-                            color: '#09090B',
-                          }}
-                        >
-                          Ride 5 stops (9 mins)
-                        </Text>
-                      </Pressable>
+                      Your location
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
+                </View>
+              )}
 
-                      {routeExpanded && (
-                        <>
-                          <View
-                            style={{
-                              flexDirection: 'column',
-                              alignItems: 'flex-start',
-                              gap: 10,
-                              paddingHorizontal: 24,
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>
-                              LT13
-                            </Text>
-                          </View>
-                          <View
-                            style={{
-                              flexDirection: 'column',
-                              alignItems: 'flex-start',
-                              gap: 10,
-                              paddingHorizontal: 24,
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>
-                              AS5
-                            </Text>
-                          </View>
-                          <View
-                            style={{
-                              flexDirection: 'column',
-                              alignItems: 'flex-start',
-                              gap: 10,
-                              paddingHorizontal: 24,
-                            }}
-                          >
-                            <Text style={{ fontSize: 12, color: '#09090B' }}>
-                              Opp NUSS
-                            </Text>
-                          </View>
-                        </>
-                      )}
-                    </View>
+              {/* Connecting line */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 16,
+                  justifyContent: 'center',
+                  marginVertical: 8,
+                }}
+              >
+                <DotDivider />
+                <View
+                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                />
+              </View>
 
-                    {/* Final Stop */}
+              {/* Map through route steps */}
+              {!isLoadingRoutes && !routeError && routes.length > 0 && routes[0].legs?.[0]?.steps && (
+                <>
+                  {routes[0].legs[0].steps.map((step, stepIndex) => {
+                    const isWalk = step.travelMode === 'WALK';
+                    const isTransit = step.travelMode === 'TRANSIT';
+                    const duration = step.staticDuration ? durationToMinutes(step.staticDuration) : 0;
+
+                    if (isWalk) {
+                      return (
+                        <React.Fragment key={`step-${stepIndex}`}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 12,
+                              }}
+                            >
+                              <PersonIcon />
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  fontWeight: '500',
+                                  color: '#211F26',
+                                }}
+                              >
+                                Walk {duration} min{duration > 1 ? 's' : ''}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 14, color: '#09090B' }}>
+                              {step.transitDetails?.stopDetails?.departureTime
+                                ? formatTime(step.transitDetails.stopDetails.departureTime)
+                                : ''}
+                            </Text>
+                          </View>
+
+                          {stepIndex < routes[0].legs[0].steps.length - 1 && (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 20,
+                                paddingLeft: 9,
+                                height: 16,
+                                justifyContent: 'center',
+                                marginVertical: 8,
+                              }}
+                            >
+                              <DotDivider />
+                              <View
+                                style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                              />
+                            </View>
+                          )}
+                        </React.Fragment>
+                      );
+                    } else if (isTransit) {
+                      const lineName = step.transitDetails?.transitLine?.name || 'Bus';
+                      const boardingStop = step.transitDetails?.stopDetails?.departureStop?.name || 'Unknown';
+                      const alightingStop = step.transitDetails?.stopDetails?.arrivalStop?.name || currentDestination;
+
+                      return (
+                        <React.Fragment key={`step-${stepIndex}`}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'flex-start',
+                              gap: 16,
+                            }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 16,
+                                flex: 1,
+                              }}
+                            >
+                              <BusIndicator expanded={routeExpanded} />
+
+                              <View
+                                style={{
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-start',
+                                  gap: 16,
+                                  flex: 1,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-start',
+                                    gap: 8,
+                                    alignSelf: 'stretch',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 16,
+                                      fontWeight: '500',
+                                      color: '#211F26',
+                                    }}
+                                  >
+                                    {boardingStop}
+                                  </Text>
+
+                                  <Text
+                                    style={{
+                                      fontSize: 14,
+                                      color: '#737373',
+                                    }}
+                                  >
+                                    Take {lineName} to {alightingStop}
+                                  </Text>
+
+                                  <Text style={{ fontSize: 12, color: '#666' }}>
+                                    {duration} min ride
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          </View>
+
+                          {stepIndex < routes[0].legs[0].steps.length - 1 && (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 20,
+                                paddingLeft: 9,
+                                height: 16,
+                                justifyContent: 'center',
+                                marginVertical: 8,
+                              }}
+                            >
+                              <DotDivider />
+                              <View
+                                style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                              />
+                            </View>
+                          )}
+                        </React.Fragment>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  {/* Final Destination */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 16,
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <DotDivider />
+                    <View
+                      style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                    />
+                  </View>
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <View
                       style={{
-                        height: 36,
-                        justifyContent: 'center',
+                        flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 10,
+                        gap: 12,
                       }}
                     >
+                      <MapPin />
                       <Text
                         style={{
                           fontSize: 16,
@@ -1073,103 +1007,14 @@ export default function NavigationPage() {
                         {currentDestination}
                       </Text>
                     </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {routes[0].legs?.[0]?.steps?.[routes[0].legs[0].steps.length - 1]?.transitDetails?.stopDetails?.arrivalTime
+                        ? formatTime(routes[0].legs[0].steps[routes[0].legs[0].steps.length - 1].transitDetails?.stopDetails?.arrivalTime!)
+                        : ''}
+                    </Text>
                   </View>
-                </View>
-              </View>
-
-              {/* Connecting line */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 20,
-                  paddingLeft: 9,
-                  height: 16,
-                  justifyContent: 'center',
-                  marginVertical: 8,
-                }}
-              >
-                <DotDivider />
-                <View
-                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
-                />
-              </View>
-
-              {/* Step 4: Final Walk */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <PersonIcon />
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '500',
-                      color: '#211F26',
-                    }}
-                  >
-                    Walk 10 min
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
-              </View>
-
-              {/* Connecting line */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 20,
-                  paddingLeft: 9,
-                  height: 16,
-                  justifyContent: 'center',
-                  marginVertical: 8,
-                }}
-              >
-                <DotDivider />
-                <View
-                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
-                />
-              </View>
-
-              {/* Step 5: Destination */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <MapPin />
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '500',
-                      color: '#211F26',
-                    }}
-                  >
-                    {currentDestination}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 14, color: '#09090B' }}>9:50AM</Text>
-              </View>
+                </>
+              )}
             </View>
 
             {/* Divider */}

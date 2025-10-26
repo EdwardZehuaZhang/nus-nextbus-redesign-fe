@@ -3,12 +3,21 @@ import React from 'react';
 import { Animated, TextInput } from 'react-native';
 
 import {
+  calculateDistance,
   formatArrivalTime,
+  formatDistance,
   getRouteColor,
   passengerLoadToCrowding,
+  sortShuttlesByArrival,
+  useBusStops,
   useServiceDescriptions,
   useShuttleService,
 } from '@/api';
+import {
+  getPlaceAutocomplete,
+  getPlaceDetails,
+} from '@/api/google-maps/places';
+import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
 import {
@@ -38,6 +47,7 @@ import {
   getBusStationById,
   searchBusStations,
 } from '@/lib/bus-stations';
+import { useLocation } from '@/lib/hooks/use-location';
 import { type FavoriteRoute, getFavorites } from '@/lib/storage/favorites';
 import {
   addRecentSearch,
@@ -70,11 +80,6 @@ type PopularSearchItem = {
   title: string;
   image: string;
 };
-
-const tabs: TabItem[] = [
-  { id: 'CENLIB', label: 'Central Library (3min walk)' },
-  { id: 'PGP', label: 'PGP Foyer' },
-];
 
 const popularSearches: PopularSearchItem[] = [
   {
@@ -587,6 +592,53 @@ const NearestStopsSection = ({
   selectedRoute: string | null;
   onRouteClick: (routeName: string) => void;
 }) => {
+  // Get user's current location
+  const { coords: userLocation } = useLocation();
+
+  // Fetch all bus stops from the API
+  const { data: busStopsData } = useBusStops();
+
+  // Calculate nearest stops based on user location
+  const nearestStops = React.useMemo(() => {
+    if (!userLocation || !busStopsData?.BusStopsResult?.busstops) {
+      // Fallback to default stops if no location or data
+      return [
+        { id: 'CLB', label: 'Central Library', distance: null },
+        { id: 'PGP', label: 'PGP Foyer', distance: null },
+      ];
+    }
+
+    const stops = busStopsData.BusStopsResult.busstops
+      .map((stop) => {
+        const distance = calculateDistance({
+          lat1: userLocation.latitude,
+          lon1: userLocation.longitude,
+          lat2: stop.latitude,
+          lon2: stop.longitude,
+        });
+
+        return {
+          id: stop.name, // Use 'name' field (API code like 'YIH', 'CLB', 'UHC-OPP') for ShuttleService endpoint
+          label: `${stop.caption} (${formatDistance(distance)})`,
+          distance,
+        };
+      })
+      .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+      .slice(0, 2); // Get the 2 nearest stops
+
+    return stops;
+  }, [userLocation, busStopsData]);
+
+  // Update activeTab when nearest stops change (only if current tab is not in nearest stops)
+  React.useEffect(() => {
+    if (
+      nearestStops.length > 0 &&
+      !nearestStops.find((s) => s.id === activeTab)
+    ) {
+      onTabChange(nearestStops[0].id);
+    }
+  }, [nearestStops, activeTab, onTabChange]);
+
   // Fetch shuttle service data for the active bus stop
   const { data: shuttleData, isLoading } = useShuttleService(activeTab);
 
@@ -614,22 +666,44 @@ const NearestStopsSection = ({
       return [];
     }
 
-    return shuttleData.ShuttleServiceResult.shuttles.map((shuttle) => ({
-      route: shuttle.name,
-      color: getRouteColor(shuttle.name, colorMap[shuttle.name]),
-      times: [
-        {
-          time: formatArrivalTime(shuttle.arrivalTime),
-          crowding: passengerLoadToCrowding(shuttle.passengers),
-          textColor: '#211F26',
-        },
-        {
-          time: formatArrivalTime(shuttle.nextArrivalTime),
-          crowding: passengerLoadToCrowding(shuttle.nextPassengers),
-          textColor: '#737373',
-        },
-      ],
-    }));
+    // Sort shuttles by arrival time (closest first)
+    const sortedShuttles = sortShuttlesByArrival(
+      shuttleData.ShuttleServiceResult.shuttles
+    );
+
+    return sortedShuttles
+      .map((shuttle) => {
+        // Remove "PUB:" prefix from public bus routes
+        const routeName = shuttle.name.replace(/^PUB:/, '');
+
+        // Use special color for public buses, otherwise use route color
+        const isPublicBus = shuttle.name.startsWith('PUB:');
+        const routeColor = isPublicBus
+          ? '#55DD33'
+          : getRouteColor(shuttle.name, colorMap[shuttle.name]);
+
+        return {
+          route: routeName,
+          color: routeColor,
+          times: [
+            {
+              time: formatArrivalTime(shuttle.arrivalTime),
+              crowding: passengerLoadToCrowding(shuttle.passengers),
+              textColor: '#211F26',
+            },
+            {
+              time: formatArrivalTime(shuttle.nextArrivalTime),
+              crowding: passengerLoadToCrowding(shuttle.nextPassengers),
+              textColor: '#737373',
+            },
+          ],
+        };
+      })
+      .filter((route) => {
+        // Filter out routes where all timings are N/A
+        const hasValidTiming = route.times.some((t) => t.time !== 'N/A');
+        return hasValidTiming;
+      });
   }, [shuttleData, colorMap]);
 
   return (
@@ -638,7 +712,11 @@ const NearestStopsSection = ({
         Nearest Stops
       </Text>
 
-      <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
+      <TabBar
+        tabs={nearestStops}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+      />
 
       <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
         {isLoading ? (
@@ -696,11 +774,16 @@ const NearestStopsSection = ({
 const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
+  const [googlePlaceResults, setGooglePlaceResults] = React.useState<
+    PlaceAutocompleteResult[]
+  >([]);
+  const [isSearchingGoogle, setIsSearchingGoogle] = React.useState(false);
   const [recentSearches, setRecentSearches] = React.useState<
     RecentSearchItem[]
   >([]);
   const [showAllRecent, setShowAllRecent] = React.useState(false);
   const [showAllPopular, setShowAllPopular] = React.useState(false);
+  const { coords: userLocation } = useLocation();
 
   // Load recent searches on component mount
   React.useEffect(() => {
@@ -734,13 +817,82 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 
   // Handle search input changes
   React.useEffect(() => {
-    if (searchText.trim().length > 0) {
-      const results = searchBusStations(searchText);
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
-    }
-  }, [searchText]);
+    const searchPlaces = async () => {
+      if (searchText.trim().length > 0) {
+        // Search local bus stations
+        const busStationResults = searchBusStations(searchText);
+        setSearchResults(busStationResults);
+
+        // Search Google Places using JavaScript API (for web only)
+        if (typeof window !== 'undefined' && window.google) {
+          setIsSearchingGoogle(true);
+          try {
+            const service = new window.google.maps.places.AutocompleteService();
+
+            // Define NUS campus bounds (approximate)
+            const nusBounds = new window.google.maps.LatLngBounds(
+              new window.google.maps.LatLng(1.29, 103.77), // Southwest corner
+              new window.google.maps.LatLng(1.305, 103.785) // Northeast corner
+            );
+
+            service.getPlacePredictions(
+              {
+                input: searchText,
+                locationRestriction: nusBounds, // Restrict to NUS campus bounds only
+              },
+              (predictions, status) => {
+                if (
+                  status === window.google.maps.places.PlacesServiceStatus.OK &&
+                  predictions
+                ) {
+                  // Filter results to only include those within NUS campus
+                  const filteredPredictions = predictions.filter((p) => {
+                    // Check if description contains NUS-related keywords
+                    const desc = p.description.toLowerCase();
+                    return (
+                      desc.includes('nus') ||
+                      desc.includes('national university of singapore') ||
+                      desc.includes('kent ridge') ||
+                      desc.includes('utown') ||
+                      desc.includes('university town')
+                    );
+                  });
+
+                  // Convert Google Maps API format to our format
+                  const converted = filteredPredictions.map((p) => ({
+                    description: p.description,
+                    matched_substrings: p.matched_substrings || [],
+                    place_id: p.place_id,
+                    reference: p.place_id, // Use place_id as reference
+                    structured_formatting: p.structured_formatting,
+                    terms: p.terms || [],
+                    types: p.types || [],
+                  }));
+                  setGooglePlaceResults(converted);
+                } else {
+                  setGooglePlaceResults([]);
+                }
+                setIsSearchingGoogle(false);
+              }
+            );
+          } catch (error) {
+            console.error('Google Places search error:', error);
+            setGooglePlaceResults([]);
+            setIsSearchingGoogle(false);
+          }
+        } else {
+          setGooglePlaceResults([]);
+        }
+      } else {
+        setSearchResults([]);
+        setGooglePlaceResults([]);
+      }
+    };
+
+    // Debounce the search
+    const timeoutId = setTimeout(searchPlaces, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchText, userLocation]);
 
   const handleResultPress = (item: BusStation) => {
     addRecentSearch(item);
@@ -749,6 +901,26 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       pathname: '/navigation' as any,
       params: { destination: item.name },
     });
+  };
+
+  const handleGooglePlacePress = async (place: PlaceAutocompleteResult) => {
+    try {
+      // Get detailed information including coordinates
+      const details = await getPlaceDetails(place.place_id);
+
+      // Navigate to navigation page with place details
+      router.push({
+        pathname: '/navigation' as any,
+        params: {
+          destination: place.structured_formatting.main_text,
+          destinationAddress: place.description,
+          destinationLat: details.result.geometry.location.lat.toString(),
+          destinationLng: details.result.geometry.location.lng.toString(),
+        },
+      });
+    } catch (error) {
+      console.error('Error getting place details:', error);
+    }
   };
 
   const handleRecentPress = (item: RecentSearchItem) => {
@@ -840,11 +1012,12 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {searchText.trim().length > 0 ? (
-          <View>
-            {searchResults.length > 0 ? (
+          <View style={{ gap: 16 }}>
+            {/* Bus Station Results */}
+            {searchResults.length > 0 && (
               <View>
                 <Text className="mb-3 text-sm font-medium text-neutral-500">
-                  Search Results ({searchResults.length})
+                  Bus Stops ({searchResults.length})
                 </Text>
                 {searchResults.map((item, index, array) => (
                   <SearchResultItem
@@ -855,10 +1028,56 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
                   />
                 ))}
               </View>
-            ) : (
-              <View className="items-center py-8">
-                <Text className="text-base text-neutral-500">
-                  No results found for &quot;{searchText}&quot;
+            )}
+
+            {/* Google Places Results */}
+            {googlePlaceResults.length > 0 && (
+              <View>
+                <Text className="mb-3 text-sm font-medium text-neutral-500">
+                  Other Locations ({googlePlaceResults.length})
+                </Text>
+                {googlePlaceResults.map((place, index) => (
+                  <Pressable
+                    key={place.place_id}
+                    onPress={() => handleGooglePlacePress(place)}
+                    className={`flex-row items-center gap-3 py-3 ${
+                      index < googlePlaceResults.length - 1
+                        ? 'border-b border-neutral-200'
+                        : ''
+                    }`}
+                  >
+                    <View className="flex-1">
+                      <Text className="text-base font-medium text-neutral-900">
+                        {place.structured_formatting.main_text}
+                      </Text>
+                      <Text className="text-sm text-neutral-500">
+                        {place.structured_formatting.secondary_text?.replace(
+                          /, Singapore$/,
+                          ''
+                        )}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {/* No results message */}
+            {searchResults.length === 0 &&
+              googlePlaceResults.length === 0 &&
+              !isSearchingGoogle && (
+                <View className="items-center py-8">
+                  <Text className="text-base text-neutral-500">
+                    No results found for &quot;{searchText}&quot;
+                  </Text>
+                </View>
+              )}
+
+            {/* Loading state */}
+            {isSearchingGoogle && (
+              <View className="items-center py-4">
+                <Text className="text-sm text-neutral-500">
+                  Searching locations...
                 </Text>
               </View>
             )}
@@ -1136,6 +1355,7 @@ export default function TransitPage() {
           }}
           style={{ width: '100%', height: '100%' }}
           showD1Route={selectedRoute === 'D1'}
+          activeRoute={selectedRoute as any} // Pass selected route to show real-time buses
         />
       </View>
 

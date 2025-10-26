@@ -46,7 +46,8 @@ export const getPickupPoints = async (
 
 /**
  * Get all oncoming shuttle bus services at a specified stop
- * @param busStopName - Name of the bus stop
+ * @param busStopName - Bus stop code from BusStop.name field (e.g., 'YIH', 'CLB', 'UHC-OPP')
+ *                      WARNING: Must use BusStop.name, NOT ShortName, caption, or LongName
  */
 export const getShuttleService = async (
   busStopName: string
