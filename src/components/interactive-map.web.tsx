@@ -1168,7 +1168,7 @@ const useBusStopMarkers = (
     // Function to update marker visibility based on zoom
     const updateMarkersVisibility = () => {
       const zoom = map.getZoom() || 16;
-  const showAllStops = zoom >= 1; // Show all stops when zoomed in
+      const showAllStops = zoom >= 17; // Show all stops when zoomed in (17+ is close zoom)
 
       // Handle circle markers - hide when zoomed out, show all when zoomed in
       circleMarkersRef.current.forEach((marker) => {
