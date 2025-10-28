@@ -24,7 +24,6 @@ import {
   FocusAwareStatusBar,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   View,
@@ -47,7 +46,7 @@ import {
   getBusStationById,
   searchBusStations,
 } from '@/lib/bus-stations';
-import { useLocation } from '@/lib/hooks/use-location';
+import { type LocationCoords, useLocation } from '@/lib/hooks/use-location';
 import { type FavoriteRoute, getFavorites } from '@/lib/storage/favorites';
 import {
   addRecentSearch,
@@ -460,7 +459,7 @@ const TabBar = ({
   );
 };
 
-const FavoriteButton = ({ item }: { item: FavoriteRoute }) => {
+const FavoriteButton = ({ item, userLocation }: { item: FavoriteRoute; userLocation: LocationCoords | null }) => {
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
@@ -492,12 +491,14 @@ const FavoriteButton = ({ item }: { item: FavoriteRoute }) => {
   };
 
   const handlePress = () => {
-    // Navigate to navigation page with the route
+    // Navigate to navigation page with the route and user location
     router.push({
       pathname: '/(app)/navigation',
       params: {
         from: item.fromId,
         to: item.toId,
+        userLat: userLocation?.latitude?.toString(),
+        userLng: userLocation?.longitude?.toString(),
       },
     });
   };
@@ -537,6 +538,9 @@ const AddButton = () => {
 
 const FavoritesSection = () => {
   const [favorites, setFavorites] = React.useState<FavoriteRoute[]>([]);
+  
+  // Get user's current location to pass to navigation
+  const { coords: userLocation } = useLocation();
 
   // Load favorites from storage
   React.useEffect(() => {
@@ -571,7 +575,7 @@ const FavoritesSection = () => {
           contentContainerStyle={{ gap: 8 }}
         >
           {favorites.map((item) => (
-            <FavoriteButton key={item.id} item={item} />
+            <FavoriteButton key={item.id} item={item} userLocation={userLocation} />
           ))}
           <AddButton />
         </ScrollView>
@@ -593,7 +597,7 @@ const NearestStopsSection = ({
   onRouteClick: (routeName: string) => void;
 }) => {
   // Get user's current location
-  const { coords: userLocation } = useLocation();
+  const { coords: userLocation, error: locationError, loading: locationLoading } = useLocation();
 
   // Fetch all bus stops from the API
   const { data: busStopsData } = useBusStops();
@@ -601,11 +605,8 @@ const NearestStopsSection = ({
   // Calculate nearest stops based on user location
   const nearestStops = React.useMemo(() => {
     if (!userLocation || !busStopsData?.BusStopsResult?.busstops) {
-      // Fallback to default stops if no location or data
-      return [
-        { id: 'CLB', label: 'Central Library', distance: null },
-        { id: 'PGP', label: 'PGP Foyer', distance: null },
-      ];
+      // Return empty array if no location - we'll show error message instead
+      return [];
     }
 
     const stops = busStopsData.BusStopsResult.busstops
@@ -712,60 +713,79 @@ const NearestStopsSection = ({
         Nearest Stops
       </Text>
 
-      <TabBar
-        tabs={nearestStops}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-      />
-
-      <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
-        {isLoading ? (
-          <View className="items-center py-8">
-            <Text className="text-sm text-neutral-500">
-              Loading bus data...
+      {nearestStops.length === 0 ? (
+        <View className="rounded-md border border-neutral-200 bg-white p-6 shadow-sm">
+          <View className="items-center">
+            <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+              Location Unavailable
+            </Text>
+            <Text className="text-center text-sm text-neutral-500">
+              {locationLoading
+                ? 'Getting your location...'
+                : locationError
+                  ? `Error: ${locationError}`
+                  : 'Unable to determine your location. Please enable location services in your browser.'}
             </Text>
           </View>
-        ) : currentBusRoutes.length === 0 ? (
-          <View className="items-center py-8">
-            <Text className="text-sm text-neutral-500">No buses available</Text>
-          </View>
-        ) : (
-          <View className="gap-2">
-            <View className="flex-row gap-2">
-              {currentBusRoutes.slice(0, 3).map((route) => (
-                <BusRouteCard
-                  key={route.route}
-                  route={route}
-                  isSelected={selectedRoute === route.route}
-                  onPress={() => onRouteClick(route.route)}
-                />
-              ))}
-              {currentBusRoutes.length < 3 &&
-                Array.from({ length: 3 - currentBusRoutes.length }).map(
-                  (_, i) => <View key={`empty-${i}`} className="flex-1" />
-                )}
-            </View>
-            {currentBusRoutes.length > 3 && (
-              <View className="flex-row gap-2">
-                {currentBusRoutes.slice(3, 6).map((route) => (
-                  <BusRouteCard
-                    key={route.route}
-                    route={route}
-                    isSelected={selectedRoute === route.route}
-                    onPress={() => onRouteClick(route.route)}
-                  />
-                ))}
-                {currentBusRoutes.length < 6 &&
-                  Array.from({
-                    length: 6 - currentBusRoutes.length,
-                  }).map((_, i) => (
-                    <View key={`empty-row2-${i}`} className="flex-1" />
+        </View>
+      ) : (
+        <>
+          <TabBar
+            tabs={nearestStops}
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+          />
+
+          <View className="rounded-b-md border border-t-0 border-neutral-200 bg-white p-2 shadow-sm">
+            {isLoading ? (
+              <View className="items-center py-8">
+                <Text className="text-sm text-neutral-500">
+                  Loading bus data...
+                </Text>
+              </View>
+            ) : currentBusRoutes.length === 0 ? (
+              <View className="items-center py-8">
+                <Text className="text-sm text-neutral-500">No buses available</Text>
+              </View>
+            ) : (
+              <View className="gap-2">
+                <View className="flex-row gap-2">
+                  {currentBusRoutes.slice(0, 3).map((route) => (
+                    <BusRouteCard
+                      key={route.route}
+                      route={route}
+                      isSelected={selectedRoute === route.route}
+                      onPress={() => onRouteClick(route.route)}
+                    />
                   ))}
+                  {currentBusRoutes.length < 3 &&
+                    Array.from({ length: 3 - currentBusRoutes.length }).map(
+                      (_, i) => <View key={`empty-${i}`} className="flex-1" />
+                    )}
+                </View>
+                {currentBusRoutes.length > 3 && (
+                  <View className="flex-row gap-2">
+                    {currentBusRoutes.slice(3, 6).map((route) => (
+                      <BusRouteCard
+                        key={route.route}
+                        route={route}
+                        isSelected={selectedRoute === route.route}
+                        onPress={() => onRouteClick(route.route)}
+                      />
+                    ))}
+                    {currentBusRoutes.length < 6 &&
+                      Array.from({
+                        length: 6 - currentBusRoutes.length,
+                      }).map((_, i) => (
+                        <View key={`empty-row2-${i}`} className="flex-1" />
+                      ))}
+                  </View>
+                )}
               </View>
             )}
           </View>
-        )}
-      </View>
+        </>
+      )}
     </View>
   );
 };
@@ -896,10 +916,14 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 
   const handleResultPress = (item: BusStation) => {
     addRecentSearch(item);
-    // Navigate to navigation page
+    // Navigate to navigation page with user location
     router.push({
       pathname: '/navigation' as any,
-      params: { destination: item.name },
+      params: { 
+        destination: item.name,
+        userLat: userLocation?.latitude?.toString(),
+        userLng: userLocation?.longitude?.toString(),
+      },
     });
   };
 
@@ -908,7 +932,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       // Get detailed information including coordinates
       const details = await getPlaceDetails(place.place_id);
 
-      // Navigate to navigation page with place details
+      // Navigate to navigation page with place details and user location
       router.push({
         pathname: '/navigation' as any,
         params: {
@@ -916,6 +940,8 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
           destinationAddress: place.description,
           destinationLat: details.result.geometry.location.lat.toString(),
           destinationLng: details.result.geometry.location.lng.toString(),
+          userLat: userLocation?.latitude?.toString(),
+          userLng: userLocation?.longitude?.toString(),
         },
       });
     } catch (error) {
@@ -929,7 +955,11 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       addRecentSearch(station);
       router.push({
         pathname: '/navigation' as any,
-        params: { destination: item.title },
+        params: { 
+          destination: item.title,
+          userLat: userLocation?.latitude?.toString(),
+          userLng: userLocation?.longitude?.toString(),
+        },
       });
     }
   };
@@ -938,7 +968,11 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     const handleNavPress = () => {
       router.push({
         pathname: '/navigation' as any,
-        params: { destination: item.title.replace('\n', ' ') },
+        params: { 
+          destination: item.title.replace('\n', ' '),
+          userLat: userLocation?.latitude?.toString(),
+          userLng: userLocation?.longitude?.toString(),
+        },
       });
     };
 
@@ -1264,7 +1298,7 @@ const useDragHandlers = () => {
     setContainerHeight(45); // Default expanded state
     Animated.spring(translateY, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -1279,7 +1313,7 @@ const useDragHandlers = () => {
     setContainerHeight(DEFAULT_HEIGHT); // Return to normal size
     Animated.spring(translateY, {
       toValue: 0,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -1312,7 +1346,7 @@ const useDragHandlers = () => {
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
-  const [activeTab, setActiveTab] = React.useState<string>('CENLIB');
+  const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const {
     isCollapsed,
@@ -1332,7 +1366,7 @@ export default function TransitPage() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-neutral-50">
+    <View style={{ flex: 1, backgroundColor: '#F9F9F9' }}>
       <FocusAwareStatusBar />
 
       <View
@@ -1356,6 +1390,7 @@ export default function TransitPage() {
           style={{ width: '100%', height: '100%' }}
           showD1Route={selectedRoute === 'D1'}
           activeRoute={selectedRoute as any} // Pass selected route to show real-time buses
+          showBusStops={true} // Show bus stop markers with labels
         />
       </View>
 
@@ -1372,10 +1407,7 @@ export default function TransitPage() {
             paddingHorizontal: 20,
             paddingBottom: 20,
             paddingTop: 4,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
+            boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
             height: `${containerHeight}%`,
             marginTop: 'auto',
           },
@@ -1402,6 +1434,6 @@ export default function TransitPage() {
           onRouteClick={handleRouteClick}
         />
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }

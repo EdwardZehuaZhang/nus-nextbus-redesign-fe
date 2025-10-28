@@ -16,7 +16,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
     Animated.timing(animatedValue, {
       toValue: value ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   }, [value, animatedValue]);
 
@@ -48,10 +48,7 @@ export const ToggleSwitch: React.FC<ToggleSwitchProps> = ({
           height: 17.03,
           backgroundColor: '#FFFFFF',
           borderRadius: 8.52,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2.96 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4.44,
+          boxShadow: '0 2.96px 4.44px rgba(0, 0, 0, 0.1)',
           elevation: 3,
           transform: [{ translateX }],
         }}

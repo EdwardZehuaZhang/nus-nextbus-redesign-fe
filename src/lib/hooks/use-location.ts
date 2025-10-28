@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+
+import { useLocationStore } from '@/lib/store/location-store';
 
 export type LocationCoords = {
   latitude: number;
   longitude: number;
+  heading?: number | null; // Direction user is facing (0-360 degrees, null if unavailable)
+  speed?: number | null; // Speed in meters per second
+  accuracy?: number; // Position accuracy in meters
 };
 
 export type LocationState = {
@@ -27,70 +32,99 @@ const getLocationErrorMessage = (error: GeolocationPositionError): string => {
   }
 };
 
+// Global singleton watcher
+let globalWatchId: number | null = null;
+let activeSubscribers = 0;
+
+/**
+ * Initialize the global geolocation watcher (only once)
+ */
+const initializeGeolocationWatcher = () => {
+  if (globalWatchId !== null || typeof window === 'undefined' || !navigator.geolocation) {
+    return;
+  }
+
+  const store = useLocationStore.getState();
+
+  console.log('[useLocation] Initializing global geolocation watcher');
+  
+  // Only set loading if we don't have a location yet
+  if (!store.coords) {
+    store.setLoading(true);
+  }
+
+  globalWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      console.log('[useLocation] Position updated:', {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+      });
+
+      store.setLocation({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+        accuracy: position.coords.accuracy,
+      });
+    },
+    (err) => {
+      console.error('[useLocation] Geolocation error:', err);
+      // Only set error if we don't have any location yet
+      // If we have a cached location, keep using it despite the error
+      const currentState = useLocationStore.getState();
+      if (!currentState.coords) {
+        store.setError(getLocationErrorMessage(err));
+      } else {
+        // We have a location, just log the error but don't update state
+        console.warn('[useLocation] Error occurred but keeping cached location');
+        store.setLoading(false);
+      }
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 20000, // Increase timeout to 20 seconds
+      maximumAge: 120000, // Accept positions up to 2 minutes old
+    }
+  );
+
+  console.log('[useLocation] Watcher initialized with ID:', globalWatchId);
+};
+
 /**
  * Hook to get user's current location using Geolocation API
- * Works in both web and React Native environments
+ * Uses global Zustand store to persist location across navigation
  */
 export const useLocation = () => {
-  const [state, setState] = useState<LocationState>({
-    coords: null,
-    error: null,
-    loading: true,
-  });
+  const { coords, error, loading } = useLocationStore();
 
   useEffect(() => {
-    let isMounted = true;
+    activeSubscribers++;
+    console.log('[useLocation] Component mounted, subscribers:', activeSubscribers);
 
-    const handleSuccess = (position: GeolocationPosition) => {
-      if (isMounted) {
-        setState({
-          coords: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          },
-          error: null,
-          loading: false,
-        });
-      }
-    };
-
-    const handleError = (error: GeolocationPositionError) => {
-      if (isMounted) {
-        setState({
-          coords: null,
-          error: getLocationErrorMessage(error),
-          loading: false,
-        });
-      }
-    };
-
-    const getLocation = () => {
-      // Check if geolocation is available
-      if (!navigator.geolocation) {
-        if (isMounted) {
-          setState({
-            coords: null,
-            error: 'Geolocation is not supported by your browser',
-            loading: false,
-          });
-        }
-        return;
-      }
-
-      // Get current position
-      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
-        enableHighAccuracy: false,
-        timeout: 5000,
-        maximumAge: 0,
-      });
-    };
-
-    getLocation();
+    // Initialize watcher on first mount
+    initializeGeolocationWatcher();
 
     return () => {
-      isMounted = false;
+      activeSubscribers--;
+      console.log('[useLocation] Component unmounted, subscribers:', activeSubscribers);
+
+      // Only clean up watcher when ALL components are unmounted
+      // Keep a small delay to handle quick re-mounts during navigation
+      if (activeSubscribers === 0) {
+        setTimeout(() => {
+          if (activeSubscribers === 0 && globalWatchId !== null) {
+            console.log('[useLocation] Clearing global watcher');
+            navigator.geolocation.clearWatch(globalWatchId);
+            globalWatchId = null;
+          }
+        }, 1000); // 1 second delay to handle navigation transitions
+      }
     };
   }, []);
 
-  return state;
+  return { coords, error, loading };
 };

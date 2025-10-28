@@ -1,10 +1,10 @@
 import polyline from '@mapbox/polyline';
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
 
-import type { ActiveBus, RouteCode } from '@/api/bus';
+import type { ActiveBus, BusStop, RouteCode } from '@/api/bus';
 import {
   useActiveBuses,
+  useBusStops,
   useCheckpoints,
   useServiceDescriptions,
 } from '@/api/bus';
@@ -17,6 +17,28 @@ import {
 import { MapTypeSelector } from '@/components/map-type-selector';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 import { Env } from '@/lib/env';
+import { useLocation } from '@/lib/hooks/use-location';
+
+// Extend HTMLElement for Google Places UI Kit custom elements
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace JSX {
+    interface IntrinsicElements {
+      'gmp-place-details-compact': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-details-place-request': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-standard-content': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+    }
+  }
+}
 
 interface InteractiveMapProps {
   origin?: LatLng;
@@ -36,6 +58,10 @@ interface InteractiveMapProps {
   style?: any;
   showD1Route?: boolean; // Control D1 bus route visibility
   activeRoute?: RouteCode | null; // Active route code to show live buses
+  showLandmarks?: boolean; // Control landmark visibility (default true)
+  showUserLocation?: boolean; // Control user location marker visibility (default true)
+  showMapControls?: boolean; // Control map type/layer controls visibility (default true)
+  showBusStops?: boolean; // Control bus stop markers visibility (default false)
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -60,7 +86,6 @@ const loadGoogleMapsScript = (): Promise<void> => {
 
     // Check if already loaded
     if (window.google?.maps) {
-      console.log('Google Maps already loaded');
       resolve();
       return;
     }
@@ -69,10 +94,8 @@ const loadGoogleMapsScript = (): Promise<void> => {
     const existingScript = document.getElementById(scriptId);
 
     if (existingScript) {
-      console.log('Google Maps script already in DOM, waiting for load...');
       // Script is loading, wait for it
       existingScript.addEventListener('load', () => {
-        console.log('Google Maps loaded from existing script');
         resolve();
       });
       existingScript.addEventListener('error', () =>
@@ -81,18 +104,16 @@ const loadGoogleMapsScript = (): Promise<void> => {
       return;
     }
 
-    console.log('Loading Google Maps script...');
     const script = document.createElement('script');
     script.id = scriptId;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${Env.GOOGLE_MAPS_API_KEY}&libraries=places`;
     script.async = true;
+    script.defer = true;
 
     script.addEventListener('load', () => {
-      console.log('Google Maps script loaded successfully');
       resolve();
     });
     script.addEventListener('error', () => {
-      console.error('Failed to load Google Maps script');
       reject(new Error('Failed to load Google Maps'));
     });
 
@@ -151,6 +172,19 @@ const createUserLocationSVG = (heading: number = 0): string => {
   `;
 };
 
+// Create SVG for destination marker (pin only, no circle)
+const createDestinationPinSVG = (): string => {
+  return `
+    <svg width="32" height="48" viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">
+      <!-- Pin shape -->
+      <path d="M 16 0 C 7.163 0 0 7.163 0 16 C 0 28 16 48 16 48 S 32 28 32 16 C 32 7.163 24.837 0 16 0 Z" 
+            fill="#EA4335" stroke="white" stroke-width="2"/>
+      <!-- Inner circle -->
+      <circle cx="16" cy="16" r="6" fill="white"/>
+    </svg>
+  `;
+};
+
 // Helper to add coordinate listener for development
 const addCoordinateListener = (map: google.maps.Map) => {
   map.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
@@ -199,7 +233,33 @@ const createMapInstance = (
       {
         featureType: 'poi',
         elementType: 'labels',
-        stylers: [{ visibility: 'on' }],
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'poi.business',
+        stylers: [{ visibility: 'off' }],
+      },
+      // Hide transit (MRT/LRT) station names and transit line labels to
+      // avoid map clutter on the campus map.
+      {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'transit.station',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'transit.station.rail',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'transit.line',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
       },
     ],
   };
@@ -251,17 +311,16 @@ const applyVerticalOffset = (
 // Custom hooks
 const useGoogleMapsInit = (
   mapContainerRef: React.RefObject<HTMLDivElement | null>,
-  initialRegion: { latitude: number; longitude: number }
+  initialRegion: { latitude: number; longitude: number },
+  hasRoutePolyline: boolean = false
 ) => {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [isLoaded, setIsLoaded] = React.useState(false);
   const [isMapCreated, setIsMapCreated] = React.useState(false);
 
   useEffect(() => {
-    console.log('Starting Google Maps initialization...');
     loadGoogleMapsScript()
       .then(() => {
-        console.log('Google Maps script loaded, setting isLoaded to true');
         setIsLoaded(true);
       })
       .catch((error) => {
@@ -275,24 +334,25 @@ const useGoogleMapsInit = (
     }
 
     if (!mapRef.current) {
-      console.log('Creating new Google Map instance...');
       try {
         mapRef.current = createMapInstance(
           mapContainerRef.current,
           initialRegion
         );
-        console.log('Google Map created successfully!');
         addCoordinateListener(mapRef.current);
         // Move the chosen target slightly upward on the viewport so it isn't
         // obscured by the bottom panel. Offset value can be tuned if needed.
-        try {
-          applyVerticalOffset(
-            mapRef.current,
-            { lat: initialRegion.latitude, lng: initialRegion.longitude },
-            200 // increase offset so the focal point appears higher on the viewport
-          );
-        } catch (e) {
-          // ignore
+        // Skip vertical offset if we have a route polyline (it will fitBounds instead)
+        if (!hasRoutePolyline) {
+          try {
+            applyVerticalOffset(
+              mapRef.current,
+              { lat: initialRegion.latitude, lng: initialRegion.longitude },
+              200 // increase offset so the focal point appears higher on the viewport
+            );
+          } catch (e) {
+            // ignore
+          }
         }
         if (mapContainerRef.current) {
           preventContextMenu(mapContainerRef.current);
@@ -302,19 +362,19 @@ const useGoogleMapsInit = (
         console.error('Error creating map:', error);
       }
     }
-  }, [isLoaded, initialRegion, mapContainerRef]);
+  }, [isLoaded, initialRegion, mapContainerRef, hasRoutePolyline]);
 
   // Pan to new center when initialRegion changes (after map is already created)
+  // Skip this if we have a route polyline (the polyline hook will handle bounds)
   useEffect(() => {
-    if (mapRef.current && isMapCreated) {
-      console.log('Panning map to new center:', initialRegion);
+    if (mapRef.current && isMapCreated && !hasRoutePolyline) {
       mapRef.current.panTo({
         lat: initialRegion.latitude,
         lng: initialRegion.longitude,
       });
       mapRef.current.setZoom(15); // Zoom level for city-scale view
     }
-  }, [initialRegion.latitude, initialRegion.longitude, isMapCreated]);
+  }, [initialRegion.latitude, initialRegion.longitude, isMapCreated, hasRoutePolyline]);
 
   return { mapRef, isMapCreated };
 };
@@ -567,8 +627,6 @@ const createOverlayPolygons = (map: google.maps.Map) => {
   });
   topOverlay.setMap(map);
 
-  console.log('✅ Top overlay polygon created with', topPath.length, 'points');
-
   // Bottom side of campus coordinates - red polyline for debugging
   const bottomCampusBoundary = [
     { lat: 1.305554861947453, lng: 103.77152132256184 },
@@ -637,17 +695,10 @@ const createOverlayPolygons = (map: google.maps.Map) => {
     fillOpacity: 0.3,
   });
   bottomOverlay.setMap(map);
-
-  console.log(
-    '✅ Bottom overlay polygon created with',
-    bottomPolylinePath.length,
-    'points'
-  );
 };
 
 // Helper function to create D1 bus route polyline
 const createD1BusRoute = (map: google.maps.Map): google.maps.Polyline => {
-  console.log('🚌 Creating D1 bus route...');
   const d1Route = new google.maps.Polyline({
     path: D1_BUS_ROUTE,
     geodesic: true,
@@ -656,7 +707,6 @@ const createD1BusRoute = (map: google.maps.Map): google.maps.Polyline => {
     strokeWeight: 4,
   });
   d1Route.setMap(map);
-  console.log('✅ D1 bus route created with', D1_BUS_ROUTE.length, 'points');
   return d1Route;
 };
 
@@ -664,8 +714,6 @@ const createD1BusRoute = (map: google.maps.Map): google.maps.Polyline => {
 const createCampusBorderPolyline = (
   map: google.maps.Map
 ): { border: google.maps.Polyline; overlay: google.maps.Polygon | null } => {
-  console.log('🎨 Creating NUS campus border...');
-
   const campusBorder = new google.maps.Polyline({
     path: NUS_CAMPUS_BOUNDARY,
     geodesic: true,
@@ -677,7 +725,6 @@ const createCampusBorderPolyline = (
 
   createOverlayPolygons(map);
 
-  console.log('✅ Campus border and split overlays created');
   return { border: campusBorder, overlay: null };
 };
 
@@ -687,7 +734,6 @@ const useNUSCampusHighlight = (
   isMapLoaded: boolean,
   showD1Route: boolean = false
 ) => {
-  const testPolylineRef = useRef<google.maps.Polyline | null>(null);
   const campusBorderRef = useRef<google.maps.Polyline | null>(null);
   const campusOverlayRef = useRef<google.maps.Polygon | null>(null);
   const d1RouteRef = useRef<google.maps.Polyline | null>(null);
@@ -695,24 +741,12 @@ const useNUSCampusHighlight = (
   useEffect(() => {
     const map = mapRef.current;
 
-    console.log('🗺️ Polyline Hook - State:', {
-      hasMap: !!map,
-      isMapLoaded,
-      hasGoogle: !!(typeof window !== 'undefined' && window.google),
-      testPolylineExists: !!testPolylineRef.current,
-      campusBorderExists: !!campusBorderRef.current,
-      campusOverlayExists: !!campusOverlayRef.current,
-      d1RouteExists: !!d1RouteRef.current,
-      showD1Route,
-    });
-
     if (
       !map ||
       !isMapLoaded ||
       typeof window === 'undefined' ||
       !window.google
     ) {
-      console.log('⏸️ Not ready to create polyline');
       return;
     }
 
@@ -746,12 +780,10 @@ const useNUSCampusHighlight = (
     if (showD1Route && !d1RouteRef.current) {
       // Create and show D1 route
       d1RouteRef.current = createD1BusRoute(map);
-      console.log('✅ D1 route shown');
     } else if (!showD1Route && d1RouteRef.current) {
       // Hide D1 route
       d1RouteRef.current.setMap(null);
       d1RouteRef.current = null;
-      console.log('❌ D1 route hidden');
     }
   }, [mapRef, isMapLoaded, showD1Route]);
 };
@@ -804,17 +836,11 @@ const addMarkersAndFitBounds = ({
     hasMarkers = true;
   });
 
+  // Don't create destination marker here - it's handled by useDestinationMarker hook
+  // This prevents the default circle marker from appearing
   if (destination) {
-    const marker = createMarker({
-      position: { lat: destination.lat, lng: destination.lng },
-      map,
-      title: 'Destination',
-      color: '#D32F2F',
-      scale: 10,
-      onClick: () => onMarkerPress?.('destination'),
-    });
-    markers.push(marker);
-    bounds.extend(marker.getPosition()!);
+    // Just extend bounds to include destination for proper map framing
+    bounds.extend(new google.maps.LatLng(destination.lat, destination.lng));
     hasMarkers = true;
   }
 
@@ -883,11 +909,334 @@ const useMapPolyline = (
         geodesic: true,
         strokeColor: '#274F9C',
         strokeOpacity: 1.0,
-        strokeWeight: 4,
+        strokeWeight: 6,
         map: mapRef.current,
+      });
+
+      // Fit map bounds to show entire route
+      const bounds = new google.maps.LatLngBounds();
+      decodedPath.forEach((point) => bounds.extend(point));
+      mapRef.current.fitBounds(bounds, {
+        top: 100,
+        right: 50,
+        bottom: 400, // More padding at bottom for the card
+        left: 50,
       });
     }
   }, [routePolyline, mapRef]);
+};
+
+// Hook to draw dotted connector lines from user location to route start and route end to destination
+const useConnectorLines = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  origin?: LatLng,
+  destination?: LatLng,
+  routePolyline?: string
+) => {
+  const startConnectorRef = useRef<google.maps.Polyline | null>(null);
+  const endConnectorRef = useRef<google.maps.Polyline | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || typeof window === 'undefined' || !window.google)
+      return;
+
+    // Remove existing connector lines
+    if (startConnectorRef.current) {
+      startConnectorRef.current.setMap(null);
+      startConnectorRef.current = null;
+    }
+    if (endConnectorRef.current) {
+      endConnectorRef.current.setMap(null);
+      endConnectorRef.current = null;
+    }
+
+    // Only draw connectors if we have a route
+    if (routePolyline) {
+      const decodedPath = polyline
+        .decode(routePolyline)
+        .map(([lat, lng]) => ({ lat, lng }));
+
+      if (decodedPath.length > 0) {
+        const routeStart = decodedPath[0];
+        const routeEnd = decodedPath[decodedPath.length - 1];
+
+        // Draw dotted line from user/origin location to route start
+        if (origin) {
+          const userLocation = { lat: origin.lat, lng: origin.lng };
+          startConnectorRef.current = new google.maps.Polyline({
+            path: [userLocation, routeStart],
+            geodesic: true,
+            strokeColor: '#274F9C',
+            strokeOpacity: 0,
+            strokeWeight: 0,
+            icons: [
+              {
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#274F9C',
+                  fillOpacity: 0.8,
+                  strokeColor: '#274F9C',
+                  strokeOpacity: 1,
+                  strokeWeight: 1,
+                  scale: 3,
+                },
+                offset: '0',
+                repeat: '15px',
+              },
+            ],
+            map: mapRef.current,
+          });
+        }
+
+        // Draw dotted line from route end to destination
+        if (destination) {
+          const destinationLocation = { lat: destination.lat, lng: destination.lng };
+          endConnectorRef.current = new google.maps.Polyline({
+            path: [routeEnd, destinationLocation],
+            geodesic: true,
+            strokeColor: '#274F9C',
+            strokeOpacity: 0,
+            strokeWeight: 0,
+            icons: [
+              {
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  fillColor: '#274F9C',
+                  fillOpacity: 0.8,
+                  strokeColor: '#274F9C',
+                  strokeOpacity: 1,
+                  strokeWeight: 1,
+                  scale: 3,
+                },
+                offset: '0',
+                repeat: '15px',
+              },
+            ],
+            map: mapRef.current,
+          });
+        }
+      }
+    }
+
+    return () => {
+      if (startConnectorRef.current) {
+        startConnectorRef.current.setMap(null);
+      }
+      if (endConnectorRef.current) {
+        endConnectorRef.current.setMap(null);
+      }
+    };
+  }, [origin, destination, routePolyline, mapRef]);
+};
+
+// Hook to render bus stop markers with labels
+const useBusStopMarkers = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
+  showBusStops: boolean
+) => {
+  const circleMarkersRef = useRef<google.maps.Marker[]>([]);
+  const labelMarkersRef = useRef<google.maps.Marker[]>([]);
+  const { data: busStopsData } = useBusStops();
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    // Clear existing markers
+    circleMarkersRef.current.forEach((marker) => marker.setMap(null));
+    labelMarkersRef.current.forEach((marker) => marker.setMap(null));
+    circleMarkersRef.current = [];
+    labelMarkersRef.current = [];
+
+    if (!showBusStops || !busStopsData?.BusStopsResult?.busstops) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const busStops = busStopsData.BusStopsResult.busstops;
+
+    // Log all bus stop names to debug
+    console.log('All bus stops:', busStops.map((s: BusStop) => ({
+      name: s.name,
+      ShortName: s.ShortName,
+      caption: s.caption
+    })));
+
+    // Priority stops that should always be shown (key locations)
+    // Use exact matches for ShortName to avoid partial matching issues
+    const priorityStops = [
+      'BIZ 2',
+      'COM 3',
+      'TCOMS',
+      'PGP',
+      'PGP Foyer',
+      'KR MRT',
+      'S 17',
+      'UHall',
+      'UHC',
+      'YIH',
+      'Museum',
+      'Kent Vale',
+      'EA',
+      'UTown',
+      'SDE3',
+      'KR Bus Ter',
+      'Ventus',
+      'CLB',
+      'Opp NUSS',
+    ];
+
+    // Function to check if a stop is a priority stop
+    const isPriorityStop = (stop: BusStop) => {
+      // Use exact match for ShortName to avoid "UHall" matching "Opp UHall"
+      const isMatch = priorityStops.some((priority) =>
+        stop.ShortName === priority ||
+        stop.ShortName.trim() === priority
+      );
+      if (isMatch) {
+        console.log('Priority stop found:', stop.ShortName, stop);
+      }
+      return isMatch;
+    };
+
+    // Function to update marker visibility based on zoom
+    const updateMarkersVisibility = () => {
+      const zoom = map.getZoom() || 16;
+  const showAllStops = zoom >= 1; // Show all stops when zoomed in
+
+      // Handle circle markers - hide when zoomed out, show all when zoomed in
+      circleMarkersRef.current.forEach((marker) => {
+        marker.setVisible(showAllStops);
+      });
+
+      // Handle label markers - show priority when zoomed out, all when zoomed in
+      labelMarkersRef.current.forEach((marker) => {
+        const title = marker.getTitle();
+        // Use exact match instead of includes to avoid "UHall" matching "Opp UHall"
+        const isPriority = title
+          ? priorityStops.some((p) => title === p || title.trim() === p)
+          : false;
+
+        // Show all stops when zoomed in, or only priority stops when zoomed out
+        marker.setVisible(showAllStops || isPriority);
+      });
+    };
+
+    busStops.forEach((stop: BusStop) => {
+      const isStopPriority = isPriorityStop(stop);
+      
+      // Create circle marker
+      const marker = new google.maps.Marker({
+        position: { lat: stop.latitude, lng: stop.longitude },
+        map: map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#274F9C',
+          fillOpacity: 0.8,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 2,
+          scale: 4, // Reduced from 6 to make circles smaller
+        },
+        title: stop.ShortName, // Use short name for hover tooltip
+        zIndex: 600, // Higher than Google Maps pins (500)
+        visible: false, // Circles hidden by default when zoomed out
+      });
+
+      // Create label marker above the circle
+      const label = new google.maps.Marker({
+        position: { lat: stop.latitude + 0.0001, lng: stop.longitude },
+        map: map,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="30">
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
+                    fill="#274F9C" text-anchor="middle" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
+                ${stop.ShortName}
+              </text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
+                    fill="#274F9C" text-anchor="middle">
+                ${stop.ShortName}
+              </text>
+            </svg>
+          `),
+          anchor: new google.maps.Point(100, 15),
+        },
+        title: stop.ShortName, // Add title to label too for filtering
+        zIndex: 601, // Higher than both Google Maps pins (500) and bus stop circles
+        visible: isStopPriority, // Initially show only priority stop labels
+      });
+
+      circleMarkersRef.current.push(marker);
+      labelMarkersRef.current.push(label);
+    });
+
+    // Set up zoom change listener
+    const zoomListener = map.addListener('zoom_changed', updateMarkersVisibility);
+
+    // Initial visibility update
+    updateMarkersVisibility();
+
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+      circleMarkersRef.current.forEach((marker) => marker.setMap(null));
+      labelMarkersRef.current.forEach((marker) => marker.setMap(null));
+      circleMarkersRef.current = [];
+      labelMarkersRef.current = [];
+    };
+  }, [mapRef, isMapCreated, showBusStops, busStopsData]);
+};
+
+// Hook to render destination marker with Google Maps pin icon
+const useDestinationMarker = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
+  destination?: { lat: number; lng: number }
+) => {
+  const markerRef = useRef<google.maps.Marker | null>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    // Remove existing marker
+    if (markerRef.current) {
+      markerRef.current.setMap(null);
+      markerRef.current = null;
+    }
+
+    // Create new destination marker if destination exists
+    if (destination) {
+      const iconSvg = createDestinationPinSVG();
+      const iconUrl = svgToDataURL(iconSvg);
+
+      markerRef.current = new google.maps.Marker({
+        position: destination,
+        map: mapRef.current,
+        icon: {
+          url: iconUrl,
+          scaledSize: new google.maps.Size(32, 48),
+          anchor: new google.maps.Point(16, 48), // Anchor at bottom center of pin
+        },
+        title: 'Destination',
+        zIndex: 999, // Below user location marker
+        animation: google.maps.Animation.DROP, // Animated drop effect
+      });
+    }
+
+    return () => {
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
+    };
+  }, [mapRef, isMapCreated, destination]);
+
+  return markerRef;
 };
 
 // Hook to render real-time bus location markers
@@ -957,8 +1306,6 @@ const useBusMarkers = (
 
       busMarkersRef.current.push(marker);
     });
-
-    console.log(`🚌 Rendered ${activeBuses.length} bus markers on map`);
   }, [mapRef, activeBuses, routeColor]);
 
   return busMarkersRef;
@@ -1020,13 +1367,6 @@ const useRouteCheckpoints = (
     });
 
     polylineRef.current = polyline;
-
-    const dataSource = checkpointsData?.CheckPointResult?.CheckPoint
-      ? 'API'
-      : 'Local';
-    console.log(
-      `🛣️ Drew ${routeCode} route with ${checkpoints.length} checkpoints (${dataSource})`
-    );
 
     // Cleanup
     return () => {
@@ -1093,8 +1433,6 @@ const useLandmarkMarkers = (
       landmarkMarkersRef.current.push(marker);
     });
 
-    console.log(`📍 Rendered ${NUS_LANDMARKS.length} landmark markers on map`);
-
     // Cleanup
     return () => {
       landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
@@ -1110,8 +1448,10 @@ const useUserLocationMarker = (
   isMapCreated: boolean
 ) => {
   const userMarkerRef = useRef<google.maps.Marker | null>(null);
-  const watchIdRef = useRef<number | null>(null);
   const headingRef = useRef<number>(0);
+
+  // Use global location from hook
+  const { coords: userLocation } = useLocation();
 
   useEffect(() => {
     if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
@@ -1122,6 +1462,11 @@ const useUserLocationMarker = (
 
     // Function to update marker position and rotation
     const updateUserMarker = (lat: number, lng: number, heading: number) => {
+      // Validate coordinates (should be within Singapore bounds roughly)
+      if (lat < 1.1 || lat > 1.5 || lng < 103.6 || lng > 104.1) {
+        return;
+      }
+
       const iconSvg = createUserLocationSVG(heading);
       const iconUrl = svgToDataURL(iconSvg);
 
@@ -1154,8 +1499,14 @@ const useUserLocationMarker = (
       if (event.alpha !== null) {
         // alpha is the compass heading (0-360)
         // Convert to match map north (0 = north)
-        const heading = event.webkitCompassHeading || event.alpha || 0;
+        const heading =
+          (event as any).webkitCompassHeading || event.alpha || 0;
         headingRef.current = heading;
+
+        // Update marker rotation if we have location
+        if (userLocation && userMarkerRef.current) {
+          updateUserMarker(userLocation.latitude, userLocation.longitude, heading);
+        }
       }
     };
 
@@ -1180,41 +1531,170 @@ const useUserLocationMarker = (
       }
     };
 
-    // Start watching user location
-    if (navigator.geolocation) {
-      // Start orientation tracking
-      requestOrientationPermission();
+    // Start orientation tracking
+    requestOrientationPermission();
 
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          updateUserMarker(latitude, longitude, headingRef.current);
-        },
-        (error) => {
-          console.error('Geolocation error:', error);
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 5000,
-        }
-      );
+    // Update marker when userLocation changes
+    if (userLocation) {
+      updateUserMarker(userLocation.latitude, userLocation.longitude, headingRef.current);
     }
 
     // Cleanup
     return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
       if (userMarkerRef.current) {
-        userMarkerRef.current.setMap(null);
+        try {
+          userMarkerRef.current.setMap(null);
+        } catch (error) {
+          console.warn('Error removing marker:', error);
+        }
         userMarkerRef.current = null;
       }
       window.removeEventListener('deviceorientation', handleOrientation);
     };
-  }, [mapRef, isMapCreated]);
+  }, [mapRef, isMapCreated, userLocation]);
 
   return userMarkerRef;
+};
+
+// Hook to handle place details when clicking on POIs
+const usePlaceDetailsClick = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
+  onPlaceSelected: (placeId: string | null) => void
+) => {
+  useEffect(() => {
+    if (
+      !mapRef.current ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    // Add click listener to the map
+    const clickListener = map.addListener(
+      'click',
+      (event: google.maps.MapMouseEvent & { placeId?: string }) => {
+        if (event.placeId) {
+          // User clicked on a POI (Point of Interest)
+          event.stop(); // Prevent default info window
+          onPlaceSelected(event.placeId);
+        } else {
+          // User clicked on empty map area - close place details
+          onPlaceSelected(null);
+        }
+      }
+    );
+
+    return () => {
+      if (clickListener) {
+        google.maps.event.removeListener(clickListener);
+      }
+    };
+  }, [mapRef, isMapCreated, onPlaceSelected]);
+};
+
+// PlaceDetailsCompact Component using Google Places UI Kit
+const PlaceDetailsCompact: React.FC<{
+  placeId: string;
+  onClose: () => void;
+}> = ({ placeId, onClose }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const placeDetailsRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || typeof window === 'undefined' || !window.google) {
+      return;
+    }
+
+    // Dynamically create the place details element
+    const loadPlacesLibrary = async () => {
+      try {
+        // Import the places library
+        await google.maps.importLibrary('places');
+
+        // Create the custom elements
+        const placeDetails = document.createElement('gmp-place-details-compact') as HTMLElement;
+        const placeRequest = document.createElement('gmp-place-details-place-request') as HTMLElement;
+        const contentConfig = document.createElement('gmp-place-standard-content') as HTMLElement;
+
+        // Set the place ID
+        placeRequest.setAttribute('place', placeId);
+
+        // Append elements
+        placeDetails.appendChild(placeRequest);
+        placeDetails.appendChild(contentConfig);
+
+        // Set attributes
+        placeDetails.setAttribute('orientation', 'horizontal');
+        placeDetails.setAttribute('truncation-preferred', '');
+
+        // Clear and append to container
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+          containerRef.current.appendChild(placeDetails);
+          placeDetailsRef.current = placeDetails;
+        }
+      } catch (error) {
+        console.error('Error loading place details:', error);
+      }
+    };
+
+    loadPlacesLibrary();
+
+    return () => {
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+    };
+  }, [placeId]);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        style={{
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          zIndex: 1,
+          background: 'rgba(255, 255, 255, 0.95)',
+          border: 'none',
+          borderRadius: '50%',
+          width: '28px',
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          fontSize: '18px',
+          color: '#666',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'rgba(245, 245, 245, 0.95)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+        }}
+      >
+        ×
+      </button>
+      
+      {/* Place details container */}
+      <div
+        ref={containerRef}
+        style={{
+          minHeight: '80px',
+          width: '100%',
+        }}
+      />
+    </div>
+  );
 };
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -1227,11 +1707,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   style,
   showD1Route = false,
   activeRoute = null,
+  showLandmarks = true, // Default to true for backward compatibility
+  showUserLocation = true, // Default to true for backward compatibility
+  showMapControls = true, // Default to true for backward compatibility
+  showBusStops = false, // Default to false for backward compatibility
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
-    initialRegion
+    initialRegion,
+    !!routePolyline // Don't pan/zoom if we have a route polyline
   );
 
   // Fetch active buses for the selected route
@@ -1249,9 +1736,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     if (!activeRoute) return '#274F9C';
 
     // Try to get color from API
-    const serviceDesc = serviceDescriptions?.ServiceDescriptionResult?.ServiceDescription?.find(
-      (s) => s.Route === activeRoute
-    );
+    const serviceDesc =
+      serviceDescriptions?.ServiceDescriptionResult?.ServiceDescription?.find(
+        (s) => s.Route === activeRoute
+      );
 
     if (serviceDesc?.Color) {
       // API returns hex without #, so add it
@@ -1275,11 +1763,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
   useMapPolyline(mapRef, routePolyline);
+  useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
   useBusMarkers(mapRef, activeBuses, routeColor);
   useRouteCheckpoints(mapRef, activeRoute, routeColor);
-  useLandmarkMarkers(mapRef, isMapCreated);
+  useLandmarkMarkers(mapRef, isMapCreated && showLandmarks);
+  useBusStopMarkers(mapRef, isMapCreated, showBusStops); // Add bus stop markers with labels
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
+  useDestinationMarker(mapRef, isMapCreated, destination); // Add destination pin marker
+  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceId); // Handle place clicks
 
   const handleMapTypeChange = (mapType: google.maps.MapTypeId) => {
     if (mapRef.current) {
@@ -1288,11 +1780,31 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>
       {!isMapCreated && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading Map...</Text>
-        </View>
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#E8EAF6',
+          }}
+        >
+          <span
+            style={{
+              fontSize: '16px',
+              color: '#274F9C',
+              fontWeight: '500',
+            }}
+          >
+            Loading Map...
+          </span>
+        </div>
       )}
       <div
         ref={mapContainerRef}
@@ -1304,44 +1816,48 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }}
       />
       {/* Always show controls, not just when map is loaded */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '56px',
-          right: '20px',
-          zIndex: 9999,
-        }}
-      >
-        <MapTypeSelector
-          onMapTypeChange={handleMapTypeChange}
-          onFilterChange={(filters) => {
-            console.log('Filter changes:', filters);
-            // TODO: Implement filter logic for map layers
+      {showMapControls && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '56px',
+            right: '20px',
+            zIndex: 9999,
           }}
-        />
-      </div>
-    </View>
+        >
+          <MapTypeSelector
+            onMapTypeChange={handleMapTypeChange}
+            onFilterChange={(filters) => {
+              console.log('Filter changes:', filters);
+              // TODO: Implement filter logic for map layers
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Place Details Compact Element */}
+      {selectedPlaceId && isMapCreated && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden',
+          }}
+        >
+          <PlaceDetailsCompact
+            placeId={selectedPlaceId}
+            onClose={() => setSelectedPlaceId(null)}
+          />
+        </div>
+      )}
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#E8EAF6',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E8EAF6',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#274F9C',
-    fontWeight: '500',
-  },
-});

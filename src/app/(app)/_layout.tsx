@@ -66,6 +66,13 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="turn-by-turn-navigation"
+        options={{
+          title: 'Turn by Turn Navigation',
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

@@ -8,3 +8,5 @@ export const DragIcon = () => (
     />
   </Svg>
 );
+
+export default DragIcon;

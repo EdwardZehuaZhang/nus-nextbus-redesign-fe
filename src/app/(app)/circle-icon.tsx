@@ -8,3 +8,5 @@ export const CircleIcon = () => (
     />
   </Svg>
 );
+
+export default CircleIcon;

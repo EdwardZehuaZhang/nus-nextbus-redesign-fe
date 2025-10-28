@@ -35,7 +35,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   newArchEnabled: true,
   updates: {
     fallbackToCacheTimeout: 0,
+    url: 'https://u.expo.dev/52efcc10-65b2-4756-92c9-b44bcacf373e',
   },
+  runtimeVersion: '1.0.0',
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: true,

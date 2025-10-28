@@ -50,6 +50,21 @@
       "env": {
         "APP_ENV": "development",
         "EXPO_NO_DOTENV": "1"
+      },
+      "channel": "development"
+    },
+    "adhoc": {
+      "channel": "adhoc",
+      "pnpm": "9.12.3",
+      "ios": {
+        "simulator": false,
+        "image": "latest",
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "APP_ENV": "staging",
+        "EXPO_NO_DOTENV": "1",
+        "FLIPPER_DISABLE": "1"
       }
     },
     "simulator": {
@@ -64,7 +79,8 @@
       "env": {
         "APP_ENV": "development",
         "EXPO_NO_DOTENV": "1"
-      }
+      },
+      "channel": "simulator"
     }
   },
   "submit": {

@@ -39,7 +39,7 @@ const BUNDLE_ID = 'com.nus.nextbus'; // ios bundle id
 const PACKAGE = 'com.nus.nextbus'; // android package name
 const NAME = 'NUS NextBus'; // app name
 const EXPO_ACCOUNT_OWNER = 'edwardzehuazhang'; // expo account owner
-const EAS_PROJECT_ID = 'c3e1075b-6fe7-4686-aa49-35b46a229044'; // eas project id
+const EAS_PROJECT_ID = '52efcc10-65b2-4756-92c9-b44bcacf373e'; // eas project id
 const SCHEME = 'nusnextbus'; // app scheme
 
 /**

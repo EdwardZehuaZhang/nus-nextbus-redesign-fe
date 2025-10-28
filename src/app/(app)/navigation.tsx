@@ -23,7 +23,9 @@ import {
   View,
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
+import { useLocation } from '@/lib/hooks/use-location';
 import { addFavorite, isFavorite } from '@/lib/storage/favorites';
+import { getTransitLineColor } from '@/lib/transit-colors';
 
 import { CircleIcon } from './circle-icon';
 import { DragIcon } from './drag-icon';
@@ -33,7 +35,7 @@ const NavigationArrow = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
     <Path
       d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
-      fill="#737373"
+      fill="#274F9C"
     />
   </Svg>
 );
@@ -238,13 +240,18 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
 
 export default function NavigationPage() {
   const router = useRouter();
-  const { destination, from, to } = useLocalSearchParams();
+  const { destination, from, to, userLat, userLng } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
+
+  // Use global location hook
+  const { coords: globalUserLocation } = useLocation();
 
   // Get destination from URL parameter or default to "COM3"
   const currentDestination =
@@ -274,20 +281,46 @@ export default function NavigationPage() {
   // Helper to map destination names to coordinates (simplified for now)
   const getDestinationCoordinates = (dest: string): { lat: number; lng: number } | null => {
     const destinations: Record<string, { lat: number; lng: number }> = {
+      // Residential Colleges
       'COM1': { lat: 1.29453, lng: 103.77397 },
       'COM2': { lat: 1.29453, lng: 103.77397 },
-      'COM3': { lat: 1.29453, lng: 103.77397 }, // Using COM2 as proxy
+      'COM3': { lat: 1.29453, lng: 103.77397 },
       'PGP': { lat: 1.29289, lng: 103.78004 },
       'KRB': { lat: 1.29481, lng: 103.76986 },
+      
+      // Academic Buildings
       'LT13': { lat: 1.29464, lng: 103.77131 },
       'AS5': { lat: 1.29364, lng: 103.77253 },
       'BIZ2': { lat: 1.29363, lng: 103.77534 },
       'TCOMS': { lat: 1.29289, lng: 103.77657 },
       'YIHHT': { lat: 1.29869, lng: 103.77463 },
       'MUSEUM': { lat: 1.30120, lng: 103.77372 },
+      
+      // Special Locations (common names)
       'UTOWN': { lat: 1.30373, lng: 103.77434 },
+      'UNIVERSITY TOWN': { lat: 1.30373, lng: 103.77434 },
+      'UTown': { lat: 1.30373, lng: 103.77434 },
+      'THE ICON': { lat: 1.29700, lng: 103.77300 },
+      'VENTUS': { lat: 1.29400, lng: 103.77600 },
+      'KENT RIDGE': { lat: 1.29400, lng: 103.77000 },
+      'SCIENCE': { lat: 1.29300, lng: 103.77500 },
+      'ENGINEERING': { lat: 1.29500, lng: 103.77200 },
     };
-    return destinations[dest.toUpperCase()] || null;
+    
+    // Try exact match first (case-insensitive)
+    const upperDest = dest.toUpperCase();
+    if (destinations[upperDest]) {
+      return destinations[upperDest];
+    }
+    
+    // Try partial match
+    for (const [key, coords] of Object.entries(destinations)) {
+      if (key.includes(upperDest) || upperDest.includes(key)) {
+        return coords;
+      }
+    }
+    
+    return null;
   };
 
   // Fetch routes when destination changes
@@ -295,40 +328,38 @@ export default function NavigationPage() {
     const fetchRoutes = async () => {
       const destCoords = getDestinationCoordinates(currentDestination);
       if (!destCoords) {
-        setRouteError('Destination coordinates not found');
+        setRouteError(`Destination coordinates not found for: "${currentDestination}"`);
+        setIsLoadingRoutes(false);
         return;
       }
 
+      setDestinationCoords(destCoords); // Store destination coords for map marker
       setIsLoadingRoutes(true);
       setRouteError(null);
 
       try {
-        // Get user's current location (or use NUS campus center as fallback)
+        // Use passed user location from transit page, or get current location, or use NUS campus center as fallback
         let originLatLng = { latitude: 1.2976493, longitude: 103.7766916 }; // Default: NUS center
 
-        try {
-          const position =
-            await new Promise<GeolocationPosition>((resolve, reject) => {
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                  timeout: 5000,
-                  maximumAge: 0,
-                });
-              } else {
-                reject(new Error('Geolocation not supported'));
-              }
-            });
+        // First, try to use the passed user location from URL params
+        if (userLat && userLng) {
+          const lat = parseFloat(typeof userLat === 'string' ? userLat : userLat[0]);
+          const lng = parseFloat(typeof userLng === 'string' ? userLng : userLng[0]);
+          
+          if (!isNaN(lat) && !isNaN(lng)) {
+            originLatLng = { latitude: lat, longitude: lng };
+            setUserLocation(originLatLng); // Save user location for map display
+          }
+        } else if (globalUserLocation) {
+          // Use global location from hook if available
           originLatLng = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
+            latitude: globalUserLocation.latitude,
+            longitude: globalUserLocation.longitude,
           };
-          setUserLocation(originLatLng); // Save user location for map centering
-          console.log('📍 Using user location:', originLatLng);
-        } catch (geoError) {
-          console.log(
-            '⚠️ Geolocation failed, using NUS campus center:',
-            geoError
-          );
+          setUserLocation(originLatLng);
+        } else {
+          // If no user location available, use default NUS campus center
+          // The global location hook is still loading
         }
 
         const origin: Waypoint = {
@@ -345,20 +376,17 @@ export default function NavigationPage() {
             },
           },
         };
-
+        
         // Call Google Routes API
         const result = await getTransitRoute(origin, dest);
 
         if (result && result.routes && result.routes.length > 0) {
-          console.log('✅ Routes fetched:', result.routes.length, 'routes');
-          console.log('First route:', result.routes[0]);
           setRoutes(result.routes);
+          setRouteError(null);
         } else {
-          console.log('❌ No routes found');
           setRouteError('No routes found');
         }
       } catch (error) {
-        console.error('Error fetching routes:', error);
         setRouteError(error instanceof Error ? error.message : 'Failed to fetch routes');
       } finally {
         setIsLoadingRoutes(false);
@@ -366,7 +394,7 @@ export default function NavigationPage() {
     };
 
     fetchRoutes();
-  }, [currentDestination]);
+  }, [currentDestination, userLat, userLng, globalUserLocation]);
 
   // Manage all locations as a unified list
   type LocationItem = {
@@ -449,6 +477,8 @@ export default function NavigationPage() {
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           routePolyline={routes[0]?.polyline?.encodedPolyline}
+          origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
+          destination={destinationCoords || undefined}
           initialRegion={
             userLocation
               ? {
@@ -459,6 +489,8 @@ export default function NavigationPage() {
                 }
               : undefined
           }
+          showLandmarks={false}
+          showMapControls={false}
         />
 
         {/* Location Input Card */}
@@ -472,10 +504,7 @@ export default function NavigationPage() {
             backgroundColor: '#FFFFFF',
             padding: 12,
             paddingHorizontal: 20,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 3,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
             elevation: 2,
           }}
         >
@@ -617,7 +646,7 @@ export default function NavigationPage() {
           {/* Add Stop */}
           <Pressable
             onPress={handleAddStop}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
           >
             <PlusCircle />
             <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
@@ -641,10 +670,7 @@ export default function NavigationPage() {
             paddingHorizontal: 20,
             paddingBottom: 20,
             paddingTop: 4,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.1,
-            shadowRadius: 3,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
             elevation: 5,
             maxHeight: '55%',
           }}
@@ -684,10 +710,7 @@ export default function NavigationPage() {
                     backgroundColor: '#FFFFFF',
                     paddingHorizontal: 12,
                     paddingVertical: 8,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 2,
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                     elevation: 1,
                     width: 154,
                     height: 32,
@@ -718,9 +741,17 @@ export default function NavigationPage() {
                 </Text>
               )}
               {routeError && (
-                <Text style={{ fontSize: 14, color: '#F00', padding: 16 }}>
-                  Error: {routeError}
-                </Text>
+                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
+                  <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
+                    ❌ Error: {routeError}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                    Destination: {currentDestination}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#666' }}>
+                    Check the browser console for more details
+                  </Text>
+                </View>
               )}
 
               {/* Render Dynamic Route Steps */}
@@ -813,70 +844,115 @@ export default function NavigationPage() {
               {/* Map through route steps */}
               {!isLoadingRoutes && !routeError && routes.length > 0 && routes[0].legs?.[0]?.steps && (
                 <>
-                  {routes[0].legs[0].steps.map((step, stepIndex) => {
-                    const isWalk = step.travelMode === 'WALK';
-                    const isTransit = step.travelMode === 'TRANSIT';
-                    const duration = step.staticDuration ? durationToMinutes(step.staticDuration) : 0;
+                  {(() => {
+                    // Combine consecutive walking steps
+                    const steps = routes[0].legs[0].steps;
+                    const combinedSteps: Array<{
+                      type: 'WALK' | 'TRANSIT';
+                      duration: number;
+                      step?: RouteStep;
+                    }> = [];
 
-                    if (isWalk) {
-                      return (
-                        <React.Fragment key={`step-${stepIndex}`}>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
+                    let i = 0;
+                    while (i < steps.length) {
+                      const step = steps[i];
+                      
+                      if (step.travelMode === 'WALK') {
+                        // Collect all consecutive walk steps
+                        let totalDuration = step.staticDuration ? durationToMinutes(step.staticDuration) : 0;
+                        
+                        let j = i + 1;
+                        while (j < steps.length && steps[j].travelMode === 'WALK') {
+                          totalDuration += steps[j].staticDuration ? durationToMinutes(steps[j].staticDuration) : 0;
+                          j++;
+                        }
+                        
+                        combinedSteps.push({
+                          type: 'WALK',
+                          duration: totalDuration,
+                        });
+                        
+                        i = j; // Skip all the walk steps we just combined
+                      } else {
+                        combinedSteps.push({
+                          type: 'TRANSIT',
+                          duration: step.staticDuration ? durationToMinutes(step.staticDuration) : 0,
+                          step,
+                        });
+                        i++;
+                      }
+                    }
+
+                    return combinedSteps.map((combinedStep, stepIndex) => {
+                      if (combinedStep.type === 'WALK') {
+                        return (
+                          <React.Fragment key={`step-${stepIndex}`}>
                             <View
                               style={{
                                 flexDirection: 'row',
+                                justifyContent: 'space-between',
                                 alignItems: 'center',
-                                gap: 12,
                               }}
                             >
-                              <PersonIcon />
-                              <Text
+                              <View
                                 style={{
-                                  fontSize: 16,
-                                  fontWeight: '500',
-                                  color: '#211F26',
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 12,
                                 }}
                               >
-                                Walk {duration} min{duration > 1 ? 's' : ''}
-                              </Text>
+                                <PersonIcon />
+                                <Text
+                                  style={{
+                                    fontSize: 16,
+                                    fontWeight: '500',
+                                    color: '#211F26',
+                                  }}
+                                >
+                                  Walk {combinedStep.duration} min{combinedStep.duration !== 1 ? 's' : ''}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 14, color: '#09090B' }} />
                             </View>
-                            <Text style={{ fontSize: 14, color: '#09090B' }}>
-                              {step.transitDetails?.stopDetails?.departureTime
-                                ? formatTime(step.transitDetails.stopDetails.departureTime)
-                                : ''}
-                            </Text>
-                          </View>
 
-                          {stepIndex < routes[0].legs[0].steps.length - 1 && (
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 20,
-                                paddingLeft: 9,
-                                height: 16,
-                                justifyContent: 'center',
-                                marginVertical: 8,
-                              }}
-                            >
-                              <DotDivider />
+                            {stepIndex < combinedSteps.length - 1 && (
                               <View
-                                style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
-                              />
-                            </View>
-                          )}
-                        </React.Fragment>
-                      );
-                    } else if (isTransit) {
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 20,
+                                  paddingLeft: 9,
+                                  height: 16,
+                                  justifyContent: 'center',
+                                  marginVertical: 8,
+                                }}
+                              >
+                                <DotDivider />
+                                <View
+                                  style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                                />
+                              </View>
+                            )}
+                          </React.Fragment>
+                        );
+                      }
+
+                      // Transit step
+                      const step = combinedStep.step!;
                       const lineName = step.transitDetails?.transitLine?.name || 'Bus';
                       const boardingStop = step.transitDetails?.stopDetails?.departureStop?.name || 'Unknown';
                       const alightingStop = step.transitDetails?.stopDetails?.arrivalStop?.name || currentDestination;
+                      const numStops = step.transitDetails?.stopCount || 3;
+                      const isExpanded = expandedSteps[stepIndex] || false;
+                      const toggleExpanded = () => {
+                        setExpandedSteps(prev => ({
+                          ...prev,
+                          [stepIndex]: !prev[stepIndex]
+                        }));
+                      };
+
+                      // Get the appropriate color for this transit line
+                      const lineColor = getTransitLineColor(lineName);
 
                       return (
                         <React.Fragment key={`step-${stepIndex}`}>
@@ -890,21 +966,22 @@ export default function NavigationPage() {
                             <View
                               style={{
                                 flexDirection: 'row',
-                                alignItems: 'center',
+                                alignItems: 'flex-start',
                                 gap: 16,
                                 flex: 1,
                               }}
                             >
-                              <BusIndicator expanded={routeExpanded} />
+                              <BusIndicator expanded={isExpanded} color={lineColor} />
 
                               <View
                                 style={{
                                   flexDirection: 'column',
                                   alignItems: 'flex-start',
-                                  gap: 16,
+                                  gap: 24,
                                   flex: 1,
                                 }}
                               >
+                                {/* Start Bus Stop */}
                                 <View
                                   style={{
                                     flexDirection: 'column',
@@ -923,24 +1000,186 @@ export default function NavigationPage() {
                                     {boardingStop}
                                   </Text>
 
-                                  <Text
+                                  {/* Bus Route Badge with Timing */}
+                                  <View
                                     style={{
-                                      fontSize: 14,
-                                      color: '#737373',
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      height: 37,
+                                      borderRadius: 5,
                                     }}
                                   >
-                                    Take {lineName} to {alightingStop}
-                                  </Text>
+                                    {/* Bus Number Badge */}
+                                    <View
+                                      style={{
+                                        width: 38,
+                                        height: 37,
+                                        backgroundColor: lineColor,
+                                        borderTopLeftRadius: 5,
+                                        borderBottomLeftRadius: 5,
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.1,
+                                        shadowRadius: 2,
+                                        elevation: 1,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 14,
+                                          fontWeight: '600',
+                                          color: '#FFFFFF',
+                                          fontFamily: 'Inter',
+                                        }}
+                                      >
+                                        {lineName}
+                                      </Text>
+                                    </View>
 
-                                  <Text style={{ fontSize: 12, color: '#666' }}>
-                                    {duration} min ride
+                                    {/* Timing Info */}
+                                    <View
+                                      style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        flex: 1,
+                                        height: 37,
+                                        borderTopWidth: 1,
+                                        borderRightWidth: 1,
+                                        borderBottomWidth: 1,
+                                        borderColor: '#E5E5E5',
+                                        borderTopRightRadius: 5,
+                                        borderBottomRightRadius: 5,
+                                        backgroundColor: '#FFFFFF',
+                                        overflow: 'hidden',
+                                        marginLeft: -1,
+                                      }}
+                                    >
+                                      <View
+                                        style={{
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          paddingHorizontal: 10,
+                                          paddingVertical: 7,
+                                          flex: 1,
+                                          backgroundColor: '#FFFFFF',
+                                          borderRightWidth: 1,
+                                          borderBottomWidth: 1,
+                                          borderColor: '#E5E5E5',
+                                          gap: 8,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 14,
+                                            fontWeight: '500',
+                                            color: '#211F26',
+                                            fontFamily: 'Inter',
+                                          }}
+                                        >
+                                          1 Min
+                                        </Text>
+                                        <CapacityIcons opacity={1} />
+                                      </View>
+                                    </View>
+                                  </View>
+
+                                  {/* Expandable Ride Info */}
+                                  <Pressable
+                                    onPress={toggleExpanded}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <View
+                                      style={{
+                                        transform: [{ rotate: isExpanded ? '180deg' : '0deg' }],
+                                      }}
+                                    >
+                                      <ChevronDown />
+                                    </View>
+                                    <Text
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: '500',
+                                        color: '#211F26',
+                                        fontFamily: 'Inter',
+                                      }}
+                                    >
+                                      Ride {numStops} stop{numStops !== 1 ? 's' : ''} ({combinedStep.duration} mins)
+                                    </Text>
+                                  </Pressable>
+
+                                  {/* Expanded Stops List */}
+                                  {isExpanded && (
+                                    <View
+                                      style={{
+                                        flexDirection: 'column',
+                                        alignItems: 'flex-start',
+                                        gap: 10,
+                                        paddingLeft: 24,
+                                      }}
+                                    >
+                                      {/* Placeholder stops - in real implementation, get from step.transitDetails */}
+                                      <Text
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: '400',
+                                          color: '#211F26',
+                                          fontFamily: 'Inter',
+                                        }}
+                                      >
+                                        Stop 1
+                                      </Text>
+                                      <Text
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: '400',
+                                          color: '#211F26',
+                                          fontFamily: 'Inter',
+                                        }}
+                                      >
+                                        Stop 2
+                                      </Text>
+                                      <Text
+                                        style={{
+                                          fontSize: 12,
+                                          fontWeight: '400',
+                                          color: '#211F26',
+                                          fontFamily: 'Inter',
+                                        }}
+                                      >
+                                        Stop 3
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+
+                                {/* End Bus Stop */}
+                                <View
+                                  style={{
+                                    alignSelf: 'stretch',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 16,
+                                      fontWeight: '500',
+                                      color: '#211F26',
+                                    }}
+                                  >
+                                    {alightingStop}
                                   </Text>
                                 </View>
                               </View>
                             </View>
                           </View>
 
-                          {stepIndex < routes[0].legs[0].steps.length - 1 && (
+                          {stepIndex < combinedSteps.length - 1 && (
                             <View
                               style={{
                                 flexDirection: 'row',
@@ -960,9 +1199,8 @@ export default function NavigationPage() {
                           )}
                         </React.Fragment>
                       );
-                    }
-                    return null;
-                  })}
+                    });
+                  })()}
 
                   {/* Final Destination */}
                   <View
@@ -1046,42 +1284,91 @@ export default function NavigationPage() {
               />
             </View>
 
-            {/* Save as Favorite Button */}
-            <Pressable
-              onPress={handleSaveFavorite}
-              disabled={favorited}
+            {/* Action Buttons Row */}
+            <View
               style={{
-                height: 36,
-                paddingVertical: 8,
-                paddingLeft: 16,
-                paddingRight: 13,
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: 4,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: favorited ? '#274F9C' : '#E5E5E5',
-                backgroundColor: favorited ? '#F0F4FF' : '#FFFFFF',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 2,
-                elevation: 1,
                 flexDirection: 'row',
-                opacity: favorited ? 0.7 : 1,
+                gap: 12,
+                alignSelf: 'stretch',
               }}
             >
-              <Text
+              {/* Start Navigation Button */}
+              <Pressable
+                onPress={() => {
+                  // Navigate to the new turn-by-turn navigation page
+                  router.push({
+                    pathname: '/turn-by-turn-navigation',
+                    params: {
+                      destination: currentDestination,
+                      destinationLat: destinationCoords?.lat,
+                      destinationLng: destinationCoords?.lng,
+                      userLat,
+                      userLng,
+                    },
+                  });
+                }}
                 style={{
-                  fontSize: 14,
-                  fontWeight: '500',
-                  color: favorited ? '#274F9C' : '#211F26',
+                  flex: 1,
+                  height: 36,
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 4,
+                  borderRadius: 8,
+                  backgroundColor: '#274F9C',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                  elevation: 1,
+                  flexDirection: 'row',
                 }}
               >
-                {favorited ? 'Saved as favorite' : 'Save as favorite'}
-              </Text>
-              <BookmarkIcon />
-            </Pressable>
+                <NavigationArrow />
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  Start Navigation
+                </Text>
+              </Pressable>
+
+              {/* Save as Favorite Button */}
+              <Pressable
+                onPress={handleSaveFavorite}
+                disabled={favorited}
+                style={{
+                  flex: 1,
+                  height: 36,
+                  paddingVertical: 8,
+                  paddingLeft: 16,
+                  paddingRight: 13,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: 4,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: favorited ? '#274F9C' : '#E5E5E5',
+                  backgroundColor: favorited ? '#F0F4FF' : '#FFFFFF',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                  elevation: 1,
+                  flexDirection: 'row',
+                  opacity: favorited ? 0.7 : 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: '500',
+                    color: favorited ? '#274F9C' : '#211F26',
+                  }}
+                >
+                  {favorited ? 'Saved' : 'Save'}
+                </Text>
+                <BookmarkIcon />
+              </Pressable>
+            </View>
           </ScrollView>
         </View>
       </View>

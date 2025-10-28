@@ -177,3 +177,5 @@ export const DraggableLocation: React.FC<DraggableLocationProps> = ({
     </Animated.View>
   );
 };
+
+export default DraggableLocation;
