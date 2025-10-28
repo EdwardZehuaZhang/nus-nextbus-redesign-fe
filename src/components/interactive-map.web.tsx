@@ -9,6 +9,7 @@ import {
   useServiceDescriptions,
 } from '@/api/bus';
 import type { LatLng } from '@/api/google-maps';
+import type { RouteStep } from '@/api/google-routes';
 import { createBusMarkerSVG, svgToDataURL } from '@/components/bus-marker-icon';
 import {
   getLandmarkMarkerSVG,
@@ -18,6 +19,7 @@ import { MapTypeSelector } from '@/components/map-type-selector';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 import { Env } from '@/lib/env';
 import { useLocation } from '@/lib/hooks/use-location';
+import { getTransitLineColor, PUBLIC_BUS_COLOR } from '@/lib/transit-colors';
 
 // Extend HTMLElement for Google Places UI Kit custom elements
 declare global {
@@ -45,6 +47,7 @@ interface InteractiveMapProps {
   destination?: LatLng;
   waypoints?: LatLng[];
   routePolyline?: string;
+  routeSteps?: RouteStep[]; // Individual route steps for multi-colored rendering
   onMarkerPress?: (
     type: 'origin' | 'destination' | 'waypoint',
     index?: number
@@ -886,25 +889,80 @@ const useMapMarkers = ({
 
 const useMapPolyline = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
-  routePolyline?: string
+  routePolyline?: string,
+  routeSteps?: RouteStep[]
 ) => {
-  const polylineRef = useRef<google.maps.Polyline | null>(null);
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
 
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
       return;
 
-    if (polylineRef.current) {
-      polylineRef.current.setMap(null);
-      polylineRef.current = null;
-    }
+    // Clear existing polylines
+    polylinesRef.current.forEach((poly) => poly.setMap(null));
+    polylinesRef.current = [];
 
-    if (routePolyline) {
+    // If we have individual steps, render them with different colors
+    if (routeSteps && routeSteps.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+
+      routeSteps.forEach((step) => {
+        if (!step.polyline?.encodedPolyline) return;
+
+        const decodedPath = polyline
+          .decode(step.polyline.encodedPolyline)
+          .map(([lat, lng]) => ({ lat, lng }));
+
+        // Determine color based on travel mode
+        let strokeColor = '#9CA3AF'; // Default gray for walking
+        
+        if (step.travelMode === 'TRANSIT' && step.transitDetails) {
+          const lineName = step.transitDetails.transitLine.nameShort || step.transitDetails.transitLine.name;
+          
+          // Try to get color from API first
+          const apiColor = step.transitDetails.transitLine.color;
+          if (apiColor) {
+            strokeColor = apiColor.startsWith('#') ? apiColor : `#${apiColor}`;
+          } else {
+            // Fallback to helper function
+            strokeColor = getTransitLineColor(lineName);
+          }
+        } else if (step.travelMode === 'WALK') {
+          strokeColor = '#9CA3AF'; // Gray for walking
+        }
+
+        const stepPolyline = new google.maps.Polyline({
+          path: decodedPath,
+          geodesic: true,
+          strokeColor,
+          strokeOpacity: 1.0,
+          strokeWeight: 6,
+          map: mapRef.current,
+        });
+
+        polylinesRef.current.push(stepPolyline);
+        
+        // Extend bounds for this step
+        decodedPath.forEach((point) => bounds.extend(point));
+      });
+
+      // Fit map to show all steps
+      if (!bounds.isEmpty()) {
+        mapRef.current.fitBounds(bounds, {
+          top: 100,
+          right: 50,
+          bottom: 400,
+          left: 50,
+        });
+      }
+    } 
+    // Fallback to single polyline if no steps provided
+    else if (routePolyline) {
       const decodedPath = polyline
         .decode(routePolyline)
         .map(([lat, lng]) => ({ lat, lng }));
 
-      polylineRef.current = new google.maps.Polyline({
+      const singlePolyline = new google.maps.Polyline({
         path: decodedPath,
         geodesic: true,
         strokeColor: '#274F9C',
@@ -913,17 +971,23 @@ const useMapPolyline = (
         map: mapRef.current,
       });
 
+      polylinesRef.current.push(singlePolyline);
+
       // Fit map bounds to show entire route
       const bounds = new google.maps.LatLngBounds();
       decodedPath.forEach((point) => bounds.extend(point));
       mapRef.current.fitBounds(bounds, {
         top: 100,
         right: 50,
-        bottom: 400, // More padding at bottom for the card
+        bottom: 400,
         left: 50,
       });
     }
-  }, [routePolyline, mapRef]);
+
+    return () => {
+      polylinesRef.current.forEach((poly) => poly.setMap(null));
+    };
+  }, [routePolyline, routeSteps, mapRef]);
 };
 
 // Hook to draw dotted connector lines from user location to route start and route end to destination
@@ -1702,6 +1766,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   destination,
   waypoints = [],
   routePolyline,
+  routeSteps,
   onMarkerPress,
   initialRegion = DEFAULT_REGION,
   style,
@@ -1762,7 +1827,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [activeRoute, serviceDescriptions]);
 
   useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
-  useMapPolyline(mapRef, routePolyline);
+  useMapPolyline(mapRef, routePolyline, routeSteps);
   useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
   useBusMarkers(mapRef, activeBuses, routeColor);

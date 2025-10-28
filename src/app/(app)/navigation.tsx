@@ -477,6 +477,7 @@ export default function NavigationPage() {
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           routePolyline={routes[0]?.polyline?.encodedPolyline}
+          routeSteps={routes[0]?.legs?.[0]?.steps}
           origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
           destination={destinationCoords || undefined}
           initialRegion={
@@ -951,8 +952,14 @@ export default function NavigationPage() {
                         }));
                       };
 
-                      // Get the appropriate color for this transit line
-                      const lineColor = getTransitLineColor(lineName);
+                      // Get the color from Google Maps API (already includes #)
+                      // If not provided, fall back to our helper function
+                      const apiColor = step.transitDetails?.transitLine?.color;
+                      const lineColor = apiColor && apiColor.startsWith('#') 
+                        ? apiColor 
+                        : apiColor 
+                          ? `#${apiColor}` 
+                          : getTransitLineColor(lineName);
 
                       return (
                         <React.Fragment key={`step-${stepIndex}`}>
@@ -1012,13 +1019,14 @@ export default function NavigationPage() {
                                     {/* Bus Number Badge */}
                                     <View
                                       style={{
-                                        width: 38,
+                                        minWidth: 38,
                                         height: 37,
                                         backgroundColor: lineColor,
                                         borderTopLeftRadius: 5,
                                         borderBottomLeftRadius: 5,
                                         justifyContent: 'center',
                                         alignItems: 'center',
+                                        paddingHorizontal: 8,
                                         shadowColor: '#000',
                                         shadowOffset: { width: 0, height: 1 },
                                         shadowOpacity: 0.1,
@@ -1027,6 +1035,7 @@ export default function NavigationPage() {
                                       }}
                                     >
                                       <Text
+                                        numberOfLines={1}
                                         style={{
                                           fontSize: 14,
                                           fontWeight: '600',
@@ -1115,7 +1124,7 @@ export default function NavigationPage() {
                                   </Pressable>
 
                                   {/* Expanded Stops List */}
-                                  {isExpanded && (
+                                  {isExpanded && numStops > 0 && (
                                     <View
                                       style={{
                                         flexDirection: 'column',
@@ -1124,36 +1133,17 @@ export default function NavigationPage() {
                                         paddingLeft: 24,
                                       }}
                                     >
-                                      {/* Placeholder stops - in real implementation, get from step.transitDetails */}
+                                      {/* Show intermediate stops message */}
                                       <Text
                                         style={{
                                           fontSize: 12,
                                           fontWeight: '400',
-                                          color: '#211F26',
+                                          color: '#737373',
                                           fontFamily: 'Inter',
+                                          fontStyle: 'italic',
                                         }}
                                       >
-                                        Stop 1
-                                      </Text>
-                                      <Text
-                                        style={{
-                                          fontSize: 12,
-                                          fontWeight: '400',
-                                          color: '#211F26',
-                                          fontFamily: 'Inter',
-                                        }}
-                                      >
-                                        Stop 2
-                                      </Text>
-                                      <Text
-                                        style={{
-                                          fontSize: 12,
-                                          fontWeight: '400',
-                                          color: '#211F26',
-                                          fontFamily: 'Inter',
-                                        }}
-                                      >
-                                        Stop 3
+                                        {numStops} {numStops === 1 ? 'stop' : 'stops'} between {boardingStop} and {alightingStop}
                                       </Text>
                                     </View>
                                   )}
