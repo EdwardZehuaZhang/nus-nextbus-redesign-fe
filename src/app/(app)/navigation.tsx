@@ -133,6 +133,7 @@ const DynamicBusTime = ({
 }) => {
   const [fontSize, setFontSize] = React.useState(14);
   const containerRef = React.useRef<any>(null);
+  const lastCalculatedSizeRef = React.useRef<number>(14);
 
   React.useEffect(() => {
     if (containerRef.current && typeof window !== 'undefined') {
@@ -141,8 +142,10 @@ const DynamicBusTime = ({
           containerRef.current?.measure?.(
             (_x: number, _y: number, width: number) => {
               if (width > 0) {
-                const newSize = calculateFontSize(time.length, width, fontSize);
-                if (newSize !== fontSize) {
+                const newSize = calculateFontSize(time.length, width, 14);
+                // Only update if the change is significant (> 0.5px) to prevent oscillation
+                if (Math.abs(newSize - lastCalculatedSizeRef.current) > 0.5) {
+                  lastCalculatedSizeRef.current = newSize;
                   setFontSize(newSize);
                 }
               }
@@ -154,9 +157,11 @@ const DynamicBusTime = ({
             const newSize = calculateFontSize(
               time.length,
               element.offsetWidth,
-              fontSize
+              14
             );
-            if (newSize !== fontSize) {
+            // Only update if the change is significant (> 0.5px) to prevent oscillation
+            if (Math.abs(newSize - lastCalculatedSizeRef.current) > 0.5) {
+              lastCalculatedSizeRef.current = newSize;
               setFontSize(newSize);
             }
           }
@@ -166,7 +171,7 @@ const DynamicBusTime = ({
       const timer = setTimeout(measureContainer, 50);
       return () => clearTimeout(timer);
     }
-  }, [time, fontSize]);
+  }, [time]); // Removed fontSize from dependencies to prevent infinite loop
 
   return (
     <View
