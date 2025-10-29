@@ -13,6 +13,7 @@ const mapOptions = [
 interface MapTypeSelectorProps {
   onMapTypeChange?: (mapType: google.maps.MapTypeId | 'dark' | 'light') => void;
   onFilterChange?: (filters: Record<string, boolean>) => void;
+  filters?: Record<string, boolean>; // Current filter state to sync with MapFilterSelector
   initialMapType?: google.maps.MapTypeId | 'dark' | 'light';
 }
 
@@ -95,6 +96,7 @@ const Dropdown: React.FC<DropdownProps> = ({ selectedMap, onMapChange }) => (
 export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
   onMapTypeChange,
   onFilterChange,
+  filters,
   initialMapType = 'light',
 }) => {
   const [selectedMap, setSelectedMap] = useState(initialMapType);
@@ -138,7 +140,7 @@ export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
         </button>
       </div>
 
-      {isFilterOpen && <MapFilterSelector onFilterChange={onFilterChange} />}
+      {isFilterOpen && <MapFilterSelector onFilterChange={onFilterChange} filters={filters} />}
       {isMapTypeOpen && (
         <Dropdown selectedMap={selectedMap} onMapChange={handleMapChange} />
       )}

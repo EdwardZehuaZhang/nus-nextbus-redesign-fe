@@ -62,6 +62,7 @@ interface InteractiveMapProps {
   style?: any;
   showD1Route?: boolean; // Control D1 bus route visibility
   activeRoute?: RouteCode | null; // Active route code to show live buses
+  onActiveRouteChange?: (route: RouteCode | null) => void; // Callback when filter route changes
   showLandmarks?: boolean; // Control landmark visibility (default true)
   showUserLocation?: boolean; // Control user location marker visibility (default true)
   showMapControls?: boolean; // Control map type/layer controls visibility (default true)
@@ -719,6 +720,482 @@ const NUS_CAMPUS_BOUNDARY = [
   { lat: 1.2943662309653878, lng: 103.78561449648741 }, // Close the loop back to start
 ];
 
+// Orange area boundary coordinates
+const ORANGE_AREA_BOUNDARY = [
+  { lat: 1.3010537146934977, lng: 103.77647036235194 },
+  { lat: 1.3006808807897483, lng: 103.77724360151856 },
+  { lat: 1.3002721790822405, lng: 103.77784173412888 },
+  { lat: 1.299756158295517, lng: 103.77861048577994 },
+  { lat: 1.299346134027396, lng: 103.77931291426627 },
+  { lat: 1.298903643242334, lng: 103.7800039074017 },
+  { lat: 1.2987721506544276, lng: 103.78023145366478 },
+  { lat: 1.298171490115871, lng: 103.78026364017296 },
+  { lat: 1.2977746250389015, lng: 103.78012416530419 },
+  { lat: 1.2974313903275074, lng: 103.78009197879601 },
+  { lat: 1.2972671409671992, lng: 103.77955049036099 },
+  { lat: 1.2972832300963788, lng: 103.77883702276303 },
+  { lat: 1.2974602105106123, lng: 103.77834886072232 },
+  { lat: 1.2978517125950928, lng: 103.7775332526938 },
+  { lat: 1.2982146380617559, lng: 103.77703598509963 },
+  { lat: 1.2986293792042596, lng: 103.77671389733325 },
+  { lat: 1.2988517744058754, lng: 103.77650126021773 },
+  { lat: 1.2989054048024804, lng: 103.77624913257033 },
+  { lat: 1.2989429460794093, lng: 103.7759031276074 },
+  { lat: 1.2989244084127014, lng: 103.7755543536351 },
+  { lat: 1.2989868019135127, lng: 103.77526743567576 },
+  { lat: 1.2991369670130861, lng: 103.77499653256525 },
+  { lat: 1.29922372123066, lng: 103.77490801966776 },
+  { lat: 1.2994516503747702, lng: 103.77489460862269 },
+  { lat: 1.2997351720763195, lng: 103.7750084928118 },
+  { lat: 1.3000274576217574, lng: 103.77508359466422 },
+  { lat: 1.3002124823990608, lng: 103.7751694253527 },
+  { lat: 1.3003993579258157, lng: 103.7754662722588 },
+  { lat: 1.300672872768943, lng: 103.77553332748417 },
+  { lat: 1.3010244780494662, lng: 103.77565670909885 },
+  { lat: 1.30112101267946, lng: 103.77570230665211 },
+  { lat: 1.3011183311620012, lng: 103.77584714593891 },
+];
+
+// Blue area boundary coordinates
+const BLUE_AREA_BOUNDARY = [
+  { lat: 1.3029588914483468, lng: 103.7740572529275 },
+  { lat: 1.303072855854243, lng: 103.77411760263034 },
+  { lat: 1.3031626866175896, lng: 103.77421282105037 },
+  { lat: 1.3032806732869775, lng: 103.77431340388843 },
+  { lat: 1.3033410073771567, lng: 103.77442069224902 },
+  { lat: 1.3033751151414301, lng: 103.77448163093017 },
+  { lat: 1.303407293321815, lng: 103.77473509968208 },
+  { lat: 1.3034488568042093, lng: 103.77490944326804 },
+  { lat: 1.3034837164986053, lng: 103.77505294145034 },
+  { lat: 1.303515385823726, lng: 103.77517220682535 },
+  { lat: 1.3035676753637424, lng: 103.77528351849946 },
+  { lat: 1.3035985127842655, lng: 103.7754337222043 },
+  { lat: 1.3036226464174645, lng: 103.77551687068376 },
+  { lat: 1.3036186241452838, lng: 103.77568182653818 },
+  { lat: 1.3036963866905322, lng: 103.77575155844127 },
+  { lat: 1.3037004089625983, lng: 103.77583738912975 },
+  { lat: 1.303681638359597, lng: 103.7759366308633 },
+  { lat: 1.3036789568448608, lng: 103.77604794253742 },
+  { lat: 1.303803647276561, lng: 103.77603050817882 },
+  { lat: 1.303792921218163, lng: 103.77590712656414 },
+  { lat: 1.3038197363640753, lng: 103.77574887623226 },
+  { lat: 1.3038733666550224, lng: 103.77566840996181 },
+  { lat: 1.3039189524014427, lng: 103.77559330810939 },
+  { lat: 1.3039028633145644, lng: 103.77556380381023 },
+  { lat: 1.304010123891802, lng: 103.77542164673244 },
+  { lat: 1.304082524778855, lng: 103.77529826511775 },
+  { lat: 1.304173696263286, lng: 103.7751078282777 },
+  { lat: 1.3042353710891166, lng: 103.77508100618755 },
+  { lat: 1.3043614022502468, lng: 103.77491470922863 },
+  { lat: 1.3044874334050542, lng: 103.77475109447872 },
+  { lat: 1.3045973754711386, lng: 103.77461966623699 },
+  { lat: 1.3047126805596474, lng: 103.77453651775753 },
+  { lat: 1.3048622199005193, lng: 103.77452578892147 },
+  { lat: 1.3051062376140568, lng: 103.774442640442 },
+  { lat: 1.3053100326094251, lng: 103.77437290300762 },
+  { lat: 1.3055004200243696, lng: 103.77434876312648 },
+  { lat: 1.3056934889374858, lng: 103.77427634348308 },
+  { lat: 1.3058439883122877, lng: 103.77425471843006 },
+  { lat: 1.306004879052258, lng: 103.77426008284809 },
+  { lat: 1.3061899033904794, lng: 103.77423862517597 },
+  { lat: 1.3063293420131956, lng: 103.77412329018833 },
+  { lat: 1.3064500100458236, lng: 103.77403209508182 },
+  { lat: 1.3065277738860157, lng: 103.77396503985645 },
+  { lat: 1.3066323528397041, lng: 103.77391139567615 },
+  { lat: 1.3067851989949582, lng: 103.77382824719669 },
+  { lat: 1.3069809493205493, lng: 103.77374778092624 },
+  { lat: 1.3071445214987447, lng: 103.77366999686481 },
+  { lat: 1.3072785970466845, lng: 103.77357343734027 },
+  { lat: 1.307356360861216, lng: 103.77354929745914 },
+  { lat: 1.3074368061840589, lng: 103.7735412508321 },
+  { lat: 1.3076325564588631, lng: 103.7735948950124 },
+  { lat: 1.3078309882286843, lng: 103.77369681895496 },
+  { lat: 1.3080750056538726, lng: 103.77372364104511 },
+  { lat: 1.3082412592706234, lng: 103.77374778092624 },
+  { lat: 1.3083726532502664, lng: 103.77369950116397 },
+  { lat: 1.3084475248934138, lng: 103.77366932081199 },
+  { lat: 1.308509199614337, lng: 103.7735271637342 },
+  { lat: 1.3085816003717377, lng: 103.77342523979164 },
+  { lat: 1.3086700901835115, lng: 103.77311410354591 },
+  { lat: 1.3087558984828644, lng: 103.77290757345176 },
+  { lat: 1.308817573196205, lng: 103.77267153905845 },
+  { lat: 1.3088631588529083, lng: 103.7725186531446 },
+  { lat: 1.3089006999813562, lng: 103.77235503839469 },
+  { lat: 1.3089006999813562, lng: 103.77226384328819 },
+  { lat: 1.3087666245200673, lng: 103.772049266567 },
+  { lat: 1.3086110969760143, lng: 103.77194734262443 },
+  { lat: 1.3084391290743826, lng: 103.7719016446764 },
+  { lat: 1.3081039403460804, lng: 103.77186141154118 },
+  { lat: 1.3078411523517828, lng: 103.77183727166005 },
+  { lat: 1.307605179435499, lng: 103.77177021643467 },
+  { lat: 1.307248538508546, lng: 103.77172998329945 },
+  { lat: 1.3068999420648242, lng: 103.77167365691014 },
+  { lat: 1.3065413563959933, lng: 103.77159797151347 },
+  { lat: 1.3061364481005335, lng: 103.7715496917512 },
+  { lat: 1.305870978387957, lng: 103.77155773837825 },
+  { lat: 1.3055840565458747, lng: 103.77159797151347 },
+  { lat: 1.305396350650145, lng: 103.77160601814052 },
+  { lat: 1.3051389253989427, lng: 103.77164356906673 },
+  { lat: 1.3048359143924146, lng: 103.77167843778392 },
+  { lat: 1.304551673946027, lng: 103.77177499730846 },
+  { lat: 1.3043612864592657, lng: 103.7718903322961 },
+  { lat: 1.304072424833536, lng: 103.77225779493114 },
+  { lat: 1.303906170940993, lng: 103.77250724036952 },
+  { lat: 1.3037640506692956, lng: 103.77281569440623 },
+  { lat: 1.3036138858452089, lng: 103.77304636438151 },
+  { lat: 1.3034288613175156, lng: 103.77339505155345 },
+  { lat: 1.3032840595037292, lng: 103.77371691663524 },
+  { lat: 1.3032170216241774, lng: 103.7739261289384 },
+  { lat: 1.3032009325328082, lng: 103.77395026881953 },
+  { lat: 1.3030668567674584, lng: 103.77395295102855 },
+];
+
+// Dark blue area boundary coordinates
+const DARK_BLUE_AREA_BOUNDARY = [
+  { lat: 1.2972535820554234, lng: 103.77843185356016 },
+  { lat: 1.2971355951043275, lng: 103.77839966705199 },
+  { lat: 1.2969881114077255, lng: 103.77836211612578 },
+  { lat: 1.2967414113869467, lng: 103.7783674805438 },
+  { lat: 1.2964947113421101, lng: 103.77842917135115 },
+  { lat: 1.2964346400737337, lng: 103.77829374370977 },
+  { lat: 1.296237113568602, lng: 103.77790215967968 },
+  { lat: 1.2960938876647257, lng: 103.77772158358889 },
+  { lat: 1.2957184744474743, lng: 103.77760356639223 },
+  { lat: 1.2952304371818735, lng: 103.77755528662996 },
+  { lat: 1.2951178131841585, lng: 103.77778059218721 },
+  { lat: 1.2949331180051922, lng: 103.77840521683238 },
+  { lat: 1.294939843960143, lng: 103.77901148467211 },
+  { lat: 1.2949344809121468, lng: 103.77935480742602 },
+  { lat: 1.2948301821634047, lng: 103.77979956371973 },
+  { lat: 1.2946853798568358, lng: 103.7800624202032 },
+  { lat: 1.2942006358588714, lng: 103.78048987883444 },
+  { lat: 1.2939524295113145, lng: 103.78076855493232 },
+  { lat: 1.2937437856848786, lng: 103.78119844756478 },
+  { lat: 1.2940187035252286, lng: 103.78124662342839 },
+  { lat: 1.2942550623407818, lng: 103.78139507310736 },
+  { lat: 1.294462902440757, lng: 103.7814237480227 },
+  { lat: 1.2945393493740007, lng: 103.78146437082042 },
+  { lat: 1.2946898542588081, lng: 103.78157668090547 },
+  { lat: 1.2947519673849968, lng: 103.7815957975157 },
+  { lat: 1.2948379282344262, lng: 103.78177367099286 },
+  { lat: 1.2949076478603476, lng: 103.78195606120588 },
+  { lat: 1.2949354374708373, lng: 103.78213851298987 },
+  { lat: 1.2949885063920636, lng: 103.78224831155899 },
+  { lat: 1.2950917450620958, lng: 103.78228183917167 },
+  { lat: 1.2951762130617241, lng: 103.78229390911224 },
+  { lat: 1.295332410770289, lng: 103.78227781585815 },
+  { lat: 1.2954718499930107, lng: 103.78238778642776 },
+  { lat: 1.2955155646032217, lng: 103.7826432812864 },
+  { lat: 1.295478023275442, lng: 103.78287126905266 },
+  { lat: 1.2954270743296823, lng: 103.78315826541726 },
+  { lat: 1.2953761253829046, lng: 103.78343989736382 },
+  { lat: 1.2953788069064447, lng: 103.78366520292107 },
+  { lat: 1.2953966410594182, lng: 103.7839342325293 },
+  { lat: 1.2954154117239822, lng: 103.78415149145951 },
+  { lat: 1.2955173096149293, lng: 103.78430974179139 },
+  { lat: 1.2957398760466807, lng: 103.78421854668488 },
+  { lat: 1.2959651239818202, lng: 103.78401201659074 },
+  { lat: 1.2961930534195842, lng: 103.78386717730393 },
+  { lat: 1.2963968491348141, lng: 103.78365528279176 },
+  { lat: 1.2965872372223695, lng: 103.78355335884919 },
+  { lat: 1.2968258926921838, lng: 103.78335219317307 },
+  { lat: 1.2970189622692727, lng: 103.78308933668961 },
+  { lat: 1.2974367299662395, lng: 103.78244958766462 },
+  { lat: 1.2975279016908023, lng: 103.78247640975476 },
+  { lat: 1.2977960538028184, lng: 103.78174684890271 },
+  { lat: 1.2980856580518843, lng: 103.7813123310423 },
+  { lat: 1.2982680014509225, lng: 103.78104947455884 },
+  { lat: 1.298514701322826, lng: 103.7806095922804 },
+  { lat: 1.2986541403702099, lng: 103.78033600696088 },
+  { lat: 1.298595146928026, lng: 103.7802927221605 },
+  { lat: 1.2983484470639721, lng: 103.78036245959488 },
+  { lat: 1.298133925423495, lng: 103.78039464610306 },
+  { lat: 1.2978604103054916, lng: 103.78028199332444 },
+  { lat: 1.2978014168447713, lng: 103.78020152705399 },
+  { lat: 1.2974045517097377, lng: 103.7801317896196 },
+  { lat: 1.297302653894742, lng: 103.78012106078354 },
+  { lat: 1.297168577816133, lng: 103.7795363392183 },
+  { lat: 1.2971632147728442, lng: 103.779482695038 },
+  { lat: 1.2971310365128566, lng: 103.77908036368576 },
+  { lat: 1.2972490234641434, lng: 103.77870485442368 },
+  { lat: 1.297289246287207, lng: 103.77855196850983 },
+];
+
+// Yellow area boundary coordinates
+const YELLOW_AREA_BOUNDARY = [
+  { lat: 1.295481756937539, lng: 103.78438025695094 },
+  { lat: 1.295336954668208, lng: 103.78451973181971 },
+  { lat: 1.2951653371530827, lng: 103.78467529994258 },
+  { lat: 1.2950124902938955, lng: 103.78478527051219 },
+  { lat: 1.2946608581989938, lng: 103.78497240215293 },
+  { lat: 1.2944034318532862, lng: 103.78506359725944 },
+  { lat: 1.2941781837793729, lng: 103.7851118770217 },
+  { lat: 1.2938905666341707, lng: 103.78513065248481 },
+  { lat: 1.293539286820088, lng: 103.78516820341102 },
+  { lat: 1.2932014145866073, lng: 103.78500995307914 },
+  { lat: 1.2929359435144707, lng: 103.78477928310386 },
+  { lat: 1.2926440719887566, lng: 103.7844789625741 },
+  { lat: 1.2923678747514697, lng: 103.78416782632837 },
+  { lat: 1.2920842477655454, lng: 103.78396459346207 },
+  { lat: 1.2918804517037878, lng: 103.78377952104005 },
+  { lat: 1.2917517383931971, lng: 103.78354080443772 },
+  { lat: 1.2917892797761403, lng: 103.78340132956895 },
+  { lat: 1.2919153115576059, lng: 103.78328331237229 },
+  { lat: 1.2920976554006116, lng: 103.78315188413056 },
+  { lat: 1.2922799992305132, lng: 103.78304727797898 },
+  { lat: 1.2923711711405532, lng: 103.78289170985612 },
+  { lat: 1.2924703876271801, lng: 103.78272273068818 },
+  { lat: 1.2925106105260555, lng: 103.78253497605714 },
+  { lat: 1.2925186551057595, lng: 103.78244914536866 },
+  { lat: 1.2925588780038715, lng: 103.78222920422944 },
+  { lat: 1.2926661390623908, lng: 103.78194489007386 },
+  { lat: 1.2927170880636067, lng: 103.7817356777707 },
+  { lat: 1.2927734001163937, lng: 103.7815211010495 },
+  { lat: 1.2928699350611097, lng: 103.78138430838975 },
+  { lat: 1.2930201005233681, lng: 103.78132529979142 },
+  { lat: 1.2932031508959994, lng: 103.78123876231395 },
+  { lat: 1.2933962207490712, lng: 103.78116902487956 },
+  { lat: 1.293632194994, lng: 103.78124949115 },
+  { lat: 1.2938440354906315, lng: 103.78129240649425 },
+  { lat: 1.2940905312908313, lng: 103.78131926468232 },
+  { lat: 1.2942460597303376, lng: 103.78143459966996 },
+  { lat: 1.294473989322715, lng: 103.78151506594041 },
+  { lat: 1.2946590145061878, lng: 103.78160626104692 },
+  { lat: 1.2947984537659691, lng: 103.78181010893205 },
+  { lat: 1.2948681733929719, lng: 103.78201395681718 },
+  { lat: 1.294894988633614, lng: 103.78216952494004 },
+  { lat: 1.2949459375900731, lng: 103.78230095318177 },
+  { lat: 1.2951282812152871, lng: 103.78231168201783 },
+  { lat: 1.2952864911147606, lng: 103.78232777527192 },
+  { lat: 1.2953964335814676, lng: 103.78238141945222 },
+  { lat: 1.2954527455747529, lng: 103.78249943664888 },
+  { lat: 1.2954822423326375, lng: 103.78268834103656 },
+  { lat: 1.2954312933869794, lng: 103.78281440486026 },
+  { lat: 1.295353529204776, lng: 103.78309871901584 },
+  { lat: 1.295348166157645, lng: 103.7832891558559 },
+  { lat: 1.2953133204335174, lng: 103.78356012939703 },
+  { lat: 1.295337454145874, lng: 103.7838256680895 },
+  { lat: 1.2953562248108705, lng: 103.78406170248282 },
+  { lat: 1.2953857215698876, lng: 103.78423068165075 },
+  { lat: 1.2954903009854561, lng: 103.78436210989248 },
+];
+
+// Dark orange area boundary coordinates
+const DARK_ORANGE_AREA_BOUNDARY = [
+  { lat: 1.3015345132149319, lng: 103.77086499874379 },
+  { lat: 1.3016256847915608, lng: 103.77084622328069 },
+  { lat: 1.3018643397854117, lng: 103.77093205396916 },
+  { lat: 1.3020761795924736, lng: 103.77108762209203 },
+  { lat: 1.302281662780734, lng: 103.77112093674215 },
+  { lat: 1.3024693689087208, lng: 103.77118799196752 },
+  { lat: 1.3025390883241277, lng: 103.77141329752477 },
+  { lat: 1.3025578589356401, lng: 103.77169539245698 },
+  { lat: 1.3025739480311058, lng: 103.77191265138718 },
+  { lat: 1.3026329413802777, lng: 103.77215405019852 },
+  { lat: 1.3027026607911554, lng: 103.77236326250168 },
+  { lat: 1.3027643356530152, lng: 103.77260197910401 },
+  { lat: 1.3027831062628483, lng: 103.77278705152604 },
+  { lat: 1.3027536095902026, lng: 103.77294798406693 },
+  { lat: 1.3026608108106672, lng: 103.77320662237172 },
+  { lat: 1.3025803653350687, lng: 103.77350434757237 },
+  { lat: 1.3024784677289594, lng: 103.77370551324849 },
+  { lat: 1.3024167928600896, lng: 103.77389326787953 },
+  { lat: 1.3022022715653643, lng: 103.77402737833027 },
+  { lat: 1.30194484598757, lng: 103.77418562866215 },
+  { lat: 1.301733006169465, lng: 103.77427950597767 },
+  { lat: 1.3015801597073893, lng: 103.7743572900391 },
+  { lat: 1.3013656383414578, lng: 103.7744109342194 },
+  { lat: 1.3011537984746904, lng: 103.7744109342194 },
+  { lat: 1.300966092248781, lng: 103.77436533666615 },
+  { lat: 1.300853468506528, lng: 103.77423390842442 },
+  { lat: 1.3008481054710506, lng: 103.7741400311089 },
+  { lat: 1.3007569338663056, lng: 103.77405420042042 },
+  { lat: 1.3006979404732548, lng: 103.77398714519505 },
+  { lat: 1.3008266533290518, lng: 103.77376988626484 },
+  { lat: 1.3009768183192143, lng: 103.7734560678101 },
+  { lat: 1.3010679899160078, lng: 103.7732227156258 },
+  { lat: 1.3011350278527332, lng: 103.77291962600712 },
+  { lat: 1.3011377093701664, lng: 103.77260044313435 },
+  { lat: 1.3010787159860084, lng: 103.77231344676976 },
+  { lat: 1.3011162572306356, lng: 103.77191916204457 },
+  { lat: 1.3011940212355806, lng: 103.77152487731938 },
+  { lat: 1.3013227340660858, lng: 103.7712405631638 },
+  { lat: 1.301459491441296, lng: 103.77096161342625 },
+];
+
+// CDE area boundary coordinates
+const CDE_AREA_BOUNDARY = [
+  { lat: 1.3013111956660077, lng: 103.77074246952215 },
+  { lat: 1.3012200240779925, lng: 103.77102946588674 },
+  { lat: 1.3011047188296163, lng: 103.7713996107308 },
+  { lat: 1.3009947766111325, lng: 103.77173488685766 },
+  { lat: 1.3008687452816237, lng: 103.77214258262792 },
+  { lat: 1.30090896804703, lng: 103.77258246490636 },
+  { lat: 1.3009545538470744, lng: 103.77290164777914 },
+  { lat: 1.3009143310823803, lng: 103.77331898479096 },
+  { lat: 1.3007722106419863, lng: 103.77367840079896 },
+  { lat: 1.3005469631351403, lng: 103.77398953704468 },
+  { lat: 1.3003648790876527, lng: 103.77421968851233 },
+  { lat: 1.3000484599141044, lng: 103.77439939651633 },
+  { lat: 1.2996645479502762, lng: 103.77440827656055 },
+  { lat: 1.2993561732469572, lng: 103.7744002299335 },
+  { lat: 1.2990052237313279, lng: 103.77417777139766 },
+  { lat: 1.2985842251040827, lng: 103.7738612707339 },
+  { lat: 1.2982785317893974, lng: 103.77355281669719 },
+  { lat: 1.2979862460416633, lng: 103.77306197244746 },
+  { lat: 1.297650370940819, lng: 103.77292985904845 },
+  { lat: 1.2973473590347029, lng: 103.772849392778 },
+  { lat: 1.2970282579615842, lng: 103.7725623964134 },
+  { lat: 1.2967332905472868, lng: 103.77225306486923 },
+  { lat: 1.2964839089793045, lng: 103.77196070408661 },
+  { lat: 1.2963766480822811, lng: 103.77155032610733 },
+  { lat: 1.2964034633069694, lng: 103.77139475798447 },
+  { lat: 1.2964410046210346, lng: 103.77108898615677 },
+  { lat: 1.2964356415761935, lng: 103.77084490513641 },
+  { lat: 1.2963820111272366, lng: 103.77047744250137 },
+  { lat: 1.2962962024065365, lng: 103.77016898846466 },
+  { lat: 1.2962506165224874, lng: 103.77000000929672 },
+  { lat: 1.296392737217122, lng: 103.76990076756317 },
+  { lat: 1.2965697176936308, lng: 103.76988199210007 },
+  { lat: 1.2967413351135941, lng: 103.76989540314514 },
+  { lat: 1.2970282579615842, lng: 103.76988638264952 },
+  { lat: 1.2973285883844512, lng: 103.76991320473967 },
+  { lat: 1.2975457916144968, lng: 103.76992661578474 },
+  { lat: 1.2978353958922004, lng: 103.76996684891996 },
+  { lat: 1.2980629569804742, lng: 103.76998294217405 },
+  { lat: 1.298341835117378, lng: 103.77001244647322 },
+  { lat: 1.2985724458612087, lng: 103.7700097642642 },
+  { lat: 1.2988405978624395, lng: 103.77003122193632 },
+  { lat: 1.2991060683156275, lng: 103.77005267960844 },
+  { lat: 1.2992615964469763, lng: 103.77005536181746 },
+  { lat: 1.2995387601413104, lng: 103.77006804292917 },
+  { lat: 1.2997398740679835, lng: 103.77009486501932 },
+  { lat: 1.2999436694973452, lng: 103.77010022943735 },
+  { lat: 1.3001555094656867, lng: 103.77015387361764 },
+  { lat: 1.3004156167442795, lng: 103.77023165767908 },
+  { lat: 1.300622093637056, lng: 103.77033358162164 },
+  { lat: 1.3008731991165645, lng: 103.77042477672815 },
+  { lat: 1.3011011281117608, lng: 103.77056425159692 },
+  { lat: 1.3013022419139344, lng: 103.77069567983865 },
+];
+
+// FASS area boundary coordinates
+const FASS_AREA_BOUNDARY = [
+  { lat: 1.2951665497768692, lng: 103.76989311507172 },
+  { lat: 1.2953435303390621, lng: 103.76991725495286 },
+  { lat: 1.2955607337393944, lng: 103.76993066599793 },
+  { lat: 1.2957886632135442, lng: 103.76994675925202 },
+  { lat: 1.2959549176405858, lng: 103.76994675925202 },
+  { lat: 1.2960447867605696, lng: 103.7700862341208 },
+  { lat: 1.2961305954898061, lng: 103.77030081084199 },
+  { lat: 1.2961788628987185, lng: 103.77060658266969 },
+  { lat: 1.2961922705121314, lng: 103.77079701950974 },
+  { lat: 1.2962056781254807, lng: 103.77105182936616 },
+  { lat: 1.2961520476716637, lng: 103.77130663922257 },
+  { lat: 1.2961627737625034, lng: 103.77153462698884 },
+  { lat: 1.2961895889894564, lng: 103.77177066138215 },
+  { lat: 1.2962455210446713, lng: 103.77198773582482 },
+  { lat: 1.2963554634697385, lng: 103.77220767696404 },
+  { lat: 1.2963688710822354, lng: 103.77238202055001 },
+  { lat: 1.2962347949541497, lng: 103.77255099971795 },
+  { lat: 1.2961221710010897, lng: 103.77270120342278 },
+  { lat: 1.296009547043017, lng: 103.77293992002511 },
+  { lat: 1.2959532350621106, lng: 103.7731893654635 },
+  { lat: 1.2958861969879472, lng: 103.77349159034345 },
+  { lat: 1.2957440762648782, lng: 103.77362033637617 },
+  { lat: 1.2956502229528208, lng: 103.77366861613844 },
+  { lat: 1.2955724587773345, lng: 103.7736257007942 },
+  { lat: 1.2953793890899568, lng: 103.77345135720823 },
+  { lat: 1.2951943639590775, lng: 103.77347549708936 },
+  { lat: 1.295065650816598, lng: 103.77339771302793 },
+  { lat: 1.295068332340469, lng: 103.77316704305265 },
+  { lat: 1.2949744790033741, lng: 103.77300074609373 },
+  { lat: 1.294741186407554, lng: 103.77284517797086 },
+  { lat: 1.2944354926288129, lng: 103.7727432540283 },
+  { lat: 1.2942102445577492, lng: 103.77256086381529 },
+  { lat: 1.294033263916437, lng: 103.77228996070478 },
+  { lat: 1.293880416989008, lng: 103.77216389688108 },
+  { lat: 1.2937061178499896, lng: 103.77210757049177 },
+  { lat: 1.2935371817499854, lng: 103.77205660852049 },
+  { lat: 1.2935988568354255, lng: 103.77165964158628 },
+  { lat: 1.2936363981910413, lng: 103.77154162438963 },
+  { lat: 1.2938509202124853, lng: 103.7711580685005 },
+  { lat: 1.2939978894932338, lng: 103.77092254883688 },
+  { lat: 1.2941641440377396, lng: 103.77080989605825 },
+  { lat: 1.2943947551620791, lng: 103.77069456107061 },
+  { lat: 1.294542239009681, lng: 103.77051485306662 },
+  { lat: 1.2947621240028768, lng: 103.77028954750936 },
+  { lat: 1.294885474112665, lng: 103.77014470822256 },
+  { lat: 1.2949739644051224, lng: 103.76995695359152 },
+];
+
+// COM/BIZ area boundary coordinates
+const COMBIZ_AREA_BOUNDARY = [
+  { lat: 1.295601791447121, lng: 103.77374150550402 },
+  { lat: 1.2959235742229849, lng: 103.77419211661852 },
+  { lat: 1.296036198184887, lng: 103.77459981238879 },
+  { lat: 1.296084465595593, lng: 103.77506115233935 },
+  { lat: 1.2959343003148043, lng: 103.77544739043749 },
+  { lat: 1.2958163133022345, lng: 103.77576389110125 },
+  { lat: 1.2953121869138788, lng: 103.77595701015032 },
+  { lat: 1.2951083911113872, lng: 103.77602138316668 },
+  { lat: 1.2949314105327827, lng: 103.77612330710924 },
+  { lat: 1.2947919712803166, lng: 103.77669729983843 },
+  { lat: 1.2944993417496968, lng: 103.77681229135806 },
+  { lat: 1.2941078391470149, lng: 103.77669963857943 },
+  { lat: 1.2941024760972375, lng: 103.77638313791567 },
+  { lat: 1.2937002473320516, lng: 103.77629194280917 },
+  { lat: 1.2935608080118908, lng: 103.77607736608797 },
+  { lat: 1.293587623266362, lng: 103.77568039915377 },
+  { lat: 1.2935983493680663, lng: 103.77539072058016 },
+  { lat: 1.293201483574645, lng: 103.77525124571139 },
+  { lat: 1.2928314329816253, lng: 103.77511177084261 },
+  { lat: 1.2923916626415053, lng: 103.77477917692477 },
+  { lat: 1.2921503252273887, lng: 103.77463970205599 },
+  { lat: 1.29212350995774, lng: 103.77426419279391 },
+  { lat: 1.2922468601957935, lng: 103.77374920866305 },
+  { lat: 1.2926919936137307, lng: 103.77333078405672 },
+  { lat: 1.2929762353940175, lng: 103.77297673246676 },
+  { lat: 1.2931532161090424, lng: 103.77259585878664 },
+  { lat: 1.2934749991956849, lng: 103.77218816301638 },
+  { lat: 1.2937914191910755, lng: 103.77222034952456 },
+  { lat: 1.2939683998492577, lng: 103.77242956182772 },
+  { lat: 1.294193647941809, lng: 103.77275142690951 },
+  { lat: 1.2945368830919923, lng: 103.77299819013888 },
+  { lat: 1.2947728572307922, lng: 103.77310011408144 },
+  { lat: 1.2948908442919482, lng: 103.7733254196387 },
+  { lat: 1.2949391117244855, lng: 103.77349708101565 },
+  { lat: 1.2953037989627765, lng: 103.77360973379427 },
+];
+
+const LAW_AREA_BOUNDARY = [
+  { lat: 1.3199541334261549, lng: 103.81773070558138 },
+  { lat: 1.3197878805889836, lng: 103.81788359149523 },
+  { lat: 1.3196001757594775, lng: 103.81808207496233 },
+  { lat: 1.3195358198146734, lng: 103.81821082099505 },
+  { lat: 1.3193481149661348, lng: 103.81831274493761 },
+  { lat: 1.3191443211145575, lng: 103.81843344434328 },
+  { lat: 1.3190156091996958, lng: 103.81855146153994 },
+  { lat: 1.318857400795223, lng: 103.81840394004412 },
+  { lat: 1.3186482439060692, lng: 103.81820545657702 },
+  { lat: 1.3183969621836291, lng: 103.8179760855578 },
+  { lat: 1.3182146202475187, lng: 103.81766763152109 },
+  { lat: 1.318024233799972, lng: 103.81743964375482 },
+  { lat: 1.3179062478251788, lng: 103.81720360936151 },
+  { lat: 1.3178767513306189, lng: 103.8170024436854 },
+  { lat: 1.3179813298097938, lng: 103.81675836266504 },
+  { lat: 1.3181636717629774, lng: 103.81657329024301 },
+  { lat: 1.3183674656948574, lng: 103.81646063746439 },
+  { lat: 1.3186034375951448, lng: 103.81630506934152 },
+  { lat: 1.3188501354669755, lng: 103.81623801411615 },
+  { lat: 1.3189813710406701, lng: 103.8163555576431 },
+  { lat: 1.3191905279018226, lng: 103.81661304970854 },
+  { lat: 1.3194050477411514, lng: 103.81690004607313 },
+  { lat: 1.3196490640358944, lng: 103.81719240685575 },
+  { lat: 1.3198689468304363, lng: 103.81747672101133 },
+  { lat: 1.3199493917504048, lng: 103.81764301797025 },
+];
+
 // Helper function to create test polyline
 const createTestPolyline = (map: google.maps.Map): google.maps.Polyline => {
   console.log('🎨 Creating test polyline using Google Maps example...');
@@ -788,6 +1265,7 @@ const createOverlayPolygons = (map: google.maps.Map) => {
     strokeWeight: 0,
     fillColor: '#000000',
     fillOpacity: 0.4, // Increased opacity for more prominent dimming effect
+    clickable: false, // Allow clicking through to get coordinates
   });
   topOverlay.setMap(map);
 
@@ -857,6 +1335,7 @@ const createOverlayPolygons = (map: google.maps.Map) => {
     strokeWeight: 0,
     fillColor: '#000000',
     fillOpacity: 0.4, // Increased opacity for more prominent dimming effect
+    clickable: false, // Allow clicking through to get coordinates
   });
   bottomOverlay.setMap(map);
 };
@@ -892,15 +1371,262 @@ const createCampusBorderPolyline = (
   return { border: campusBorder, overlay: null };
 };
 
+// Helper function to create orange area overlay
+const createOrangeAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const orangeArea = new google.maps.Polygon({
+    paths: ORANGE_AREA_BOUNDARY,
+    strokeColor: '#FF0000', // Red color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#FF0000', // Red fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  orangeArea.setMap(map);
+  return orangeArea;
+};
+
+// Helper function to create blue area overlay
+const createBlueAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const blueArea = new google.maps.Polygon({
+    paths: BLUE_AREA_BOUNDARY,
+    strokeColor: '#1E90FF', // Blue color (Dodger Blue)
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#1E90FF', // Blue fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  blueArea.setMap(map);
+  return blueArea;
+};
+
+// Helper function to create dark blue area overlay
+const createDarkBlueAreaOverlay = (
+  map: google.maps.Map
+): google.maps.Polygon => {
+  const darkBlueArea = new google.maps.Polygon({
+    paths: DARK_BLUE_AREA_BOUNDARY,
+    strokeColor: '#00008B', // Dark blue color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#00008B', // Dark blue fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  darkBlueArea.setMap(map);
+  return darkBlueArea;
+};
+
+// Helper function to create yellow area overlay
+const createYellowAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const yellowArea = new google.maps.Polygon({
+    paths: YELLOW_AREA_BOUNDARY,
+    strokeColor: '#FA9E0D', // Kent Ridge color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#FA9E0D', // Kent Ridge fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  yellowArea.setMap(map);
+  return yellowArea;
+};
+
+// Helper function to create dark orange area overlay
+const createDarkOrangeAreaOverlay = (
+  map: google.maps.Map
+): google.maps.Polygon => {
+  const darkOrangeArea = new google.maps.Polygon({
+    paths: DARK_ORANGE_AREA_BOUNDARY,
+    strokeColor: '#800080', // Purple color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#800080', // Purple fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  darkOrangeArea.setMap(map);
+  return darkOrangeArea;
+};
+
+// Helper function to create CDE area overlay
+const createCDEAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const cdeArea = new google.maps.Polygon({
+    paths: CDE_AREA_BOUNDARY,
+    strokeColor: '#D7AE63', // CDE color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#D7AE63', // CDE fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  cdeArea.setMap(map);
+  return cdeArea;
+};
+
+// Helper function to create FASS area overlay
+const createFASSAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const fassArea = new google.maps.Polygon({
+    paths: FASS_AREA_BOUNDARY,
+    strokeColor: '#006400', // Dark green color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#006400', // Dark green fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  fassArea.setMap(map);
+  return fassArea;
+};
+
+// Helper function to create COM/BIZ area overlay
+const createCOMBIZAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const combizArea = new google.maps.Polygon({
+    paths: COMBIZ_AREA_BOUNDARY,
+    strokeColor: '#8B0000', // Dark red color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#8B0000', // Dark red fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  combizArea.setMap(map);
+  return combizArea;
+};
+
+// Helper function to create LAW area overlay
+const createLAWAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const lawArea = new google.maps.Polygon({
+    paths: LAW_AREA_BOUNDARY,
+    strokeColor: '#FFFFFF', // White color
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#FFFFFF', // White fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  lawArea.setMap(map);
+  return lawArea;
+};
+
+// Helper function to create area label with outline
+const createAreaLabel = (
+  map: google.maps.Map,
+  position: { lat: number; lng: number },
+  text: string,
+  color: string
+): google.maps.OverlayView | null => {
+  if (typeof window === 'undefined' || !window.google) return null;
+
+  class TextOverlay extends google.maps.OverlayView {
+    private position: google.maps.LatLng;
+    private text: string;
+    private color: string;
+    private div: HTMLDivElement | null = null;
+
+    constructor(
+      position: google.maps.LatLng,
+      text: string,
+      color: string
+    ) {
+      super();
+      this.position = position;
+      this.text = text;
+      this.color = color;
+    }
+
+    onAdd() {
+      const div = document.createElement('div');
+      div.style.position = 'absolute';
+      div.style.fontSize = '14px';
+      div.style.fontWeight = 'bold';
+      div.style.color = this.color;
+      div.style.textShadow = `
+        -1px -1px 0 #fff,
+        1px -1px 0 #fff,
+        -1px 1px 0 #fff,
+        1px 1px 0 #fff,
+        -2px 0 0 #fff,
+        2px 0 0 #fff,
+        0 -2px 0 #fff,
+        0 2px 0 #fff
+      `;
+      div.style.padding = '4px 8px';
+      div.style.whiteSpace = 'nowrap';
+      div.style.userSelect = 'none';
+      div.style.pointerEvents = 'none';
+      div.textContent = this.text;
+
+      this.div = div;
+      const panes = this.getPanes();
+      panes?.overlayLayer.appendChild(div);
+    }
+
+    draw() {
+      if (!this.div) return;
+      const overlayProjection = this.getProjection();
+      const position = overlayProjection.fromLatLngToDivPixel(this.position);
+      if (position) {
+        this.div.style.left = position.x - this.div.offsetWidth / 2 + 'px';
+        this.div.style.top = position.y - this.div.offsetHeight / 2 + 'px';
+      }
+    }
+
+    onRemove() {
+      if (this.div) {
+        this.div.parentNode?.removeChild(this.div);
+        this.div = null;
+      }
+    }
+  }
+
+  const overlay = new TextOverlay(
+    new google.maps.LatLng(position.lat, position.lng),
+    text,
+    color
+  );
+  overlay.setMap(map);
+  return overlay;
+};
+
 // Hook to add NUS campus border and bus routes
 const useNUSCampusHighlight = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapLoaded: boolean,
-  showD1Route: boolean = false
+  showD1Route: boolean = false,
+  showAcademicOverlays: boolean = false
 ) => {
   const campusBorderRef = useRef<google.maps.Polyline | null>(null);
   const campusOverlayRef = useRef<google.maps.Polygon | null>(null);
   const d1RouteRef = useRef<google.maps.Polyline | null>(null);
+  const orangeAreaRef = useRef<google.maps.Polygon | null>(null);
+  const blueAreaRef = useRef<google.maps.Polygon | null>(null);
+  const darkBlueAreaRef = useRef<google.maps.Polygon | null>(null);
+  const yellowAreaRef = useRef<google.maps.Polygon | null>(null);
+  const darkOrangeAreaRef = useRef<google.maps.Polygon | null>(null);
+  const cdeAreaRef = useRef<google.maps.Polygon | null>(null);
+  const fassAreaRef = useRef<google.maps.Polygon | null>(null);
+  const combizAreaRef = useRef<google.maps.Polygon | null>(null);
+  const lawAreaRef = useRef<google.maps.Polygon | null>(null);
+  const orangeLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const blueLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const darkBlueLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const yellowLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const darkOrangeLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const cdeLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const fassLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const combizLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const lawLabelRef = useRef<google.maps.OverlayView | null>(null);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -921,6 +1647,114 @@ const useNUSCampusHighlight = (
           const { border } = createCampusBorderPolyline(map);
           campusBorderRef.current = border;
           campusOverlayRef.current = null;
+
+          // Create orange area overlay
+          orangeAreaRef.current = createOrangeAreaOverlay(map);
+          orangeAreaRef.current.setMap(null); // Hide by default
+          // Create orange area label "SPORTS"
+          orangeLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2990960534214193, lng: 103.77794624049213 },
+            'SPORT',
+            '#FF0000'
+          );
+          orangeLabelRef.current?.setMap(null); // Hide by default
+
+          // Create blue area overlay
+          blueAreaRef.current = createBlueAreaOverlay(map);
+          blueAreaRef.current.setMap(null); // Hide by default
+          // Create blue area label "UTOWN"
+          blueLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.305695124008919, lng: 103.77290615963199 },
+            'UTR',
+            '#1E90FF'
+          );
+          blueLabelRef.current?.setMap(null); // Hide by default
+
+          // Create dark blue area overlay
+          darkBlueAreaRef.current = createDarkBlueAreaOverlay(map);
+          darkBlueAreaRef.current.setMap(null); // Hide by default
+          // Create dark blue area label "MED/SCI"
+          darkBlueLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.295951770530073, lng: 103.78078478404082 },
+            'MED/SCI',
+            '#00008B'
+          );
+          darkBlueLabelRef.current?.setMap(null); // Hide by default
+
+          // Create yellow area overlay
+          yellowAreaRef.current = createYellowAreaOverlay(map);
+          yellowAreaRef.current.setMap(null); // Hide by default
+          // Create yellow area label "KENT RIDGE"
+          yellowLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2937457075873078, lng: 103.78336899527181 },
+            'KR MRT',
+            '#FA9E0D'
+          );
+          yellowLabelRef.current?.setMap(null); // Hide by default
+
+          // Create dark orange area overlay
+          darkOrangeAreaRef.current = createDarkOrangeAreaOverlay(map);
+          darkOrangeAreaRef.current.setMap(null); // Hide by default
+          // Create dark orange area label "YST"
+          darkOrangeLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3018492354213917, lng: 103.77272979247682 },
+            'YST',
+            '#800080'
+          );
+          darkOrangeLabelRef.current?.setMap(null); // Hide by default
+
+          // Create CDE area overlay
+          cdeAreaRef.current = createCDEAreaOverlay(map);
+          cdeAreaRef.current.setMap(null); // Hide by default
+          // Create CDE area label "CDE"
+          cdeLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2990029724316363, lng: 103.77161389712826 },
+            'CDE',
+            '#D7AE63'
+          );
+          cdeLabelRef.current?.setMap(null); // Hide by default
+
+          // Create FASS area overlay
+          fassAreaRef.current = createFASSAreaOverlay(map);
+          fassAreaRef.current.setMap(null); // Hide by default
+          // Create FASS area label "FASS"
+          fassLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2949347901037016, lng: 103.77176426036192 },
+            'FASS',
+            '#006400'
+          );
+          fassLabelRef.current?.setMap(null); // Hide by default
+
+          // Create COM/BIZ area overlay
+          combizAreaRef.current = createCOMBIZAreaOverlay(map);
+          combizAreaRef.current.setMap(null); // Hide by default
+          // Create COM/BIZ area label "COM/BIZ"
+          combizLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2941306571549018, lng: 103.77457744749852 },
+            'COM/BIZ',
+            '#8B0000'
+          );
+          combizLabelRef.current?.setMap(null); // Hide by default
+
+          // Create LAW area overlay
+          lawAreaRef.current = createLAWAreaOverlay(map);
+          lawAreaRef.current.setMap(null); // Hide by default
+          // Create LAW area label "LAW"
+          lawLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3188644513003345, lng: 103.81741654343233 },
+            'LAW',
+            '#000000'
+          );
+          lawLabelRef.current?.setMap(null); // Hide by default
         }
       }, 500);
 
@@ -950,6 +1784,48 @@ const useNUSCampusHighlight = (
       d1RouteRef.current = null;
     }
   }, [mapRef, isMapLoaded, showD1Route]);
+
+  // Separate effect for academic overlays visibility
+  useEffect(() => {
+    // Toggle visibility of all academic overlays
+    const overlays = [
+      orangeAreaRef.current,
+      blueAreaRef.current,
+      darkBlueAreaRef.current,
+      yellowAreaRef.current,
+      darkOrangeAreaRef.current,
+      cdeAreaRef.current,
+      fassAreaRef.current,
+      combizAreaRef.current,
+      lawAreaRef.current,
+    ];
+
+    const labels = [
+      orangeLabelRef.current,
+      blueLabelRef.current,
+      darkBlueLabelRef.current,
+      yellowLabelRef.current,
+      darkOrangeLabelRef.current,
+      cdeLabelRef.current,
+      fassLabelRef.current,
+      combizLabelRef.current,
+      lawLabelRef.current,
+    ];
+
+    const map = mapRef.current;
+
+    overlays.forEach((overlay) => {
+      if (overlay) {
+        overlay.setMap(showAcademicOverlays ? map : null);
+      }
+    });
+
+    labels.forEach((label) => {
+      if (label) {
+        label.setMap(showAcademicOverlays ? map : null);
+      }
+    });
+  }, [showAcademicOverlays, mapRef]);
 };
 
 const addMarkersAndFitBounds = ({
@@ -1352,6 +2228,9 @@ const useBusStopMarkers = (
       'Ventus',
       'CLB',
       'Opp NUSS',
+      'College Gr',
+      'BG MRT',
+      'OTH Bldg',
     ];
 
     // Function to check if a stop is a priority stop
@@ -1747,6 +2626,209 @@ const useRouteCheckpoints = (
 };
 
 /**
+ * Custom hook to render multiple bus route polylines, stops, and buses from filters
+ */
+const useFilteredBusRoutes = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  filters: Record<string, boolean>,
+  busDataByRoute: Map<string, any>,
+  stopDataByRoute: Map<string, any>
+) => {
+  const polylinesRef = useRef<Map<string, google.maps.Polyline>>(new Map());
+  const busMarkersRef = useRef<Map<string, google.maps.Marker[]>>(new Map());
+  const stopMarkersRef = useRef<Map<string, google.maps.Marker[]>>(new Map());
+
+  // Route color mapping
+  const routeColors: Record<string, string> = {
+    A1: '#BE1E2D',
+    A2: '#E3CE0B', // Yellow (was incorrectly #E87722 orange)
+    D1: '#C77DE2',
+    D2: '#6F1B6F',
+    BTC: '#EF8136',
+    L: '#BFBFBF',
+    E: '#00B050',
+    K: '#345A9B',
+  };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || typeof window === 'undefined' || !window.google) return;
+
+    // Extract active routes from filters
+    const activeRoutes: string[] = [];
+    Object.keys(filters).forEach((key) => {
+      if (key.startsWith('bus-route-') && filters[key]) {
+        const routeCode = key.replace('bus-route-', '').toUpperCase();
+        activeRoutes.push(routeCode);
+      }
+    });
+
+    // Remove polylines that are no longer active
+    polylinesRef.current.forEach((polyline, routeCode) => {
+      if (!activeRoutes.includes(routeCode)) {
+        polyline.setMap(null);
+        polylinesRef.current.delete(routeCode);
+      }
+    });
+
+    // Remove bus markers that are no longer active
+    busMarkersRef.current.forEach((markers, routeCode) => {
+      if (!activeRoutes.includes(routeCode)) {
+        markers.forEach((marker) => marker.setMap(null));
+        busMarkersRef.current.delete(routeCode);
+      }
+    });
+
+    // Remove stop markers that are no longer active
+    stopMarkersRef.current.forEach((markers, routeCode) => {
+      if (!activeRoutes.includes(routeCode)) {
+        markers.forEach((marker) => marker.setMap(null));
+        stopMarkersRef.current.delete(routeCode);
+      }
+    });
+
+    // Add/update polylines, buses, and stops for active routes
+    activeRoutes.forEach((routeCode) => {
+      const routeColor = routeColors[routeCode] || '#274F9C';
+
+      // Add route polyline if not exists
+      if (!polylinesRef.current.has(routeCode)) {
+        const checkpoints = (routeCheckpointsData as Record<string, any>)[routeCode];
+        
+        if (checkpoints && checkpoints.length > 0) {
+          const path = checkpoints.map((point: any) => ({
+            lat: point.latitude,
+            lng: point.longitude,
+          }));
+
+          const polyline = new google.maps.Polyline({
+            path,
+            geodesic: true,
+            strokeColor: routeColor,
+            strokeOpacity: 0.8,
+            strokeWeight: 4,
+            map,
+          });
+
+          polylinesRef.current.set(routeCode, polyline);
+        }
+      }
+
+      // Update bus markers
+      const buses = busDataByRoute.get(routeCode) || [];
+      const existingBusMarkers = busMarkersRef.current.get(routeCode) || [];
+      existingBusMarkers.forEach((marker) => marker.setMap(null));
+
+      const newBusMarkers: google.maps.Marker[] = [];
+      buses.forEach((bus: any) => {
+        const { lat, lng, veh_plate, direction, speed } = bus;
+        const flipHorizontal = direction === 2;
+        const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal);
+        const iconUrl = svgToDataURL(iconSvg);
+
+        const marker = new google.maps.Marker({
+          position: { lat, lng },
+          map,
+          icon: {
+            url: iconUrl,
+            scaledSize: new google.maps.Size(32, 32),
+            anchor: new google.maps.Point(16, 16),
+          },
+          title: `Bus ${veh_plate}`,
+          zIndex: 1000,
+        });
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px; font-family: sans-serif;">
+              <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">
+                🚌 Bus ${veh_plate} (${routeCode})
+              </div>
+              <div style="font-size: 12px; color: #666;">
+                Direction: ${direction === 1 ? 'Forward' : 'Reverse'}
+              </div>
+              <div style="font-size: 12px; color: #666;">
+                Speed: ${speed || 0} km/h
+              </div>
+            </div>
+          `,
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open(map, marker);
+        });
+
+        newBusMarkers.push(marker);
+      });
+      busMarkersRef.current.set(routeCode, newBusMarkers);
+
+      // Update stop markers
+      const stops = stopDataByRoute.get(routeCode) || [];
+      const existingStopMarkers = stopMarkersRef.current.get(routeCode) || [];
+      existingStopMarkers.forEach((marker) => marker.setMap(null));
+
+      const newStopMarkers: google.maps.Marker[] = [];
+      stops.forEach((stop: any) => {
+        const marker = new google.maps.Marker({
+          position: { lat: stop.latitude, lng: stop.longitude },
+          map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: routeColor,
+            fillOpacity: 1,
+            strokeColor: '#FFFFFF',
+            strokeWeight: 2,
+          },
+          title: stop.name,
+          zIndex: 500,
+        });
+
+        const infoWindow = new google.maps.InfoWindow({
+          content: `
+            <div style="padding: 8px; font-family: sans-serif;">
+              <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">
+                ${stop.name}
+              </div>
+              <div style="font-size: 12px; color: #666;">
+                Route: ${routeCode}
+              </div>
+            </div>
+          `,
+        });
+
+        marker.addListener('click', () => {
+          infoWindow.open(map, marker);
+        });
+
+        newStopMarkers.push(marker);
+      });
+      stopMarkersRef.current.set(routeCode, newStopMarkers);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      polylinesRef.current.forEach((polyline) => {
+        polyline.setMap(null);
+      });
+      polylinesRef.current.clear();
+
+      busMarkersRef.current.forEach((markers) => {
+        markers.forEach((marker) => marker.setMap(null));
+      });
+      busMarkersRef.current.clear();
+
+      stopMarkersRef.current.forEach((markers) => {
+        markers.forEach((marker) => marker.setMap(null));
+      });
+      stopMarkersRef.current.clear();
+    };
+  }, [mapRef, filters, busDataByRoute, stopDataByRoute]);
+
+  return { polylinesRef, busMarkersRef, stopMarkersRef };
+};
+
+/**
  * Custom hook to render landmark markers (hospital, MRT, library, bus terminal)
  */
 const useLandmarkMarkers = (
@@ -2081,6 +3163,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   style,
   showD1Route = false,
   activeRoute = null,
+  onActiveRouteChange,
   showLandmarks = true, // Default to true for backward compatibility
   showUserLocation = true, // Default to true for backward compatibility
   showMapControls = true, // Default to true for backward compatibility
@@ -2088,22 +3171,142 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const previousActiveRouteRef = useRef<RouteCode | null>(null);
+  const isSyncingFromActiveRouteRef = useRef(false); // Track if we're syncing from activeRoute to prevent loops
   
-  // Map filter state - controlled internally
-  const [mapFilters, setMapFilters] = useState<Record<string, boolean>>({
-    important: true,
-    residences: false,
-    academic: false,
-    'bus-stops': true,
-    'bus-routes': false,
+  // Map filter state - controlled internally with localStorage persistence
+  const [mapFilters, setMapFilters] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('nus-nextbus-map-filters');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('Error loading map filters:', error);
+    }
+    return {
+      important: true,
+      'bus-stops': true,
+      academic: false,
+      residences: false,
+      'bus-route-a1': false,
+      'bus-route-a2': false,
+      'bus-route-d1': false,
+      'bus-route-d2': false,
+      'bus-route-btc': false,
+      'bus-route-e': false,
+      'bus-route-k': false,
+      'bus-route-l': false,
+    };
   });
 
   // Determine if landmarks should be shown based on filters
   const shouldShowLandmarks = mapFilters.important && showLandmarks;
   
+  // Determine which bus route is selected from filters (radio button selection)
+  const selectedFilterRoute = React.useMemo(() => {
+    const routeKeys = Object.keys(mapFilters).filter(
+      (key) => key.startsWith('bus-route-') && mapFilters[key]
+    );
+    if (routeKeys.length > 0) {
+      return routeKeys[0].replace('bus-route-', '').toUpperCase() as RouteCode;
+    }
+    return null;
+  }, [mapFilters]);
+  
+  // Create a single source of truth for the active route
+  // Priority: selectedFilterRoute (from filter panel) > activeRoute (from nearest stops)
+  // But when activeRoute changes from outside, update the filter to match
+  const effectiveActiveRoute = selectedFilterRoute || activeRoute;
+  
+  // Sync filter panel when activeRoute changes from "nearest stops"
+  React.useEffect(() => {
+    const previousActiveRoute = previousActiveRouteRef.current;
+    
+    if (activeRoute && activeRoute !== previousActiveRoute) {
+      // When a route is selected from "nearest stops" (new selection)
+      // Update the filter panel to match
+      isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
+      
+      const routeFilterKey = `bus-route-${activeRoute.toLowerCase()}`;
+      const updatedFilters = { ...mapFilters };
+      
+      // Deselect all bus-view radio buttons first
+      Object.keys(updatedFilters).forEach((key) => {
+        if (key === 'bus-stops' || key.startsWith('bus-route-')) {
+          updatedFilters[key] = false;
+        }
+      });
+      
+      // Select the active route in the filter
+      updatedFilters[routeFilterKey] = true;
+      
+      setMapFilters(updatedFilters);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('nus-nextbus-map-filters', JSON.stringify(updatedFilters));
+      } catch (error) {
+        console.error('Error saving filters:', error);
+      }
+      
+      previousActiveRouteRef.current = activeRoute;
+      
+      // Reset flag after a short delay to allow state to settle
+      setTimeout(() => {
+        isSyncingFromActiveRouteRef.current = false;
+      }, 100);
+    } else if (!activeRoute && previousActiveRoute) {
+      // When activeRoute becomes null (deselected from "nearest stops")
+      // Revert to "Bus Stops" as default
+      isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
+      
+      const updatedFilters = { ...mapFilters };
+      
+      // Deselect all bus routes
+      Object.keys(updatedFilters).forEach((key) => {
+        if (key.startsWith('bus-route-')) {
+          updatedFilters[key] = false;
+        }
+      });
+      
+      // Select "Bus Stops"
+      updatedFilters['bus-stops'] = true;
+      
+      setMapFilters(updatedFilters);
+      
+      // Save to localStorage
+      try {
+        localStorage.setItem('nus-nextbus-map-filters', JSON.stringify(updatedFilters));
+      } catch (error) {
+        console.error('Error saving filters:', error);
+      }
+      
+      previousActiveRouteRef.current = null;
+      
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isSyncingFromActiveRouteRef.current = false;
+      }, 100);
+    }
+  }, [activeRoute]); // Only depend on activeRoute
+  
+  // When filter route is selected, notify parent to clear activeRoute
+  React.useEffect(() => {
+    // Don't notify parent if we're syncing from activeRoute (to prevent loop)
+    if (selectedFilterRoute && activeRoute && onActiveRouteChange && !isSyncingFromActiveRouteRef.current) {
+      // Filter route is selected, so clear the activeRoute from parent
+      onActiveRouteChange(null);
+    }
+  }, [selectedFilterRoute]); // Only depend on selectedFilterRoute
+  
   // Determine if bus stops should be shown based on filters
-  // If a route is selected, always show its bus stops regardless of filter
-  const shouldShowBusStops = activeRoute ? true : (mapFilters['bus-stops'] && showBusStops);
+  // Show bus stops if:
+  // 1. effectiveActiveRoute is set (from either filter or nearest stops)
+  // 2. "bus-stops" radio is selected
+  const shouldShowBusStops = effectiveActiveRoute
+    ? true
+    : mapFilters['bus-stops'] && showBusStops;
   
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
@@ -2111,10 +3314,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     !!routePolyline // Don't pan/zoom if we have a route polyline
   );
 
-  // Fetch active buses for the selected route
+  // Fetch active buses for the selected route (use effectiveActiveRoute)
   const { data: activeBusesData } = useActiveBuses(
-    activeRoute as RouteCode,
-    !!activeRoute
+    effectiveActiveRoute as RouteCode,
+    !!effectiveActiveRoute
   );
   const activeBuses = activeBusesData?.ActiveBusResult?.activebus || [];
 
@@ -2123,12 +3326,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Get route color from API or use fallback
   const routeColor = React.useMemo(() => {
-    if (!activeRoute) return '#274F9C';
+    // Use effectiveActiveRoute (single source of truth)
+    if (!effectiveActiveRoute) return '#274F9C';
 
     // Try to get color from API
     const serviceDesc =
       serviceDescriptions?.ServiceDescriptionResult?.ServiceDescription?.find(
-        (s) => s.Route === activeRoute
+        (s) => s.Route === effectiveActiveRoute
       );
 
     if (serviceDesc?.Color) {
@@ -2148,19 +3352,83 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       K: '#345A9B', // Blue
     };
 
-    return fallbackColors[activeRoute] || '#274F9C';
-  }, [activeRoute, serviceDescriptions]);
+    return fallbackColors[effectiveActiveRoute] || '#274F9C';
+  }, [effectiveActiveRoute, serviceDescriptions]);
 
-  useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress, activeRoute }); // Hide origin/waypoint markers when route selected
+  // Fetch bus and stop data for filtered routes
+  const filteredRouteCodes = React.useMemo(() => {
+    const routes: RouteCode[] = [];
+    Object.keys(mapFilters).forEach((key) => {
+      if (key.startsWith('bus-route-') && mapFilters[key]) {
+        const routeCode = key.replace('bus-route-', '').toUpperCase() as RouteCode;
+        routes.push(routeCode);
+      }
+    });
+    return routes;
+  }, [mapFilters]);
+
+  // Fetch active buses for all filtered routes
+  const filteredBusData1 = useActiveBuses(filteredRouteCodes[0], !!filteredRouteCodes[0]);
+  const filteredBusData2 = useActiveBuses(filteredRouteCodes[1], !!filteredRouteCodes[1]);
+  const filteredBusData3 = useActiveBuses(filteredRouteCodes[2], !!filteredRouteCodes[2]);
+  const filteredBusData4 = useActiveBuses(filteredRouteCodes[3], !!filteredRouteCodes[3]);
+  const filteredBusData5 = useActiveBuses(filteredRouteCodes[4], !!filteredRouteCodes[4]);
+  const filteredBusData6 = useActiveBuses(filteredRouteCodes[5], !!filteredRouteCodes[5]);
+  const filteredBusData7 = useActiveBuses(filteredRouteCodes[6], !!filteredRouteCodes[6]);
+  const filteredBusData8 = useActiveBuses(filteredRouteCodes[7], !!filteredRouteCodes[7]);
+
+  // Fetch pickup points for all filtered routes
+  const filteredStopData1 = usePickupPoints(filteredRouteCodes[0]);
+  const filteredStopData2 = usePickupPoints(filteredRouteCodes[1]);
+  const filteredStopData3 = usePickupPoints(filteredRouteCodes[2]);
+  const filteredStopData4 = usePickupPoints(filteredRouteCodes[3]);
+  const filteredStopData5 = usePickupPoints(filteredRouteCodes[4]);
+  const filteredStopData6 = usePickupPoints(filteredRouteCodes[5]);
+  const filteredStopData7 = usePickupPoints(filteredRouteCodes[6]);
+  const filteredStopData8 = usePickupPoints(filteredRouteCodes[7]);
+
+  // Combine bus and stop data into Maps
+  const busDataByRoute = React.useMemo(() => {
+    const map = new Map<string, any>();
+    const busDataArray = [filteredBusData1, filteredBusData2, filteredBusData3, filteredBusData4,
+                          filteredBusData5, filteredBusData6, filteredBusData7, filteredBusData8];
+    filteredRouteCodes.forEach((routeCode, index) => {
+      const buses = busDataArray[index]?.data?.ActiveBusResult?.activebus || [];
+      map.set(routeCode, buses);
+    });
+    return map;
+  }, [filteredRouteCodes, filteredBusData1.data, filteredBusData2.data, filteredBusData3.data, 
+      filteredBusData4.data, filteredBusData5.data, filteredBusData6.data, filteredBusData7.data, filteredBusData8.data]);
+
+  const stopDataByRoute = React.useMemo(() => {
+    const map = new Map<string, any>();
+    const stopDataArray = [filteredStopData1, filteredStopData2, filteredStopData3, filteredStopData4,
+                           filteredStopData5, filteredStopData6, filteredStopData7, filteredStopData8];
+    filteredRouteCodes.forEach((routeCode, index) => {
+      const stops = stopDataArray[index]?.data?.PickupPointResult?.pickuppoint || [];
+      map.set(routeCode, stops);
+    });
+    return map;
+  }, [filteredRouteCodes, filteredStopData1.data, filteredStopData2.data, filteredStopData3.data,
+      filteredStopData4.data, filteredStopData5.data, filteredStopData6.data, filteredStopData7.data, filteredStopData8.data]);
+
+  useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress, activeRoute: effectiveActiveRoute }); // Hide origin/waypoint markers when route selected
   useMapPolyline(mapRef, routePolyline, routeSteps);
   useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
-  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
+  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic);
   useBusMarkers(mapRef, activeBuses, routeColor);
-  useRouteCheckpoints(mapRef, activeRoute, routeColor);
-  useLandmarkMarkers(mapRef, isMapCreated && shouldShowLandmarks, activeRoute); // Control landmarks with filter
-  useBusStopMarkers(mapRef, isMapCreated, shouldShowBusStops, activeRoute, routeColor); // Control bus stops with filter, but always show when route selected
+  useRouteCheckpoints(mapRef, effectiveActiveRoute, routeColor);
+  // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)
+  useFilteredBusRoutes(
+    mapRef,
+    selectedFilterRoute ? { [`bus-route-${selectedFilterRoute.toLowerCase()}`]: true } : {},
+    busDataByRoute,
+    stopDataByRoute
+  );
+  useLandmarkMarkers(mapRef, isMapCreated && shouldShowLandmarks, effectiveActiveRoute); // Control landmarks with filter
+  useBusStopMarkers(mapRef, isMapCreated, shouldShowBusStops, effectiveActiveRoute, routeColor); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
-  useDestinationMarker(mapRef, isMapCreated, destination, activeRoute); // Add destination pin marker (hidden when route selected)
+  useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)
   usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceId); // Handle place clicks
   usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
 
@@ -2281,6 +3549,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               console.log('Filter changes:', filters);
               setMapFilters(filters);
             }}
+            filters={mapFilters}
           />
         </div>
       )}

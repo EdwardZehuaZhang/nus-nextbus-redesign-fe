@@ -1390,6 +1390,7 @@ export default function TransitPage() {
           style={{ width: '100%', height: '100%' }}
           showD1Route={selectedRoute === 'D1'}
           activeRoute={selectedRoute as any} // Pass selected route to show real-time buses
+          onActiveRouteChange={(route) => setSelectedRoute(route)} // Sync filter selection back to transit page
           showBusStops={true} // Show bus stop markers with labels
           showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
         />

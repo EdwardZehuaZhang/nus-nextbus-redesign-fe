@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const CheckIcon = () => (
   <svg
@@ -16,34 +16,114 @@ const CheckIcon = () => (
   </svg>
 );
 
-const filterItems = [
-  { id: 'important', label: 'Important', checked: true },
-  { id: 'bus-stops', label: 'Bus Stops', checked: true },
-  { id: 'residences', label: 'Residences', checked: false },
-  { id: 'academic', label: 'Academic', checked: false },
-  { id: 'bus-routes', label: 'Bus Routes', checked: false },
+const STORAGE_KEY = 'nus-nextbus-map-filters';
+
+const defaultFilterItems = [
+  { id: 'important', label: 'Important', checked: true, type: 'checkbox' },
+  { id: 'academic', label: 'Academic', checked: false, type: 'checkbox' },
+  { id: 'residences', label: 'Residences', checked: false, type: 'checkbox' },
+  { id: 'bus-stops', label: 'Bus Stops', checked: true, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-a1', label: 'A1', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-a2', label: 'A2', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-d1', label: 'D1', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-d2', label: 'D2', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-btc', label: 'BTC', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-e', label: 'E', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-k', label: 'K', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-l', label: 'L', checked: false, type: 'radio', group: 'bus-view' },
 ];
 
 interface MapFilterSelectorProps {
   onFilterChange?: (filters: Record<string, boolean>) => void;
+  filters?: Record<string, boolean>; // Current filter state from parent
 }
 
 export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
   onFilterChange,
+  filters,
 }) => {
-  const [items, setItems] = useState(filterItems);
+  const [items, setItems] = useState(defaultFilterItems);
+
+  // Load saved filters from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedFilters = localStorage.getItem(STORAGE_KEY);
+      if (savedFilters) {
+        const parsedFilters = JSON.parse(savedFilters);
+        const updatedItems = defaultFilterItems.map((item) => ({
+          ...item,
+          checked: parsedFilters[item.id] ?? item.checked,
+        }));
+        setItems(updatedItems);
+        
+        // Notify parent of initial state
+        if (onFilterChange) {
+          onFilterChange(parsedFilters);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved filters:', error);
+    }
+  }, []);
+
+  // Sync with parent's filter state when it changes
+  useEffect(() => {
+    if (filters) {
+      const updatedItems = defaultFilterItems.map((item) => ({
+        ...item,
+        checked: filters[item.id] ?? item.checked,
+      }));
+      setItems(updatedItems);
+    }
+  }, [filters]);
 
   const handleToggle = (id: string) => {
-    const updatedItems = items.map((item) =>
-      item.id === id ? { ...item, checked: !item.checked } : item
-    );
+    const clickedItem = items.find((item) => item.id === id);
+    
+    let updatedItems;
+    if (clickedItem?.type === 'radio' && clickedItem.group) {
+      // For radio buttons in the same group
+      // If clicking the already-selected radio button, deselect it
+      // Otherwise, select the clicked one and deselect all others in the group
+      if (clickedItem.checked) {
+        // Clicking the already-selected radio button - deselect it
+        updatedItems = items.map((item) => {
+          if (item.id === id) {
+            return { ...item, checked: false };
+          }
+          return item;
+        });
+      } else {
+        // Clicking a different radio button - select it and deselect others in the group
+        updatedItems = items.map((item) => {
+          if (item.group === clickedItem.group) {
+            return { ...item, checked: item.id === id };
+          }
+          return item;
+        });
+      }
+    } else {
+      // For checkboxes, just toggle
+      updatedItems = items.map((item) =>
+        item.id === id ? { ...item, checked: !item.checked } : item
+      );
+    }
+    
     setItems(updatedItems);
 
+    const filters = updatedItems.reduce(
+      (acc, item) => ({ ...acc, [item.id]: item.checked }),
+      {}
+    );
+
+    // Save to localStorage
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Error saving filters:', error);
+    }
+
     if (onFilterChange) {
-      const filters = updatedItems.reduce(
-        (acc, item) => ({ ...acc, [item.id]: item.checked }),
-        {}
-      );
       onFilterChange(filters);
     }
   };
@@ -64,18 +144,38 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
           </label>
 
           <div className="relative ml-auto shrink-0 pl-8">
-            {item.checked ? (
-              <div
-                className="flex size-[17.18px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]"
-                onClick={() => handleToggle(item.id)}
-              >
-                <CheckIcon />
-              </div>
+            {item.type === 'radio' ? (
+              // Radio button (circle)
+              item.checked ? (
+                <div
+                  className="border-shadcn-ui-app-border shadow-box-shadow-shadow-xs size-4 cursor-pointer rounded-full border border-solid border-[#274F9C] bg-[#274F9C]"
+                  onClick={() => handleToggle(item.id)}
+                >
+                  <div className="flex size-full items-center justify-center">
+                    <div className="size-1.5 rounded-full bg-white"></div>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="size-4 cursor-pointer rounded-full border-[0.72px] border-solid border-[#cdcdcd]"
+                  onClick={() => handleToggle(item.id)}
+                />
+              )
             ) : (
-              <div
-                className="size-[17.18px] cursor-pointer rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]"
-                onClick={() => handleToggle(item.id)}
-              />
+              // Checkbox (square)
+              item.checked ? (
+                <div
+                  className="flex size-[17.18px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]"
+                  onClick={() => handleToggle(item.id)}
+                >
+                  <CheckIcon />
+                </div>
+              ) : (
+                <div
+                  className="size-[17.18px] cursor-pointer rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]"
+                  onClick={() => handleToggle(item.id)}
+                />
+              )
             )}
           </div>
         </div>

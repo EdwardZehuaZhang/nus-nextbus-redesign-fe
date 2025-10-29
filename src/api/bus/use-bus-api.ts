@@ -45,6 +45,7 @@ export const usePickupPoints = (routeCode: RouteCode) => {
     queryKey: ['pickupPoints', routeCode],
     queryFn: () => getPickupPoints(routeCode),
     staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!routeCode, // Only fetch when routeCode is provided
   });
 };
 
