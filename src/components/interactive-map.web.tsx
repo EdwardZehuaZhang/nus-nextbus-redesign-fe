@@ -6,6 +6,7 @@ import {
   useActiveBuses,
   useBusStops,
   useCheckpoints,
+  usePickupPoints,
   useServiceDescriptions,
 } from '@/api/bus';
 import type { LatLng } from '@/api/google-maps';
@@ -78,6 +79,88 @@ const DEFAULT_REGION = {
 };
 
 const PADDING = { top: 50, right: 50, bottom: 50, left: 50 };
+
+// Dark mode styles for Google Maps
+const DARK_MODE_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+  {
+    featureType: 'administrative.locality',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#d59563' }],
+  },
+  {
+    featureType: 'poi',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#d59563' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'geometry',
+    stylers: [{ color: '#263c3f' }],
+  },
+  {
+    featureType: 'poi.park',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#6b9a76' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry',
+    stylers: [{ color: '#38414e' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#212a37' }],
+  },
+  {
+    featureType: 'road',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#9ca5b3' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry',
+    stylers: [{ color: '#746855' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'geometry.stroke',
+    stylers: [{ color: '#1f2835' }],
+  },
+  {
+    featureType: 'road.highway',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#f3d19c' }],
+  },
+  {
+    featureType: 'transit',
+    elementType: 'geometry',
+    stylers: [{ color: '#2f3948' }],
+  },
+  {
+    featureType: 'transit.station',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#d59563' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#17263c' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels.text.fill',
+    stylers: [{ color: '#515c6d' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels.text.stroke',
+    stylers: [{ color: '#17263c' }],
+  },
+];
 
 // Load Google Maps script and return a promise
 const loadGoogleMapsScript = (): Promise<void> => {
@@ -194,13 +277,8 @@ const addCoordinateListener = (map: google.maps.Map) => {
     if (event.latLng) {
       const lat = event.latLng.lat();
       const lng = event.latLng.lng();
-      console.log('📍 Right-clicked coordinates:');
-      console.log(`  { lat: ${lat}, lng: ${lng} },`);
-      if (navigator.clipboard) {
-        const coordText = `{ lat: ${lat}, lng: ${lng} },`;
-        navigator.clipboard.writeText(coordText);
-        console.log('✅ Copied to clipboard!');
-      }
+      // Just output the coordinate in the console for easy copying later
+      console.log(`{ lat: ${lat}, lng: ${lng} },`);
     }
   });
 };
@@ -233,6 +311,7 @@ const createMapInstance = (
     tiltControl: false, // disables camera tilt
     gestureHandling: 'greedy',
     styles: [
+      // Light mode by default - only hide POIs and transit labels
       {
         featureType: 'poi',
         elementType: 'labels',
@@ -380,6 +459,88 @@ const useGoogleMapsInit = (
   }, [initialRegion.latitude, initialRegion.longitude, isMapCreated, hasRoutePolyline]);
 
   return { mapRef, isMapCreated };
+};
+
+// Hook to dynamically control Google Maps POI visibility based on zoom level
+const usePOIVisibilityControl = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  isMapCreated: boolean
+) => {
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapCreated) {
+      return;
+    }
+
+    const updatePOIVisibility = () => {
+      const zoom = map.getZoom() || 16;
+      const showDetails = zoom >= 17; // Show POIs and road labels when zoomed in to 17 or more
+
+      // Update map styles dynamically
+      map.setOptions({
+        styles: [
+          {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: showDetails ? 'on' : 'off' }],
+          },
+          {
+            featureType: 'poi.business',
+            stylers: [{ visibility: showDetails ? 'on' : 'off' }],
+          },
+          // Control road labels based on zoom level
+          {
+            featureType: 'road',
+            elementType: 'labels',
+            stylers: [{ visibility: showDetails ? 'on' : 'off' }],
+          },
+          {
+            featureType: 'road.arterial',
+            elementType: 'labels',
+            stylers: [{ visibility: showDetails ? 'on' : 'off' }],
+          },
+          {
+            featureType: 'road.local',
+            elementType: 'labels',
+            stylers: [{ visibility: showDetails ? 'on' : 'off' }],
+          },
+          // Always hide transit labels to avoid clutter
+          {
+            featureType: 'transit',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+          {
+            featureType: 'transit.station',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+          {
+            featureType: 'transit.station.rail',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+          {
+            featureType: 'transit.line',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }],
+          },
+        ],
+      });
+    };
+
+    // Set up zoom change listener
+    const zoomListener = map.addListener('zoom_changed', updatePOIVisibility);
+
+    // Initial update
+    updatePOIVisibility();
+
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+    };
+  }, [mapRef, isMapCreated]);
 };
 
 // Test coordinates - simple flight path to verify polyline works
@@ -626,7 +787,7 @@ const createOverlayPolygons = (map: google.maps.Map) => {
     strokeOpacity: 0,
     strokeWeight: 0,
     fillColor: '#000000',
-    fillOpacity: 0.3,
+    fillOpacity: 0.4, // Increased opacity for more prominent dimming effect
   });
   topOverlay.setMap(map);
 
@@ -695,7 +856,7 @@ const createOverlayPolygons = (map: google.maps.Map) => {
     strokeOpacity: 0,
     strokeWeight: 0,
     fillColor: '#000000',
-    fillOpacity: 0.3,
+    fillOpacity: 0.4, // Increased opacity for more prominent dimming effect
   });
   bottomOverlay.setMap(map);
 };
@@ -860,6 +1021,7 @@ const useMapMarkers = ({
   destination,
   waypoints = [],
   onMarkerPress,
+  activeRoute,
 }: {
   mapRef: React.MutableRefObject<google.maps.Map | null>;
   origin?: LatLng;
@@ -869,6 +1031,7 @@ const useMapMarkers = ({
     type: 'origin' | 'destination' | 'waypoint',
     index?: number
   ) => void;
+  activeRoute?: RouteCode | null;
 }) => {
   const markersRef = useRef<google.maps.Marker[]>([]);
 
@@ -876,7 +1039,15 @@ const useMapMarkers = ({
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
       return;
 
+    // Clear existing markers
     markersRef.current.forEach((marker) => marker.setMap(null));
+    markersRef.current = [];
+
+    // Don't create markers if a route is selected
+    if (activeRoute) {
+      return;
+    }
+
     markersRef.current = addMarkersAndFitBounds({
       map: mapRef.current,
       origin,
@@ -884,7 +1055,12 @@ const useMapMarkers = ({
       destination,
       onMarkerPress,
     });
-  }, [origin, destination, waypoints, onMarkerPress, mapRef]);
+
+    return () => {
+      markersRef.current.forEach((marker) => marker.setMap(null));
+      markersRef.current = [];
+    };
+  }, [origin, destination, waypoints, onMarkerPress, mapRef, activeRoute]);
 };
 
 const useMapPolyline = (
@@ -915,6 +1091,14 @@ const useMapPolyline = (
 
         // Determine color based on travel mode
         let strokeColor = '#9CA3AF'; // Default gray for walking
+        let polylineOptions: google.maps.PolylineOptions = {
+          path: decodedPath,
+          geodesic: true,
+          strokeColor,
+          strokeOpacity: 1.0,
+          strokeWeight: 6,
+          map: mapRef.current,
+        };
         
         if (step.travelMode === 'TRANSIT' && step.transitDetails) {
           const lineName = step.transitDetails.transitLine.nameShort || step.transitDetails.transitLine.name;
@@ -927,18 +1111,25 @@ const useMapPolyline = (
             // Fallback to helper function
             strokeColor = getTransitLineColor(lineName);
           }
+          polylineOptions.strokeColor = strokeColor;
         } else if (step.travelMode === 'WALK') {
-          strokeColor = '#9CA3AF'; // Gray for walking
+          strokeColor = '#7D7D7D'; // Gray for walking
+          // Make walking segments dotted
+          polylineOptions.strokeColor = strokeColor;
+          polylineOptions.strokeOpacity = 0;
+          polylineOptions.icons = [{
+            icon: {
+              path: 'M 0,-1 0,1',
+              strokeOpacity: 1,
+              strokeWeight: 3,
+              scale: 1,
+            },
+            offset: '0',
+            repeat: '10px', // Increased gap between dots
+          }];
         }
 
-        const stepPolyline = new google.maps.Polyline({
-          path: decodedPath,
-          geodesic: true,
-          strokeColor,
-          strokeOpacity: 1.0,
-          strokeWeight: 6,
-          map: mapRef.current,
-        });
+        const stepPolyline = new google.maps.Polyline(polylineOptions);
 
         polylinesRef.current.push(stepPolyline);
         
@@ -1097,11 +1288,14 @@ const useConnectorLines = (
 const useBusStopMarkers = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapCreated: boolean,
-  showBusStops: boolean
+  showBusStops: boolean,
+  activeRoute?: RouteCode | null,
+  routeColor?: string
 ) => {
   const circleMarkersRef = useRef<google.maps.Marker[]>([]);
   const labelMarkersRef = useRef<google.maps.Marker[]>([]);
   const { data: busStopsData } = useBusStops();
+  const { data: pickupPointsData } = usePickupPoints(activeRoute as RouteCode);
 
   useEffect(() => {
     if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
@@ -1120,6 +1314,14 @@ const useBusStopMarkers = (
 
     const map = mapRef.current;
     const busStops = busStopsData.BusStopsResult.busstops;
+
+    // Get the pickup points for the active route (stops that belong to this route)
+    const routeStopNames = new Set<string>();
+    if (activeRoute && pickupPointsData?.PickupPointResult?.pickuppoint) {
+      pickupPointsData.PickupPointResult.pickuppoint.forEach((pp: any) => {
+        routeStopNames.add(pp.ShortName);
+      });
+    }
 
     // Log all bus stop names to debug
     console.log('All bus stops:', busStops.map((s: BusStop) => ({
@@ -1159,10 +1361,12 @@ const useBusStopMarkers = (
         stop.ShortName === priority ||
         stop.ShortName.trim() === priority
       );
-      if (isMatch) {
-        console.log('Priority stop found:', stop.ShortName, stop);
-      }
       return isMatch;
+    };
+
+    // Function to check if a stop belongs to the active route
+    const belongsToRoute = (stop: BusStop) => {
+      return routeStopNames.has(stop.ShortName);
     };
 
     // Function to update marker visibility based on zoom
@@ -1170,26 +1374,120 @@ const useBusStopMarkers = (
       const zoom = map.getZoom() || 16;
       const showAllStops = zoom >= 17; // Show all stops when zoomed in (17+ is close zoom)
 
-      // Handle circle markers - hide when zoomed out, show all when zoomed in
-      circleMarkersRef.current.forEach((marker) => {
-        marker.setVisible(showAllStops);
-      });
+      // If a route is selected, only show stops belonging to that route
+      if (activeRoute) {
+        // Handle circle markers - show only route stops AND only when zoomed in
+        circleMarkersRef.current.forEach((marker) => {
+          const title = marker.getTitle();
+          const belongsToActiveRoute = title ? routeStopNames.has(title) : false;
+          marker.setVisible(belongsToActiveRoute && showAllStops); // Added zoom check
+        });
 
-      // Handle label markers - show priority when zoomed out, all when zoomed in
-      labelMarkersRef.current.forEach((marker) => {
-        const title = marker.getTitle();
-        // Use exact match instead of includes to avoid "UHall" matching "Opp UHall"
-        const isPriority = title
-          ? priorityStops.some((p) => title === p || title.trim() === p)
-          : false;
+        // Handle label markers - show route stops (labels visible at all zoom levels)
+        labelMarkersRef.current.forEach((marker) => {
+          const title = marker.getTitle();
+          const belongsToActiveRoute = title ? routeStopNames.has(title) : false;
+          marker.setVisible(belongsToActiveRoute);
+        });
+      } else {
+        // No route selected - use default priority behavior
+        // Handle circle markers - hide when zoomed out, show all when zoomed in
+        circleMarkersRef.current.forEach((marker) => {
+          marker.setVisible(showAllStops);
+        });
 
-        // Show all stops when zoomed in, or only priority stops when zoomed out
-        marker.setVisible(showAllStops || isPriority);
+        // Handle label markers - show priority when zoomed out, all when zoomed in
+        labelMarkersRef.current.forEach((marker) => {
+          const title = marker.getTitle();
+          // Use exact match instead of includes to avoid "UHall" matching "Opp UHall"
+          const isPriority = title
+            ? priorityStops.some((p) => title === p || title.trim() === p)
+            : false;
+
+          // Show all stops when zoomed in, or only priority stops when zoomed out
+          marker.setVisible(showAllStops || isPriority);
+        });
+      }
+    };
+
+    // Function to update label sizes based on zoom level
+    const updateLabelSizes = () => {
+      const zoom = map.getZoom() || 16;
+      // Start scaling at zoom 17 when roads/POIs become visible
+      // At zoom 16 and below: 12px (original)
+      // At zoom 17: 14px (when roads/buildings show)
+      // At zoom 18: 16px
+      // At zoom 19+: 18px
+      let fontSize = 12;
+      let strokeWidth = 3;
+      
+      if (zoom >= 17) {
+        fontSize = Math.min(18, 12 + (zoom - 16) * 2);
+        strokeWidth = Math.min(4, 3 + (zoom - 16) * 0.3);
+      }
+
+      labelMarkersRef.current.forEach((marker, index) => {
+        const stop = busStops[index];
+        if (!stop) return;
+
+        const isStopPriority = isPriorityStop(stop);
+        const isRouteStop = belongsToRoute(stop);
+        const stopColor = (activeRoute && isRouteStop && routeColor) ? routeColor : '#274F9C';
+        const labelBelow = shouldLabelBelow(stop);
+        const svgAnchorY = labelBelow ? 5 : 25;
+
+        const newIcon = {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="250" height="40">
+              <text x="125" y="25" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" 
+                    fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="${strokeWidth}" paint-order="stroke">
+                ${stop.ShortName}
+              </text>
+              <text x="125" y="25" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" 
+                    fill="${stopColor}" text-anchor="middle">
+                ${stop.ShortName}
+              </text>
+            </svg>
+          `),
+          anchor: new google.maps.Point(125, svgAnchorY),
+        };
+
+        marker.setIcon(newIcon);
       });
+    };
+
+    // Helper function to find if this stop should have label below (south) or above (north)
+    const shouldLabelBelow = (stop: BusStop) => {
+      // Find nearby stops (within ~50 meters / 0.0005 degrees)
+      const nearbyStops = busStops.filter((otherStop: BusStop) => {
+        if (otherStop.ShortName === stop.ShortName) return false;
+        const latDiff = Math.abs(otherStop.latitude - stop.latitude);
+        const lngDiff = Math.abs(otherStop.longitude - stop.longitude);
+        return latDiff < 0.0005 && lngDiff < 0.0005;
+      });
+      
+      // If there are nearby stops, check if this stop is more southern (lower latitude)
+      if (nearbyStops.length > 0) {
+        const hasStopToNorth = nearbyStops.some((otherStop: BusStop) => 
+          otherStop.latitude > stop.latitude
+        );
+        return hasStopToNorth; // Label below if this stop is more south (has stops north of it)
+      }
+      
+      return false; // Default to label above
     };
 
     busStops.forEach((stop: BusStop) => {
       const isStopPriority = isPriorityStop(stop);
+      const isRouteStop = belongsToRoute(stop);
+      
+      // Determine the color to use
+      const stopColor = (activeRoute && isRouteStop && routeColor) ? routeColor : '#274F9C';
+      
+      // Determine label position based on nearby stops
+      const labelBelow = shouldLabelBelow(stop);
+      const labelOffsetLat = labelBelow ? -0.0001 : 0.0001; // Negative offset moves south
+      const svgAnchorY = labelBelow ? 5 : 25; // Anchor point changes based on position
       
       // Create circle marker
       const marker = new google.maps.Marker({
@@ -1197,7 +1495,7 @@ const useBusStopMarkers = (
         map: map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#274F9C',
+          fillColor: stopColor,
           fillOpacity: 0.8,
           strokeColor: '#FFFFFF',
           strokeWeight: 2,
@@ -1208,39 +1506,43 @@ const useBusStopMarkers = (
         visible: false, // Circles hidden by default when zoomed out
       });
 
-      // Create label marker above the circle
+      // Create label marker with dynamic position
       const label = new google.maps.Marker({
-        position: { lat: stop.latitude + 0.0001, lng: stop.longitude },
+        position: { lat: stop.latitude + labelOffsetLat, lng: stop.longitude },
         map: map,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="200" height="30">
               <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
-                    fill="#274F9C" text-anchor="middle" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
+                    fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
                 ${stop.ShortName}
               </text>
               <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
-                    fill="#274F9C" text-anchor="middle">
+                    fill="${stopColor}" text-anchor="middle">
                 ${stop.ShortName}
               </text>
             </svg>
           `),
-          anchor: new google.maps.Point(100, 15),
+          anchor: new google.maps.Point(100, svgAnchorY),
         },
         title: stop.ShortName, // Add title to label too for filtering
         zIndex: 601, // Higher than both Google Maps pins (500) and bus stop circles
-        visible: isStopPriority, // Initially show only priority stop labels
+        visible: activeRoute ? isRouteStop : isStopPriority, // Show route stops if route selected, else priority stops
       });
 
       circleMarkersRef.current.push(marker);
       labelMarkersRef.current.push(label);
     });
 
-    // Set up zoom change listener
-    const zoomListener = map.addListener('zoom_changed', updateMarkersVisibility);
+    // Set up zoom change listener to update both visibility and size
+    const zoomListener = map.addListener('zoom_changed', () => {
+      updateMarkersVisibility();
+      updateLabelSizes();
+    });
 
-    // Initial visibility update
+    // Initial visibility and size update
     updateMarkersVisibility();
+    updateLabelSizes();
 
     return () => {
       if (zoomListener) {
@@ -1251,14 +1553,15 @@ const useBusStopMarkers = (
       circleMarkersRef.current = [];
       labelMarkersRef.current = [];
     };
-  }, [mapRef, isMapCreated, showBusStops, busStopsData]);
+  }, [mapRef, isMapCreated, showBusStops, busStopsData, activeRoute, pickupPointsData, routeColor]);
 };
 
 // Hook to render destination marker with Google Maps pin icon
 const useDestinationMarker = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapCreated: boolean,
-  destination?: { lat: number; lng: number }
+  destination?: { lat: number; lng: number },
+  activeRoute?: RouteCode | null
 ) => {
   const markerRef = useRef<google.maps.Marker | null>(null);
 
@@ -1273,8 +1576,8 @@ const useDestinationMarker = (
       markerRef.current = null;
     }
 
-    // Create new destination marker if destination exists
-    if (destination) {
+    // Create new destination marker if destination exists and no route is selected
+    if (destination && !activeRoute) {
       const iconSvg = createDestinationPinSVG();
       const iconUrl = svgToDataURL(iconSvg);
 
@@ -1298,7 +1601,7 @@ const useDestinationMarker = (
         markerRef.current = null;
       }
     };
-  }, [mapRef, isMapCreated, destination]);
+  }, [mapRef, isMapCreated, destination, activeRoute]);
 
   return markerRef;
 };
@@ -1448,7 +1751,8 @@ const useRouteCheckpoints = (
  */
 const useLandmarkMarkers = (
   mapRef: React.RefObject<google.maps.Map | null>,
-  isMapCreated: boolean
+  isMapCreated: boolean,
+  activeRoute?: RouteCode | null
 ) => {
   const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
 
@@ -1461,6 +1765,11 @@ const useLandmarkMarkers = (
     // Remove existing landmark markers
     landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
     landmarkMarkersRef.current = [];
+
+    // Don't create landmark markers if a route is selected
+    if (activeRoute) {
+      return;
+    }
 
     // Create markers for each landmark
     NUS_LANDMARKS.forEach((landmark) => {
@@ -1501,7 +1810,7 @@ const useLandmarkMarkers = (
     return () => {
       landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
     };
-  }, [mapRef, isMapCreated]);
+  }, [mapRef, isMapCreated, activeRoute]);
 
   return landmarkMarkersRef;
 };
@@ -1780,6 +2089,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   
+  // Map filter state - controlled internally
+  const [mapFilters, setMapFilters] = useState<Record<string, boolean>>({
+    important: true,
+    residences: false,
+    academic: false,
+    'bus-stops': true,
+    'bus-routes': false,
+  });
+
+  // Determine if landmarks should be shown based on filters
+  const shouldShowLandmarks = mapFilters.important && showLandmarks;
+  
+  // Determine if bus stops should be shown based on filters
+  // If a route is selected, always show its bus stops regardless of filter
+  const shouldShowBusStops = activeRoute ? true : (mapFilters['bus-stops'] && showBusStops);
+  
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
     initialRegion,
@@ -1826,21 +2151,74 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return fallbackColors[activeRoute] || '#274F9C';
   }, [activeRoute, serviceDescriptions]);
 
-  useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress });
+  useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress, activeRoute }); // Hide origin/waypoint markers when route selected
   useMapPolyline(mapRef, routePolyline, routeSteps);
   useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route);
   useBusMarkers(mapRef, activeBuses, routeColor);
   useRouteCheckpoints(mapRef, activeRoute, routeColor);
-  useLandmarkMarkers(mapRef, isMapCreated && showLandmarks);
-  useBusStopMarkers(mapRef, isMapCreated, showBusStops); // Add bus stop markers with labels
+  useLandmarkMarkers(mapRef, isMapCreated && shouldShowLandmarks, activeRoute); // Control landmarks with filter
+  useBusStopMarkers(mapRef, isMapCreated, shouldShowBusStops, activeRoute, routeColor); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
-  useDestinationMarker(mapRef, isMapCreated, destination); // Add destination pin marker
+  useDestinationMarker(mapRef, isMapCreated, destination, activeRoute); // Add destination pin marker (hidden when route selected)
   usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceId); // Handle place clicks
+  usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
 
-  const handleMapTypeChange = (mapType: google.maps.MapTypeId) => {
+  const handleMapTypeChange = (mapType: google.maps.MapTypeId | 'dark' | 'light') => {
     if (mapRef.current) {
-      mapRef.current.setMapTypeId(mapType);
+      if (mapType === 'dark') {
+        // Apply dark mode styles
+        mapRef.current.setMapTypeId('roadmap');
+        const currentStyles = mapRef.current.get('styles') || [];
+        // Filter out old dark mode styles and POI hiding styles, then re-add them
+        const poiStyles = currentStyles.filter((style: any) => 
+          style.featureType === 'poi' || 
+          style.featureType === 'poi.business' || 
+          style.featureType === 'transit'
+        );
+        mapRef.current.setOptions({
+          styles: [...DARK_MODE_STYLES, ...poiStyles],
+        });
+      } else if (mapType === 'light') {
+        // Apply light mode (standard roadmap with only POI hiding)
+        mapRef.current.setMapTypeId('roadmap');
+        mapRef.current.setOptions({
+          styles: [
+            {
+              featureType: 'poi',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+            {
+              featureType: 'poi.business',
+              stylers: [{ visibility: 'off' }],
+            },
+            {
+              featureType: 'transit',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+            {
+              featureType: 'transit.station',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+            {
+              featureType: 'transit.station.rail',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+            {
+              featureType: 'transit.line',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }],
+            },
+          ],
+        });
+      } else {
+        // Standard map types (satellite, terrain, hybrid)
+        mapRef.current.setMapTypeId(mapType);
+      }
     }
   };
 
@@ -1878,8 +2256,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: '100%',
           minHeight: '400px',
           backgroundColor: '#E8EAF6',
+          filter: 'contrast(1.05) saturate(1.1)', // Slight enhancement to campus area
         }}
+        className="google-map-container"
       />
+      <style>{`
+        .google-map-container .gm-style > div:first-child {
+          filter: blur(0px) !important;
+        }
+      `}</style>
       {/* Always show controls, not just when map is loaded */}
       {showMapControls && (
         <div
@@ -1894,7 +2279,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             onMapTypeChange={handleMapTypeChange}
             onFilterChange={(filters) => {
               console.log('Filter changes:', filters);
-              // TODO: Implement filter logic for map layers
+              setMapFilters(filters);
             }}
           />
         </div>

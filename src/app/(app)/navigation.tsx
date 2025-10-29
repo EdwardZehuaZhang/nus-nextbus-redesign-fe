@@ -24,7 +24,7 @@ import {
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
 import { useLocation } from '@/lib/hooks/use-location';
-import { addFavorite, isFavorite } from '@/lib/storage/favorites';
+import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
 import { getTransitLineColor } from '@/lib/transit-colors';
 
 import { CircleIcon } from './circle-icon';
@@ -92,11 +92,11 @@ const PersonIcon = () => (
   </Svg>
 );
 
-const BookmarkIcon = () => (
+const BookmarkIcon = ({ fill = 'black' }: { fill?: string }) => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
     <Path
       d="M14.375 2.50562H5.625C5.29348 2.50562 4.97554 2.63731 4.74112 2.87173C4.5067 3.10615 4.375 3.42409 4.375 3.75562V17.5056C4.37506 17.6172 4.40496 17.7266 4.46161 17.8227C4.51826 17.9188 4.59959 17.998 4.69716 18.052C4.79473 18.1061 4.90498 18.133 5.01648 18.1301C5.12798 18.1271 5.23666 18.0944 5.33125 18.0353L10 15.1173L14.6695 18.0353C14.7641 18.0942 14.8727 18.1268 14.9841 18.1296C15.0955 18.1325 15.2056 18.1055 15.303 18.0514C15.4005 17.9974 15.4817 17.9183 15.5383 17.8224C15.5949 17.7264 15.6249 17.617 15.625 17.5056V3.75562C15.625 3.42409 15.4933 3.10615 15.2589 2.87173C15.0245 2.63731 14.7065 2.50562 14.375 2.50562ZM14.375 16.3783L10.3305 13.8509C10.2311 13.7888 10.1164 13.7559 9.99922 13.7559C9.88208 13.7559 9.7673 13.7888 9.66797 13.8509L5.625 16.3783V3.75562H14.375V16.3783Z"
-      fill="black"
+      fill={fill}
     />
   </Svg>
 );
@@ -257,6 +257,33 @@ export default function NavigationPage() {
   const currentDestination =
     typeof destination === 'string' ? destination : 'COM3';
 
+  // Helper function to get actual location names from route data
+  const getActualLocationNames = (): { fromName: string; toName: string } => {
+    // If we have route data, extract the actual stop names
+    if (routes.length > 0 && routes[0].legs?.[0]?.steps) {
+      const steps = routes[0].legs[0].steps;
+      
+      // Find the first transit step to get the departure stop name
+      const firstTransitStep = steps.find(step => step.travelMode === 'TRANSIT');
+      const departureStopName = firstTransitStep?.transitDetails?.stopDetails?.departureStop?.name;
+      
+      // Find the last transit step to get the arrival stop name
+      const lastTransitStep = [...steps].reverse().find(step => step.travelMode === 'TRANSIT');
+      const arrivalStopName = lastTransitStep?.transitDetails?.stopDetails?.arrivalStop?.name;
+      
+      return {
+        fromName: departureStopName || (typeof from === 'string' ? from : 'Your location'),
+        toName: arrivalStopName || toLocation,
+      };
+    }
+    
+    // Fallback to URL parameters
+    return {
+      fromName: typeof from === 'string' ? from : 'Your location',
+      toName: toLocation,
+    };
+  };
+
   // Get from and to for favorites
   const fromLocation = typeof from === 'string' ? from : 'Your location';
   const toLocation = typeof to === 'string' ? to : currentDestination;
@@ -267,14 +294,29 @@ export default function NavigationPage() {
   );
 
   const handleSaveFavorite = () => {
+    // Get the actual location names from the route data
+    const { fromName, toName } = getActualLocationNames();
+    
     if (!favorited) {
+      // Save the favorite with actual stop names
       addFavorite({
-        from: fromLocation,
-        to: toLocation,
-        fromId: fromLocation,
-        toId: toLocation,
+        from: fromName,
+        to: toName,
+        fromId: fromName,
+        toId: toName,
       });
       setFavorited(true);
+    } else {
+      // Remove the favorite
+      const favorites = getFavorites();
+      const existingFavorite = favorites.find(
+        (f) => (f.fromId === fromLocation && f.toId === toLocation) ||
+               (f.fromId === fromName && f.toId === toName)
+      );
+      if (existingFavorite) {
+        removeFavorite(existingFavorite.id);
+        setFavorited(false);
+      }
     }
   };
 
@@ -1327,7 +1369,6 @@ export default function NavigationPage() {
               {/* Save as Favorite Button */}
               <Pressable
                 onPress={handleSaveFavorite}
-                disabled={favorited}
                 style={{
                   flex: 1,
                   height: 36,
@@ -1339,24 +1380,23 @@ export default function NavigationPage() {
                   gap: 4,
                   borderRadius: 8,
                   borderWidth: 1,
-                  borderColor: favorited ? '#274F9C' : '#E5E5E5',
-                  backgroundColor: favorited ? '#F0F4FF' : '#FFFFFF',
+                  borderColor: favorited ? '#6B7280' : '#E5E5E5',
+                  backgroundColor: favorited ? '#6B7280' : '#FFFFFF',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                   elevation: 1,
                   flexDirection: 'row',
-                  opacity: favorited ? 0.7 : 1,
                 }}
               >
                 <Text
                   style={{
                     fontSize: 14,
                     fontWeight: '500',
-                    color: favorited ? '#274F9C' : '#211F26',
+                    color: favorited ? '#FFFFFF' : '#211F26',
                   }}
                 >
-                  {favorited ? 'Saved' : 'Save'}
+                  {favorited ? 'Unsave' : 'Save'}
                 </Text>
-                <BookmarkIcon />
+                <BookmarkIcon fill={favorited ? '#FFFFFF' : '#000000'} />
               </Pressable>
             </View>
           </ScrollView>

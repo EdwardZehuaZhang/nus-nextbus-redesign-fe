@@ -17,9 +17,10 @@ const CheckIcon = () => (
 );
 
 const filterItems = [
-  { id: 'residences', label: 'Residences', checked: true },
-  { id: 'academic', label: 'Academic', checked: true },
-  { id: 'bus-stops', label: 'Bus Stops', checked: false },
+  { id: 'important', label: 'Important', checked: true },
+  { id: 'bus-stops', label: 'Bus Stops', checked: true },
+  { id: 'residences', label: 'Residences', checked: false },
+  { id: 'academic', label: 'Academic', checked: false },
   { id: 'bus-routes', label: 'Bus Routes', checked: false },
 ];
 

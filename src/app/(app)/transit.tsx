@@ -1391,6 +1391,7 @@ export default function TransitPage() {
           showD1Route={selectedRoute === 'D1'}
           activeRoute={selectedRoute as any} // Pass selected route to show real-time buses
           showBusStops={true} // Show bus stop markers with labels
+          showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
         />
       </View>
 

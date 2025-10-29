@@ -3,16 +3,17 @@ import React, { useState } from 'react';
 import { MapFilterSelector } from './map-filter-selector';
 
 const mapOptions = [
-  { id: 'roadmap', label: 'Default' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
   { id: 'satellite', label: 'Satellite' },
   { id: 'terrain', label: 'Terrain' },
   { id: 'hybrid', label: 'Hybrid' },
 ];
 
 interface MapTypeSelectorProps {
-  onMapTypeChange?: (mapType: google.maps.MapTypeId) => void;
+  onMapTypeChange?: (mapType: google.maps.MapTypeId | 'dark' | 'light') => void;
   onFilterChange?: (filters: Record<string, boolean>) => void;
-  initialMapType?: google.maps.MapTypeId;
+  initialMapType?: google.maps.MapTypeId | 'dark' | 'light';
 }
 
 const LayersIcon = () => (
@@ -94,7 +95,7 @@ const Dropdown: React.FC<DropdownProps> = ({ selectedMap, onMapChange }) => (
 export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
   onMapTypeChange,
   onFilterChange,
-  initialMapType = 'roadmap',
+  initialMapType = 'light',
 }) => {
   const [selectedMap, setSelectedMap] = useState(initialMapType);
   const [isMapTypeOpen, setIsMapTypeOpen] = useState(false);
@@ -103,7 +104,7 @@ export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
   const handleMapChange = (value: string) => {
     setSelectedMap(value);
     if (onMapTypeChange) {
-      onMapTypeChange(value as google.maps.MapTypeId);
+      onMapTypeChange(value as google.maps.MapTypeId | 'dark' | 'light');
     }
     setIsMapTypeOpen(false);
   };
