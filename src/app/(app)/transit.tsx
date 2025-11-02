@@ -309,6 +309,8 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
     >
       {times.map((timeItem, index) => {
         const isLast = index === times.length - 1;
+        // Hide capacity icon when time is "N/A" (bus doesn't exist)
+        const showCapacity = timeItem.time !== 'N/A';
         return (
           <View key={index}>
             <View className="flex-row items-center justify-between bg-white px-3 py-2">
@@ -316,7 +318,7 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
                 time={timeItem.time}
                 textColor={timeItem.textColor}
               />
-              <CrowdingIndicator crowding={timeItem.crowding} />
+              {showCapacity && <CrowdingIndicator crowding={timeItem.crowding} />}
             </View>
             {!isLast && (
               <View className="h-px bg-neutral-200" style={{ marginTop: -1 }} />

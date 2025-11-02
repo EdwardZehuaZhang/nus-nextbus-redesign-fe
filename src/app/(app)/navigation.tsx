@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { TextInput } from 'react-native';
+import { Animated, TextInput, Platform } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import {
@@ -11,6 +11,7 @@ import {
   durationToMinutes,
   formatTime,
 } from '@/api';
+import { useNearestBusStop, useStopsBetween } from '@/api/lta/hooks';
 import { BusIndicator } from '@/components/bus-indicator';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
@@ -23,9 +24,22 @@ import {
   View,
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
+import { Search as SearchIcon, Van } from '@/components/ui/icons';
 import { useLocation } from '@/lib/hooks/use-location';
 import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
 import { getTransitLineColor } from '@/lib/transit-colors';
+import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
+import { InternalRoutesSection } from '@/components/internal-route-card';
+import type { InternalBusRoute } from '@/lib/route-finding';
+import {
+  type BusStation,
+  searchBusStations,
+  getBusStationByName,
+} from '@/lib/bus-stations';
+import {
+  addRecentSearch,
+  getRecentSearches,
+} from '@/lib/storage/recent-searches';
 
 import { CircleIcon } from './circle-icon';
 import { DragIcon } from './drag-icon';
@@ -85,7 +99,7 @@ const PersonIcon = () => (
     <G clipPath="url(#clip0_530_1543)">
       <Path
         d="M7.81257 2.81812C7.81257 2.38547 7.94086 1.96254 8.18123 1.60281C8.42159 1.24307 8.76323 0.962696 9.16295 0.79713C9.56266 0.631563 10.0025 0.588243 10.4268 0.672648C10.8512 0.757054 11.2409 0.965393 11.5469 1.27132C11.8528 1.57725 12.0611 1.96702 12.1455 2.39136C12.2299 2.81569 12.1866 3.25552 12.0211 3.65524C11.8555 4.05495 11.5751 4.39659 11.2154 4.63696C10.8556 4.87732 10.4327 5.00562 10.0001 5.00562C9.4199 5.00562 8.86351 4.77515 8.45327 4.36491C8.04303 3.95468 7.81257 3.39828 7.81257 2.81812ZM16.8298 11.0041L13.2946 6.99624C13.0893 6.76347 12.8369 6.57705 12.554 6.44935C12.2711 6.32166 11.9643 6.25562 11.654 6.25562H8.34616C8.03581 6.25562 7.729 6.32166 7.44614 6.44935C7.16327 6.57705 6.91081 6.76347 6.70553 6.99624L3.17038 11.0041C2.94083 11.2389 2.81293 11.5547 2.81434 11.8831C2.81575 12.2115 2.94635 12.5262 3.17791 12.7591C3.40947 12.992 3.72338 13.1244 4.05178 13.1277C4.38018 13.131 4.69669 13.0049 4.93288 12.7767L6.95319 11.1541L5.41413 17.0041C5.28023 17.3046 5.27026 17.6459 5.38639 17.9538C5.50253 18.2617 5.73539 18.5114 6.03445 18.6487C6.33351 18.786 6.67465 18.7998 6.98384 18.6872C7.29303 18.5745 7.54533 18.3445 7.686 18.047L10.0001 14.0681L12.311 18.0525C12.4517 18.35 12.704 18.58 13.0132 18.6926C13.3224 18.8053 13.6635 18.7915 13.9626 18.6542C14.2616 18.5169 14.4945 18.2672 14.6106 17.9593C14.7267 17.6514 14.7168 17.3101 14.5829 17.0095L13.0469 11.1541L15.0704 12.7767C15.3066 13.0049 15.6231 13.131 15.9515 13.1277C16.2799 13.1244 16.5938 12.992 16.8253 12.7591C17.0569 12.5262 17.1875 12.2115 17.1889 11.8831C17.1903 11.5547 17.0624 11.2389 16.8329 11.0041H16.8298Z"
-        fill="#737373"
+        fill="#274F9C"
       />
     </G>
     <Defs>
@@ -252,9 +266,254 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
   </Svg>
 );
 
+// Custom hook for drag handlers (similar to transit page)
+const useDragHandlers = () => {
+  const [containerHeight, setContainerHeight] = React.useState(35); // Start at 35%
+  const [tempHeight, setTempHeight] = React.useState<number | null>(null);
+  const startHeight = React.useRef(35);
+  const dragStartY = React.useRef(0);
+  const dragStartTime = React.useRef(0);
+  const isDragging = React.useRef(false);
+
+  const MIN_HEIGHT = 5; // Minimum height - just frame visible
+  const MAX_HEIGHT = 90; // Maximum height - based on content
+  const DEFAULT_HEIGHT = 35; // Default state
+
+  const handleDragMove = (dy: number) => {
+    // Store the starting height when drag begins
+    if (tempHeight === null) {
+      startHeight.current = containerHeight;
+    }
+
+    // Convert dy (pixels) to percentage of screen height
+    const screenHeight =
+      typeof window !== 'undefined' ? window.innerHeight : 800;
+    const heightChange = (dy / screenHeight) * 100;
+
+    // Calculate new height (dragging down increases dy, so we subtract)
+    let newHeight = startHeight.current - heightChange;
+
+    // Clamp between MIN and MAX
+    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+
+    setTempHeight(newHeight);
+    setContainerHeight(newHeight);
+  };
+
+  const handleDragEnd = () => {
+    // Snap to nearest state
+    const currentHeight = tempHeight ?? containerHeight;
+
+    let targetHeight = DEFAULT_HEIGHT;
+
+    if (currentHeight < 15) {
+      // Snap to collapsed (minimum)
+      targetHeight = MIN_HEIGHT;
+    } else if (currentHeight > 60) {
+      // Snap to expanded (max based on content)
+      targetHeight = MAX_HEIGHT;
+    } else {
+      // Snap to default
+      targetHeight = DEFAULT_HEIGHT;
+    }
+
+    setContainerHeight(targetHeight);
+    setTempHeight(null);
+  };
+
+  const handleDrag = (_gestureState: { dy: number; vy: number }) => {
+    // This is called on drag end
+    handleDragEnd();
+  };
+
+  return {
+    containerHeight,
+    handleDrag,
+    handleDragMove,
+    handleDragEnd,
+    dragStartY,
+    dragStartTime,
+    isDragging,
+  };
+};
+
+/**
+ * Component to display intermediate bus stops using LTA API
+ */
+const IntermediateStops = ({
+  step,
+  serviceNo,
+  isExpanded,
+}: {
+  step: RouteStep;
+  serviceNo: string;
+  isExpanded: boolean;
+}) => {
+  const departureStop = step.transitDetails?.stopDetails?.departureStop;
+  const arrivalStop = step.transitDetails?.stopDetails?.arrivalStop;
+
+  // LTA API doesn't work on web due to CORS - only fetch on mobile
+  const isWeb = Platform.OS === 'web';
+  const enableFetch = isExpanded && !isWeb;
+
+  // Find nearest LTA bus stops to the Google Maps coordinates
+  const { data: fromLTAStop } = useNearestBusStop(
+    departureStop?.location?.latLng?.latitude || 0,
+    departureStop?.location?.latLng?.longitude || 0,
+    150, // 150m radius
+    enableFetch && !!departureStop
+  );
+
+  const { data: toLTAStop } = useNearestBusStop(
+    arrivalStop?.location?.latLng?.latitude || 0,
+    arrivalStop?.location?.latLng?.longitude || 0,
+    150,
+    enableFetch && !!arrivalStop
+  );
+
+  // Fetch intermediate stops if we found matching LTA stops
+  const { data: intermediateStops, isLoading } = useStopsBetween(
+    serviceNo,
+    fromLTAStop?.BusStopCode || '',
+    toLTAStop?.BusStopCode || '',
+    1, // Default to direction 1 (we could make this smarter)
+    enableFetch && !!fromLTAStop && !!toLTAStop
+  );
+
+  if (!isExpanded) return null;
+
+  // Show message on web platform
+  if (isWeb) {
+    return (
+      <View
+        style={{
+          paddingLeft: 24,
+          paddingVertical: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '400',
+            color: '#737373',
+            fontFamily: 'Inter',
+            fontStyle: 'italic',
+          }}
+        >
+          {step.transitDetails?.numStops || 0} stops between{' '}
+          {departureStop?.name || 'departure'} and {arrivalStop?.name || 'destination'}
+          {'\n'}
+          <Text style={{ fontSize: 11, color: '#999' }}>
+            (Detailed stop list available on mobile only)
+          </Text>
+        </Text>
+      </View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View
+        style={{
+          paddingLeft: 24,
+          paddingVertical: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '400',
+            color: '#737373',
+            fontFamily: 'Inter',
+            fontStyle: 'italic',
+          }}
+        >
+          Loading stops...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!intermediateStops || intermediateStops.length === 0) {
+    const numStops = step.transitDetails?.stopCount || 0;
+    const boardingStop = departureStop?.name || 'Unknown';
+    const alightingStop = arrivalStop?.name || 'Unknown';
+
+    return (
+      <View
+        style={{
+          paddingLeft: 24,
+          paddingVertical: 8,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: '400',
+            color: '#737373',
+            fontFamily: 'Inter',
+            fontStyle: 'italic',
+          }}
+        >
+          {numStops} {numStops === 1 ? 'stop' : 'stops'} between {boardingStop}{' '}
+          and {alightingStop}
+        </Text>
+      </View>
+    );
+  }
+
+  // Display the list of intermediate stops
+  return (
+    <View
+      style={{
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 8,
+        paddingLeft: 24,
+        paddingVertical: 8,
+      }}
+    >
+      {intermediateStops.map((stop, index) => {
+        const isFirst = index === 0;
+        const isLast = index === intermediateStops.length - 1;
+
+        return (
+          <View
+            key={`${stop.BusStopCode}-${stop.StopSequence}`}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <View
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: isFirst || isLast ? '#211F26' : '#A3A3A3',
+              }}
+            />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: isFirst || isLast ? '500' : '400',
+                color: isFirst || isLast ? '#211F26' : '#525252',
+                fontFamily: 'Inter',
+              }}
+            >
+              {stop.stopDetails?.Description || `Stop ${stop.BusStopCode}`}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
 export default function NavigationPage() {
   const router = useRouter();
-  const { destination, from, to, userLat, userLng } = useLocalSearchParams();
+  const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -263,6 +522,23 @@ export default function NavigationPage() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
+  const [selectedInternalRoute, setSelectedInternalRoute] = useState<InternalBusRoute | null>(null);
+  
+  // Search panel state
+  const [showSearchPanel, setShowSearchPanel] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [searchResults, setSearchResults] = useState<BusStation[]>([]);
+  const [recentSearches, setRecentSearches] = useState<any[]>([]);
+
+  // Use drag handlers for the bottom sheet
+  const {
+    containerHeight,
+    handleDrag,
+    handleDragMove,
+    dragStartY,
+    dragStartTime,
+    isDragging,
+  } = useDragHandlers();
 
   // Use global location hook
   const { coords: globalUserLocation } = useLocation();
@@ -270,6 +546,85 @@ export default function NavigationPage() {
   // Get destination from URL parameter or default to "COM3"
   const currentDestination =
     typeof destination === 'string' ? destination : 'COM3';
+
+  // Determine the origin display name and coordinates
+  const originName = typeof customOrigin === 'string' ? customOrigin : 'Your location';
+  const hasCustomOrigin = typeof customOrigin === 'string' && customOrigin !== '';
+  
+  // Parse custom origin coordinates if available
+  const customOriginCoords = React.useMemo(() => {
+    if (typeof customOriginLat === 'string' && typeof customOriginLng === 'string') {
+      const lat = parseFloat(customOriginLat);
+      const lng = parseFloat(customOriginLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { latitude: lat, longitude: lng };
+      }
+    }
+    return null;
+  }, [customOriginLat, customOriginLng]);
+
+  // Calculate the effective origin for routing - use custom origin if available, otherwise use GPS location
+  const effectiveOrigin = React.useMemo(() => {
+    if (customOriginCoords) {
+      return customOriginCoords;
+    }
+    if (userLocation) {
+      return userLocation;
+    }
+    if (globalUserLocation) {
+      return {
+        latitude: globalUserLocation.latitude,
+        longitude: globalUserLocation.longitude,
+      };
+    }
+    return null;
+  }, [customOriginCoords, userLocation, globalUserLocation]);
+
+  // Use internal route finder hook
+  const {
+    routes: internalRoutes,
+    bestRoute: bestInternalRoute,
+    isLoading: isLoadingInternalRoutes,
+    error: internalRouteError,
+    recommendInternal,
+    googleMapsTime,
+  } = useInternalRouteFinder({
+    origin: effectiveOrigin,
+    destination: destinationCoords ? {
+      latitude: destinationCoords.lat,
+      longitude: destinationCoords.lng,
+    } : null,
+    googleMapsTimeSeconds: routes.length > 0 && routes[0].legs?.[0]?.duration 
+      ? durationToMinutes(routes[0].legs[0].duration) * 60 
+      : undefined,
+    enabled: !!effectiveOrigin && !!destinationCoords,
+  });
+
+  // Update userLocation state when effectiveOrigin changes (for map display)
+  useEffect(() => {
+    if (effectiveOrigin) {
+      setUserLocation(effectiveOrigin);
+    }
+  }, [effectiveOrigin]);
+
+  // Load recent searches on component mount
+  useEffect(() => {
+    const loadRecentSearches = () => {
+      const stored = getRecentSearches();
+      setRecentSearches(stored);
+    };
+    loadRecentSearches();
+  }, []);
+
+  // Handle search input changes
+  useEffect(() => {
+    if (searchText.trim().length > 0) {
+      const results = searchBusStations(searchText);
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchText]);
 
   // Helper function to get actual location names from route data
   const getActualLocationNames = (): { fromName: string; toName: string } => {
@@ -291,15 +646,15 @@ export default function NavigationPage() {
       };
     }
     
-    // Fallback to URL parameters
+    // Fallback to URL parameters or custom origin
     return {
-      fromName: typeof from === 'string' ? from : 'Your location',
+      fromName: originName,
       toName: toLocation,
     };
   };
 
-  // Get from and to for favorites
-  const fromLocation = typeof from === 'string' ? from : 'Your location';
+  // Get from and to for favorites - use custom origin if available
+  const fromLocation = originName;
   const toLocation = typeof to === 'string' ? to : currentDestination;
 
   // Check if this route is already favorited
@@ -369,11 +724,20 @@ export default function NavigationPage() {
       return destinations[upperDest];
     }
     
-    // Try partial match
+    // Try partial match in hardcoded destinations
     for (const [key, coords] of Object.entries(destinations)) {
       if (key.includes(upperDest) || upperDest.includes(key)) {
         return coords;
       }
+    }
+    
+    // Try to find in bus stations database
+    const busStation = getBusStationByName(dest);
+    if (busStation?.coordinates) {
+      return {
+        lat: busStation.coordinates.latitude,
+        lng: busStation.coordinates.longitude,
+      };
     }
     
     return null;
@@ -390,37 +754,20 @@ export default function NavigationPage() {
       }
 
       setDestinationCoords(destCoords); // Store destination coords for map marker
+
+      // If we don't have an origin yet, wait
+      if (!effectiveOrigin) {
+        setIsLoadingRoutes(false);
+        return;
+      }
+
       setIsLoadingRoutes(true);
       setRouteError(null);
 
       try {
-        // Use passed user location from transit page, or get current location, or use NUS campus center as fallback
-        let originLatLng = { latitude: 1.2976493, longitude: 103.7766916 }; // Default: NUS center
-
-        // First, try to use the passed user location from URL params
-        if (userLat && userLng) {
-          const lat = parseFloat(typeof userLat === 'string' ? userLat : userLat[0]);
-          const lng = parseFloat(typeof userLng === 'string' ? userLng : userLng[0]);
-          
-          if (!isNaN(lat) && !isNaN(lng)) {
-            originLatLng = { latitude: lat, longitude: lng };
-            setUserLocation(originLatLng); // Save user location for map display
-          }
-        } else if (globalUserLocation) {
-          // Use global location from hook if available
-          originLatLng = {
-            latitude: globalUserLocation.latitude,
-            longitude: globalUserLocation.longitude,
-          };
-          setUserLocation(originLatLng);
-        } else {
-          // If no user location available, use default NUS campus center
-          // The global location hook is still loading
-        }
-
         const origin: Waypoint = {
           location: {
-            latLng: originLatLng,
+            latLng: effectiveOrigin,
           },
         };
 
@@ -450,7 +797,7 @@ export default function NavigationPage() {
     };
 
     fetchRoutes();
-  }, [currentDestination, userLat, userLng, globalUserLocation]);
+  }, [currentDestination, effectiveOrigin]);
 
   // Manage all locations as a unified list
   type LocationItem = {
@@ -461,7 +808,7 @@ export default function NavigationPage() {
   };
 
   const [locations, setLocations] = useState<LocationItem[]>([
-    { id: '1', text: 'Your location', type: 'origin', isEditable: false },
+    { id: '1', text: originName, type: 'origin', isEditable: false },
     {
       id: '2',
       text: currentDestination,
@@ -469,6 +816,19 @@ export default function NavigationPage() {
       isEditable: false,
     },
   ]);
+
+  // Update locations when originName changes
+  useEffect(() => {
+    setLocations([
+      { id: '1', text: originName, type: 'origin', isEditable: false },
+      {
+        id: '2',
+        text: currentDestination,
+        type: 'destination',
+        isEditable: false,
+      },
+    ]);
+  }, [originName, currentDestination]);
 
   const handleAddStop = () => {
     const newStop: LocationItem = {
@@ -595,7 +955,14 @@ export default function NavigationPage() {
 
             return (
               <React.Fragment key={location.id}>
-                <View
+                <Pressable
+                  onPress={() => {
+                    // Only allow clicking on the origin to change it
+                    if (isOrigin) {
+                      setShowSearchPanel(true);
+                    }
+                  }}
+                  disabled={!isOrigin}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
@@ -671,7 +1038,7 @@ export default function NavigationPage() {
                       </Pressable>
                     </View>
                   )}
-                </View>
+                </Pressable>
 
                 {/* Divider - show for all except last location */}
                 {!isLast && (
@@ -725,7 +1092,7 @@ export default function NavigationPage() {
         </View>
 
         {/* Journey Details Card */}
-        <View
+        <Animated.View
           style={{
             position: 'absolute',
             bottom: 0,
@@ -738,15 +1105,278 @@ export default function NavigationPage() {
             paddingTop: 4,
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
             elevation: 5,
-            maxHeight: '35%',
+            height: `${containerHeight}%`,
+          }}
+          onTouchStart={(e: any) => {
+            const touch = e.nativeEvent.touches?.[0];
+            if (touch && dragStartY && isDragging && dragStartTime) {
+              dragStartY.current = touch.pageY;
+              dragStartTime.current = Date.now();
+              isDragging.current = true;
+            }
+          }}
+          onTouchMove={(e: any) => {
+            if (!isDragging || !isDragging.current) return;
+            const touch = e.nativeEvent.touches?.[0];
+            if (touch && dragStartY) {
+              const dy = touch.pageY - dragStartY.current;
+              handleDragMove(dy);
+            }
+          }}
+          onTouchEnd={(e: any) => {
+            if (!isDragging || !isDragging.current) return;
+            const touch = e.nativeEvent.changedTouches?.[0];
+            if (touch && dragStartY && dragStartTime) {
+              const dy = touch.pageY - dragStartY.current;
+              const dt = Date.now() - dragStartTime.current;
+              const vy = dy / dt;
+              handleDrag({ dy, vy });
+              isDragging.current = false;
+            }
           }}
         >
           <Frame />
           <ScrollView
-            showsVerticalScrollIndicator={false}
+            scrollEnabled={containerHeight > 60}
+            showsVerticalScrollIndicator={containerHeight > 60}
             style={{ marginTop: 12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
+            {showSearchPanel ? (
+              // SEARCH PANEL
+              <>
+                {/* Search Header */}
+                <View
+                  style={{
+                    marginBottom: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 16,
+                  }}
+                >
+                  <View
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#E5E5E5',
+                      backgroundColor: '#FFFFFF',
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+                      elevation: 1,
+                    }}
+                  >
+                    <SearchIcon />
+                    <TextInput
+                      placeholder="Search for location..."
+                      placeholderTextColor="#737373"
+                      value={searchText}
+                      onChangeText={setSearchText}
+                      autoFocus={true}
+                      style={{
+                        flex: 1,
+                        fontSize: 16,
+                        color: '#211F26',
+                        padding: 0,
+                        outlineWidth: 0,
+                      }}
+                    />
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setShowSearchPanel(false);
+                      setSearchText('');
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '500',
+                        color: '#274F9C',
+                      }}
+                    >
+                      Cancel
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Search Results or Recent Searches */}
+                {searchText.trim().length > 0 ? (
+                  // Search Results
+                  <View>
+                    {searchResults.length > 0 ? (
+                      <View>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontWeight: '500',
+                            color: '#737373',
+                            marginBottom: 12,
+                          }}
+                        >
+                          Search Results ({searchResults.length})
+                        </Text>
+                        {searchResults.map((item, index) => {
+                          const IconComponent = item.icon;
+                          return (
+                            <Pressable
+                              key={item.id}
+                              onPress={() => {
+                                // Add to recent searches
+                                addRecentSearch(item);
+                                
+                                // Update origin with selected location
+                                router.replace({
+                                  pathname: '/navigation' as any,
+                                  params: {
+                                    destination: currentDestination,
+                                    customOrigin: item.name,
+                                    customOriginLat: item.coordinates?.latitude?.toString(),
+                                    customOriginLng: item.coordinates?.longitude?.toString(),
+                                    userLat,
+                                    userLng,
+                                  },
+                                });
+                                
+                                // Close search panel
+                                setShowSearchPanel(false);
+                                setSearchText('');
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 12,
+                                paddingVertical: 12,
+                                borderBottomWidth: index < searchResults.length - 1 ? 1 : 0,
+                                borderBottomColor: '#E5E5E5',
+                              }}
+                            >
+                              <View
+                                style={{
+                                  width: 36,
+                                  height: 36,
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: 18,
+                                  backgroundColor: '#F5F5F5',
+                                  padding: 8,
+                                }}
+                              >
+                                <IconComponent style={{ width: 20, height: 20 }} />
+                              </View>
+                              <Text
+                                style={{
+                                  flex: 1,
+                                  fontSize: 16,
+                                  fontWeight: '500',
+                                  color: '#211F26',
+                                }}
+                              >
+                                {item.name}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : (
+                      <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+                        <Text style={{ fontSize: 16, color: '#737373' }}>
+                          No results found for "{searchText}"
+                        </Text>
+                        <Text
+                          style={{
+                            marginTop: 8,
+                            fontSize: 14,
+                            color: '#A3A3A3',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Try searching with different keywords
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  // Recent Searches
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontWeight: '500',
+                        color: '#737373',
+                        marginBottom: 12,
+                      }}
+                    >
+                      Recents
+                    </Text>
+                    {recentSearches.slice(0, 5).map((item, index) => {
+                      const IconComponent = item.icon || Van;
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={() => {
+                            // Update origin with selected location
+                            router.replace({
+                              pathname: '/navigation' as any,
+                              params: {
+                                destination: currentDestination,
+                                customOrigin: item.name,
+                                customOriginLat: item.coordinates?.latitude?.toString(),
+                                customOriginLng: item.coordinates?.longitude?.toString(),
+                                userLat,
+                                userLng,
+                              },
+                            });
+                            
+                            // Close search panel
+                            setShowSearchPanel(false);
+                            setSearchText('');
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 12,
+                            paddingVertical: 12,
+                            borderBottomWidth: index < recentSearches.slice(0, 5).length - 1 ? 1 : 0,
+                            borderBottomColor: '#E5E5E5',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 36,
+                              height: 36,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 18,
+                              backgroundColor: '#F5F5F5',
+                              padding: 8,
+                            }}
+                          >
+                            <IconComponent style={{ width: 20, height: 20 }} />
+                          </View>
+                          <Text
+                            style={{
+                              flex: 1,
+                              fontSize: 16,
+                              fontWeight: '500',
+                              color: '#211F26',
+                            }}
+                          >
+                            {item.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </>
+            ) : (
+              // JOURNEY DETAILS (original content)
+              <>
             {/* Journey Time Header */}
             <View
               style={{
@@ -802,12 +1432,12 @@ export default function NavigationPage() {
             {/* Journey Steps */}
             <View style={{ marginBottom: 16 }}>
               {/* Loading/Error States */}
-              {isLoadingRoutes && (
+              {(isLoadingRoutes || isLoadingInternalRoutes) && (
                 <Text style={{ fontSize: 14, color: '#666', padding: 16 }}>
-                  Loading route...
+                  Finding best route...
                 </Text>
               )}
-              {routeError && (
+              {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && (
                 <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
                     ❌ Error: {routeError}
@@ -821,10 +1451,25 @@ export default function NavigationPage() {
                 </View>
               )}
 
-              {/* Render Dynamic Route Steps */}
-              {!isLoadingRoutes && !routeError && routes.length > 0 && routes[0].legs && (
+              {/* Show Internal Route if it's faster, otherwise show Google Maps route */}
+              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && recommendInternal && bestInternalRoute ? (
+                // DISPLAY INTERNAL BUS ROUTE
                 <>
-                  {/* Step 1: Your location */}
+                  {/* Badge showing this is the internal route */}
+                  <View style={{ 
+                    backgroundColor: '#DCFCE7', 
+                    padding: 8, 
+                    borderRadius: 6, 
+                    marginBottom: 12,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#16A34A'
+                  }}>
+                    <Text style={{ fontSize: 13, color: '#166534', fontWeight: '600' }}>
+                      🚌 Faster with Internal Shuttle ({Math.ceil(bestInternalRoute.totalTime / 60)} min vs Google Maps {googleMapsTime ? Math.ceil(googleMapsTime / 60) : '?'} min)
+                    </Text>
+                  </View>
+
+                  {/* Step 1: Origin location */}
                   <View
                     style={{
                       flexDirection: 'row',
@@ -847,7 +1492,389 @@ export default function NavigationPage() {
                           color: '#211F26',
                         }}
                       >
-                        Your location
+                        {originName}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </Text>
+                  </View>
+
+                  {/* Walking segment to bus stop */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 40,
+                      justifyContent: 'center',
+                      marginVertical: 4,
+                    }}
+                  >
+                    <DotDivider />
+                    <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                  </View>
+
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'flex-start', 
+                    gap: 16, 
+                    marginBottom: 8 
+                  }}>
+                    <View style={{ width: 21, alignItems: 'center', paddingTop: 6 }}>
+                      <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+                        <Path
+                          d="M8 2.5C8.41421 2.5 8.75 2.16421 8.75 1.75C8.75 1.33579 8.41421 1 8 1C7.58579 1 7.25 1.33579 7.25 1.75C7.25 2.16421 7.58579 2.5 8 2.5Z"
+                          fill="#737373"
+                        />
+                        <Path
+                          d="M9.5 5L8.5 4L7 6.5L6 7L4.5 11L5.5 11.5L6.5 8.5L7.5 8L8 10.5L7 14.5H8L9 10L10 8.5L11.5 9.5L12 8.5L9.5 7V5Z"
+                          fill="#737373"
+                        />
+                      </Svg>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, color: '#737373' }}>
+                        Walk {Math.ceil(bestInternalRoute.walkToStopTime / 60)} min ({Math.round(bestInternalRoute.walkToStopDistance)}m)
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Departure bus stop */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 16,
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <DotDivider />
+                    <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                  </View>
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{ 
+                        width: 8, 
+                        height: 8, 
+                        borderRadius: 4, 
+                        backgroundColor: '#274F9C' 
+                      }} />
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                        {bestInternalRoute.departureStop.code}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {new Date(Date.now() + bestInternalRoute.walkToStopTime * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </Text>
+                  </View>
+
+                  {/* Bus segment - THIS IS THE KEY PART */}
+                  {(() => {
+                    const routeColor = bestInternalRoute.routeCode === 'A1' ? '#FF6B6B' :
+                                     bestInternalRoute.routeCode === 'A2' ? '#4ECDC4' :
+                                     bestInternalRoute.routeCode === 'D1' ? '#FFD93D' :
+                                     bestInternalRoute.routeCode === 'D2' ? '#55DD33' :
+                                     '#95E1D3'; // BTC
+                    
+                    return (
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'flex-start', 
+                        gap: 16, 
+                        flex: 1 
+                      }}>
+                        {/* Vertical line with bus color */}
+                        <View style={{ 
+                          flexDirection: 'column', 
+                          width: 21, 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between', 
+                          alignSelf: 'stretch' 
+                        }}>
+                          <View style={{ marginTop: -2.5 }}>
+                            <View style={{ 
+                              flexDirection: 'row', 
+                              alignItems: 'center', 
+                              gap: 10, 
+                              padding: 6, 
+                              marginLeft: -5.5, 
+                              marginRight: -5.5, 
+                              backgroundColor: '#F5F5F5', 
+                              borderRadius: 97, 
+                              borderWidth: 1, 
+                              borderColor: '#E5E5E5' 
+                            }}>
+                              <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                                <Path
+                                  d="M19.8492 8.34297L16.2914 4.19766C16.1741 4.05749 16.0274 3.94476 15.8618 3.86741C15.6962 3.79007 15.5156 3.74999 15.3328 3.75H2.5C2.16848 3.75 1.85054 3.8817 1.61612 4.11612C1.3817 4.35054 1.25 4.66848 1.25 5V13.75C1.25 14.0815 1.3817 14.3995 1.61612 14.6339C1.85054 14.8683 2.16848 15 2.5 15H3.82812C3.96581 15.5378 4.27856 16.0144 4.71707 16.3548C5.15557 16.6952 5.69489 16.8799 6.25 16.8799C6.80511 16.8799 7.34443 16.6952 7.78293 16.3548C8.22144 16.0144 8.53419 15.5378 8.67188 15H12.5781C12.7158 15.5378 13.0286 16.0144 13.4671 16.3548C13.9056 16.6952 14.4449 16.8799 15 16.8799C15.5551 16.8799 16.0944 16.6952 16.5329 16.3548C16.9714 16.0144 17.2842 15.5378 17.4219 15H18.75C19.0815 15 19.3995 14.8683 19.6339 14.6339C19.8683 14.3995 20 14.0815 20 13.75V8.75C20 8.60067 19.9465 8.45628 19.8492 8.34297ZM2.5 8.125V5H6.875V8.125H2.5ZM6.25 15.625C6.00277 15.625 5.7611 15.5517 5.55554 15.4143C5.34998 15.277 5.18976 15.0818 5.09515 14.8534C5.00054 14.6249 4.97579 14.3736 5.02402 14.1311C5.07225 13.8887 5.1913 13.6659 5.36612 13.4911C5.54093 13.3163 5.76366 13.1972 6.00614 13.149C6.24861 13.1008 6.49995 13.1255 6.72835 13.2201C6.95676 13.3148 7.15199 13.475 7.28934 13.6805C7.42669 13.8861 7.5 14.1278 7.5 14.375C7.5 14.7065 7.3683 15.0245 7.13388 15.2589C6.89946 15.4933 6.58152 15.625 6.25 15.625ZM12.5 8.125H8.125V5H12.5V8.125ZM15 15.625C14.7528 15.625 14.5111 15.5517 14.3055 15.4143C14.1 15.277 13.9398 15.0818 13.8451 14.8534C13.7505 14.6249 13.7258 14.3736 13.774 14.1311C13.8222 13.8887 13.9413 13.6659 14.1161 13.4911C14.2909 13.3163 14.5137 13.1972 14.7561 13.149C14.9986 13.1008 15.2499 13.1255 15.4784 13.2201C15.7068 13.3148 15.902 13.475 16.0393 13.6805C16.1767 13.8861 16.25 14.1278 16.25 14.375C16.25 14.7065 16.1183 15.0245 15.8839 15.2589C15.6495 15.4933 15.3315 15.625 15 15.625ZM13.75 8.125V5H15.3328L18.0148 8.125H13.75Z"
+                                  fill={routeColor}
+                                />
+                              </Svg>
+                            </View>
+                          </View>
+                          <View style={{ 
+                            width: 13, 
+                            flex: 1, 
+                            backgroundColor: routeColor, 
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)' 
+                          }} />
+                          <View style={{ marginBottom: -2.5 }}>
+                            <View style={{ 
+                              flexDirection: 'row', 
+                              alignItems: 'center', 
+                              gap: 10, 
+                              padding: 6, 
+                              marginLeft: -5.5, 
+                              marginRight: -5.5, 
+                              backgroundColor: '#F5F5F5', 
+                              borderRadius: 97, 
+                              borderWidth: 1, 
+                              borderColor: '#E5E5E5' 
+                            }}>
+                              <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                                <Path
+                                  d="M19.8492 8.34297L16.2914 4.19766C16.1741 4.05749 16.0274 3.94476 15.8618 3.86741C15.6962 3.79007 15.5156 3.74999 15.3328 3.75H2.5C2.16848 3.75 1.85054 3.8817 1.61612 4.11612C1.3817 4.35054 1.25 4.66848 1.25 5V13.75C1.25 14.0815 1.3817 14.3995 1.61612 14.6339C1.85054 14.8683 2.16848 15 2.5 15H3.82812C3.96581 15.5378 4.27856 16.0144 4.71707 16.3548C5.15557 16.6952 5.69489 16.8799 6.25 16.8799C6.80511 16.8799 7.34443 16.6952 7.78293 16.3548C8.22144 16.0144 8.53419 15.5378 8.67188 15H12.5781C12.7158 15.5378 13.0286 16.0144 13.4671 16.3548C13.9056 16.6952 14.4449 16.8799 15 16.8799C15.5551 16.8799 16.0944 16.6952 16.5329 16.3548C16.9714 16.0144 17.2842 15.5378 17.4219 15H18.75C19.0815 15 19.3995 14.8683 19.6339 14.6339C19.8683 14.3995 20 14.0815 20 13.75V8.75C20 8.60067 19.9465 8.45628 19.8492 8.34297ZM2.5 8.125V5H6.875V8.125H2.5ZM6.25 15.625C6.00277 15.625 5.7611 15.5517 5.55554 15.4143C5.34998 15.277 5.18976 15.0818 5.09515 14.8534C5.00054 14.6249 4.97579 14.3736 5.02402 14.1311C5.07225 13.8887 5.1913 13.6659 5.36612 13.4911C5.54093 13.3163 5.76366 13.1972 6.00614 13.149C6.24861 13.1008 6.49995 13.1255 6.72835 13.2201C6.95676 13.3148 7.15199 13.475 7.28934 13.6805C7.42669 13.8861 7.5 14.1278 7.5 14.375C7.5 14.7065 7.3683 15.0245 7.13388 15.2589C6.89946 15.4933 6.58152 15.625 6.25 15.625ZM12.5 8.125H8.125V5H12.5V8.125ZM15 15.625C14.7528 15.625 14.5111 15.5517 14.3055 15.4143C14.1 15.277 13.9398 15.0818 13.8451 14.8534C13.7505 14.6249 13.7258 14.3736 13.774 14.1311C13.8222 13.8887 13.9413 13.6659 14.1161 13.4911C14.2909 13.3163 14.5137 13.1972 14.7561 13.149C14.9986 13.1008 15.2499 13.1255 15.4784 13.2201C15.7068 13.3148 15.902 13.475 16.0393 13.6805C16.1767 13.8861 16.25 14.1278 16.25 14.375C16.25 14.7065 16.1183 15.0245 15.8839 15.2589C15.6495 15.4933 15.3315 15.625 15 15.625ZM13.75 8.125V5H15.3328L18.0148 8.125H13.75Z"
+                                  fill={routeColor}
+                                />
+                              </Svg>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Bus details */}
+                        <View style={{ 
+                          flexDirection: 'column', 
+                          alignItems: 'flex-start', 
+                          gap: 8, 
+                          flex: 1 
+                        }}>
+                          <View style={{ alignSelf: 'stretch' }}>
+                            <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                              {bestInternalRoute.arrivalStop.code}
+                            </Text>
+                            
+                            {/* Bus indicator with route color */}
+                            <View style={{ 
+                              flexDirection: 'row', 
+                              alignItems: 'center', 
+                              height: 37, 
+                              borderRadius: 5,
+                              marginTop: 8 
+                            }}>
+                              <View style={{ 
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)', 
+                                minWidth: 38, 
+                                height: 37, 
+                                backgroundColor: routeColor, 
+                                borderTopLeftRadius: 5, 
+                                borderBottomLeftRadius: 5, 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                paddingRight: 8, 
+                                paddingLeft: 8 
+                              }}>
+                                <Text style={{ 
+                                  fontSize: 14, 
+                                  fontWeight: '600', 
+                                  color: '#FFFFFF', 
+                                  fontFamily: 'Inter' 
+                                }}>
+                                  {bestInternalRoute.routeCode}
+                                </Text>
+                              </View>
+                              <View style={{ 
+                                flexDirection: 'row', 
+                                alignItems: 'center', 
+                                flex: 1, 
+                                height: 37, 
+                                borderTopWidth: 1, 
+                                borderRightWidth: 1, 
+                                borderBottomWidth: 1, 
+                                borderColor: '#E5E5E5', 
+                                borderTopRightRadius: 5, 
+                                borderBottomRightRadius: 5, 
+                                backgroundColor: '#FFFFFF', 
+                                overflow: 'hidden', 
+                                marginLeft: -1 
+                              }}>
+                                <View style={{ 
+                                  flexDirection: 'row', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'space-between', 
+                                  paddingVertical: 7,
+                                  paddingHorizontal: 10, 
+                                  flex: 1, 
+                                  backgroundColor: '#FFFFFF', 
+                                  borderRightWidth: 1, 
+                                  borderBottomWidth: 1, 
+                                  borderColor: '#E5E5E5', 
+                                  gap: 8 
+                                }}>
+                                  <Text style={{ 
+                                    fontSize: 14, 
+                                    fontWeight: '500', 
+                                    color: '#211F26', 
+                                    fontFamily: 'Inter' 
+                                  }}>
+                                    {Math.ceil(bestInternalRoute.waitingTime / 60)} Min
+                                  </Text>
+                                  <CapacityIcons opacity={1} />
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Ride info */}
+                            <Pressable style={{ 
+                              flexDirection: 'row', 
+                              alignItems: 'center', 
+                              gap: 4,
+                              marginTop: 8 
+                            }}>
+                              <View style={{ transform: [{ rotate: '0deg' }] }}>
+                                <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+                                  <Path
+                                    d="M4 6L8 10L12 6"
+                                    stroke="#737373"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </Svg>
+                              </View>
+                              <Text style={{ 
+                                fontSize: 12, 
+                                fontWeight: '500', 
+                                color: '#211F26', 
+                                fontFamily: 'Inter' 
+                              }}>
+                                Ride ({Math.ceil(bestInternalRoute.busTravelTime / 60)} mins)
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })()}
+
+                  {/* Arrival bus stop */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 16,
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <DotDivider />
+                    <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                  </View>
+
+                  {/* Final walk if needed */}
+                  {bestInternalRoute.walkFromStopTime > 0 && (
+                    <>
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'flex-start', 
+                        gap: 16, 
+                        marginBottom: 8 
+                      }}>
+                        <View style={{ width: 21, alignItems: 'center', paddingTop: 6 }}>
+                          <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+                            <Path
+                              d="M8 2.5C8.41421 2.5 8.75 2.16421 8.75 1.75C8.75 1.33579 8.41421 1 8 1C7.58579 1 7.25 1.33579 7.25 1.75C7.25 2.16421 7.58579 2.5 8 2.5Z"
+                              fill="#737373"
+                            />
+                            <Path
+                              d="M9.5 5L8.5 4L7 6.5L6 7L4.5 11L5.5 11.5L6.5 8.5L7.5 8L8 10.5L7 14.5H8L9 10L10 8.5L11.5 9.5L12 8.5L9.5 7V5Z"
+                              fill="#737373"
+                            />
+                          </Svg>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 14, color: '#737373' }}>
+                            Walk {Math.ceil(bestInternalRoute.walkFromStopTime / 60)} min ({Math.round(bestInternalRoute.walkFromStopDistance)}m)
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 20,
+                          paddingLeft: 9,
+                          height: 16,
+                          justifyContent: 'center',
+                          marginVertical: 8,
+                        }}
+                      >
+                        <DotDivider />
+                        <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                      </View>
+                    </>
+                  )}
+
+                  {/* Final Destination */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <MapPin />
+                      <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                        {currentDestination}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {new Date(Date.now() + bestInternalRoute.totalTime * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </Text>
+                  </View>
+                </>
+              ) : !isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && routes[0].legs ? (
+                // DISPLAY GOOGLE MAPS ROUTE (original code)
+                <>
+                  {/* Step 1: Origin location */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <NavigationArrow />
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
+                        {originName}
                       </Text>
                     </View>
                     <Text style={{ fontSize: 14, color: '#09090B' }}>
@@ -856,39 +1883,6 @@ export default function NavigationPage() {
                         : ''}
                     </Text>
                   </View>
-                </>
-              )}
-
-              {/* Fallback for no data */}
-              {!isLoadingRoutes && !routeError && routes.length === 0 && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <NavigationArrow />
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '500',
-                        color: '#211F26',
-                      }}
-                    >
-                      Your location
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
-                </View>
-              )}
 
               {/* Connecting line */}
               <View
@@ -1189,30 +2183,12 @@ export default function NavigationPage() {
                                     </Text>
                                   </Pressable>
 
-                                  {/* Expanded Stops List */}
-                                  {isExpanded && numStops > 0 && (
-                                    <View
-                                      style={{
-                                        flexDirection: 'column',
-                                        alignItems: 'flex-start',
-                                        gap: 10,
-                                        paddingLeft: 24,
-                                      }}
-                                    >
-                                      {/* Show intermediate stops message */}
-                                      <Text
-                                        style={{
-                                          fontSize: 12,
-                                          fontWeight: '400',
-                                          color: '#737373',
-                                          fontFamily: 'Inter',
-                                          fontStyle: 'italic',
-                                        }}
-                                      >
-                                        {numStops} {numStops === 1 ? 'stop' : 'stops'} between {boardingStop} and {alightingStop}
-                                      </Text>
-                                    </View>
-                                  )}
+                                  {/* Expanded Stops List - Using LTA API */}
+                                  <IntermediateStops 
+                                    step={step} 
+                                    serviceNo={lineName} 
+                                    isExpanded={isExpanded} 
+                                  />
                                 </View>
 
                                 {/* End Bus Stop */}
@@ -1257,9 +2233,11 @@ export default function NavigationPage() {
                       );
                     });
                   })()}
+                </>
+              )}
 
-                  {/* Final Destination */}
-                  <View
+              {/* Final Destination */}
+              <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1308,8 +2286,52 @@ export default function NavigationPage() {
                     </Text>
                   </View>
                 </>
+              ) : (
+                // Fallback for no data
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <NavigationArrow />
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '500',
+                        color: '#211F26',
+                      }}
+                    >
+                      {originName}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
+                </View>
               )}
             </View>
+
+            {/* Internal Shuttle Routes Section - Shows AS alternative if Google Maps is shown */}
+            {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && internalRoutes.length > 0 && !recommendInternal && (
+              <InternalRoutesSection
+                routes={internalRoutes}
+                bestRoute={bestInternalRoute}
+                recommendInternal={recommendInternal}
+                googleMapsTimeSeconds={googleMapsTime}
+                isLoading={isLoadingInternalRoutes}
+                onSelectRoute={(route) => {
+                  setSelectedInternalRoute(route);
+                  // Optionally show the selected route on the map or expand details
+                }}
+              />
+            )}
 
             {/* Divider */}
             <View
@@ -1425,8 +2447,10 @@ export default function NavigationPage() {
                 </Text>
               </Pressable>
             </View>
+            </>
+            )}
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </View>
   );

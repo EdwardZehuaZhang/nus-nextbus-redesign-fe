@@ -84,6 +84,7 @@ const client = z.object({
   VAR_NUMBER: z.number(),
   VAR_BOOL: z.boolean(),
   GOOGLE_MAPS_API_KEY: z.string().min(1),
+  LTA_API_KEY: z.string().min(1),
 });
 
 const buildTime = z.object({
@@ -109,6 +110,7 @@ const _clientEnv = {
   VAR_NUMBER: Number(process.env.VAR_NUMBER),
   VAR_BOOL: process.env.VAR_BOOL === 'true',
   GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+  LTA_API_KEY: process.env.EXPO_PUBLIC_LTA_API_KEY,
 };
 
 /**

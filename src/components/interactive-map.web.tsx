@@ -237,7 +237,18 @@ const createMarker = ({
   color: string;
   scale: number;
   onClick?: () => void;
-}): google.maps.Marker => {
+}): google.maps.Marker | null => {
+  // Validate coordinates
+  if (
+    typeof position.lat !== 'number' ||
+    typeof position.lng !== 'number' ||
+    isNaN(position.lat) ||
+    isNaN(position.lng)
+  ) {
+    console.warn(`Invalid coordinates for marker "${title}":`, position);
+    return null;
+  }
+
   const marker = new google.maps.Marker({
     position,
     map,
@@ -2930,9 +2941,11 @@ const addMarkersAndFitBounds = ({
       scale: 10,
       onClick: () => onMarkerPress?.('origin'),
     });
-    markers.push(marker);
-    bounds.extend(marker.getPosition()!);
-    hasMarkers = true;
+    if (marker) {
+      markers.push(marker);
+      bounds.extend(marker.getPosition()!);
+      hasMarkers = true;
+    }
   }
 
   waypoints?.forEach((waypoint, index) => {
@@ -2944,9 +2957,11 @@ const addMarkersAndFitBounds = ({
       scale: 8,
       onClick: () => onMarkerPress?.('waypoint', index),
     });
-    markers.push(marker);
-    bounds.extend(marker.getPosition()!);
-    hasMarkers = true;
+    if (marker) {
+      markers.push(marker);
+      bounds.extend(marker.getPosition()!);
+      hasMarkers = true;
+    }
   });
 
   // Don't create destination marker here - it's handled by useDestinationMarker hook
@@ -3066,7 +3081,7 @@ const useMapPolyline = (
           geodesic: true,
           strokeColor,
           strokeOpacity: 1.0,
-          strokeWeight: 6,
+          strokeWeight: 4,
           map: mapRef.current,
         };
 
@@ -3086,21 +3101,24 @@ const useMapPolyline = (
           polylineOptions.strokeColor = strokeColor;
           polylineOptions.zIndex = 10; // Higher z-index for solid transit lines
         } else if (step.travelMode === 'WALK') {
-          strokeColor = '#7D7D7D'; // Gray for walking
-          // Make walking segments dotted
+          strokeColor = '#274F9C'; // Blue for walking
+          // Make walking segments dotted (same style as connector lines)
           polylineOptions.strokeColor = strokeColor;
           polylineOptions.strokeOpacity = 0;
           polylineOptions.zIndex = 5; // Lower z-index for dotted walking lines
           polylineOptions.icons = [
             {
               icon: {
-                path: 'M 0,-1 0,1',
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#274F9C',
+                fillOpacity: 0.8,
+                strokeColor: '#274F9C',
                 strokeOpacity: 1,
-                strokeWeight: 3,
-                scale: 1,
+                strokeWeight: 0,
+                scale: 2,
               },
               offset: '0',
-              repeat: '10px', // Increased gap between dots
+              repeat: '10px',
             },
           ];
         }
@@ -3135,7 +3153,7 @@ const useMapPolyline = (
         geodesic: true,
         strokeColor: '#274F9C',
         strokeOpacity: 1.0,
-        strokeWeight: 6,
+        strokeWeight: 4,
         map: mapRef.current,
       });
 
@@ -3212,11 +3230,11 @@ const useConnectorLines = (
                   fillOpacity: 0.8,
                   strokeColor: '#274F9C',
                   strokeOpacity: 1,
-                  strokeWeight: 1,
-                  scale: 3,
+                  strokeWeight: 0,
+                  scale: 2,
                 },
                 offset: '0',
-                repeat: '15px',
+                repeat: '10px',
               },
             ],
             map: mapRef.current,
@@ -3243,11 +3261,11 @@ const useConnectorLines = (
                   fillOpacity: 0.8,
                   strokeColor: '#274F9C',
                   strokeOpacity: 1,
-                  strokeWeight: 1,
-                  scale: 3,
+                  strokeWeight: 0,
+                  scale: 2,
                 },
                 offset: '0',
-                repeat: '15px',
+                repeat: '10px',
               },
             ],
             map: mapRef.current,
@@ -3518,6 +3536,20 @@ const useBusStopMarkers = (
     };
 
     busStops.forEach((stop: BusStop) => {
+      // Validate coordinates before creating marker
+      if (
+        typeof stop.latitude !== 'number' ||
+        typeof stop.longitude !== 'number' ||
+        isNaN(stop.latitude) ||
+        isNaN(stop.longitude)
+      ) {
+        console.warn(`Invalid coordinates for stop ${stop.ShortName}:`, {
+          lat: stop.latitude,
+          lng: stop.longitude,
+        });
+        return;
+      }
+
       const isStopPriority = isPriorityStop(stop);
       const isRouteStop = belongsToRoute(stop);
 
@@ -3634,6 +3666,17 @@ const useDestinationMarker = (
 
     // Create new destination marker if destination exists and no route is selected
     if (destination && !activeRoute) {
+      // Validate destination coordinates
+      if (
+        typeof destination.lat !== 'number' ||
+        typeof destination.lng !== 'number' ||
+        isNaN(destination.lat) ||
+        isNaN(destination.lng)
+      ) {
+        console.warn('Invalid destination coordinates:', destination);
+        return;
+      }
+      
       const iconSvg = createDestinationPinSVG();
       const iconUrl = svgToDataURL(iconSvg);
 
@@ -3901,6 +3944,21 @@ const useFilteredBusRoutes = (
       const newBusMarkers: google.maps.Marker[] = [];
       buses.forEach((bus: any) => {
         const { lat, lng, veh_plate, direction, speed } = bus;
+        
+        // Validate coordinates before creating marker
+        if (
+          typeof lat !== 'number' ||
+          typeof lng !== 'number' ||
+          isNaN(lat) ||
+          isNaN(lng)
+        ) {
+          console.warn(`Invalid coordinates for bus ${veh_plate}:`, {
+            lat,
+            lng,
+          });
+          return;
+        }
+        
         const flipHorizontal = direction === 2;
         const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal);
         const iconUrl = svgToDataURL(iconSvg);
@@ -3948,6 +4006,20 @@ const useFilteredBusRoutes = (
 
       const newStopMarkers: google.maps.Marker[] = [];
       stops.forEach((stop: any) => {
+        // Validate coordinates before creating marker
+        if (
+          typeof stop.latitude !== 'number' ||
+          typeof stop.longitude !== 'number' ||
+          isNaN(stop.latitude) ||
+          isNaN(stop.longitude)
+        ) {
+          console.warn(`Invalid coordinates for stop ${stop.name}:`, {
+            lat: stop.latitude,
+            lng: stop.longitude,
+          });
+          return;
+        }
+        
         const marker = new google.maps.Marker({
           position: { lat: stop.latitude, lng: stop.longitude },
           map,

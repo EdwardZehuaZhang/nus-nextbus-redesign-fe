@@ -45,6 +45,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['prince', 'george', 'park', 'pgp', 'residential'],
+    coordinates: { latitude: 1.29289, longitude: 103.78004 },
   },
   {
     id: '2',
@@ -52,6 +53,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['university', 'hall', 'uh', 'residential'],
+    coordinates: { latitude: 1.29700, longitude: 103.77900 },
   },
   {
     id: '3',
@@ -59,6 +61,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'library',
     icon: getIconForType('library'),
     keywords: ['central', 'library', 'lib', 'books', 'study'],
+    coordinates: { latitude: 1.29650, longitude: 103.77250 },
   },
   {
     id: '4',
@@ -66,6 +69,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['kent', 'vale', 'residential', 'housing'],
+    coordinates: { latitude: 1.29300, longitude: 103.76950 },
   },
   {
     id: '5',
@@ -73,6 +77,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'university', 'hall', 'opp'],
+    coordinates: { latitude: 1.29750, longitude: 103.77850 },
   },
   {
     id: '6',
@@ -80,6 +85,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['prince', 'george', 'park', 'foyer', 'pgp'],
+    coordinates: { latitude: 1.29250, longitude: 103.78050 },
   },
   {
     id: '7',
@@ -87,6 +93,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['university', 'town', 'utown', 'residential', 'college'],
+    coordinates: { latitude: 1.30373, longitude: 103.77434 },
   },
   {
     id: '8',
@@ -94,6 +101,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'nuss', 'opp'],
+    coordinates: { latitude: 1.29200, longitude: 103.77800 },
   },
   {
     id: '9',
@@ -101,6 +109,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'yusof', 'ishak', 'house', 'opp'],
+    coordinates: { latitude: 1.29869, longitude: 103.77463 },
   },
   {
     id: '10',
@@ -108,6 +117,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['biz', 'business', 'school', 'building'],
+    coordinates: { latitude: 1.29363, longitude: 103.77534 },
   },
   {
     id: '11',
@@ -115,6 +125,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['ea', 'engineering', 'auditorium'],
+    coordinates: { latitude: 1.29950, longitude: 103.77100 },
   },
   {
     id: '12',
@@ -122,6 +133,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'mrt',
     icon: getIconForType('mrt'),
     keywords: ['botanic', 'gardens', 'mrt', 'pudo', 'train', 'station'],
+    coordinates: { latitude: 1.32250, longitude: 103.81550 },
   },
   {
     id: '13',
@@ -129,6 +141,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'mrt',
     icon: getIconForType('mrt'),
     keywords: ['kent', 'ridge', 'mrt', 'train', 'station'],
+    coordinates: { latitude: 1.29350, longitude: 103.78450 },
   },
   {
     id: '14',
@@ -136,6 +149,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'university', 'health', 'centre', 'medical', 'opp'],
+    coordinates: { latitude: 1.29850, longitude: 103.77550 },
   },
   {
     id: '15',
@@ -143,6 +157,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'sde', 'school', 'design', 'environment', 'opp'],
+    coordinates: { latitude: 1.29500, longitude: 103.77150 },
   },
   {
     id: '16',
@@ -150,6 +165,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['museum', 'heritage', 'culture'],
+    coordinates: { latitude: 1.30120, longitude: 103.77372 },
   },
   {
     id: '17',
@@ -157,6 +173,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['s17', 'science', 'block', 'building'],
+    coordinates: { latitude: 1.29700, longitude: 103.78150 },
   },
   {
     id: '18',
@@ -164,6 +181,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['com3', 'computing', 'computer', 'science'],
+    coordinates: { latitude: 1.29453, longitude: 103.77397 },
   },
   {
     id: '19',
@@ -171,6 +189,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['tcoms', 'tropical', 'marine', 'science'],
+    coordinates: { latitude: 1.29289, longitude: 103.77657 },
   },
   {
     id: '20',
@@ -178,6 +197,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['ventus', 'residential', 'hall'],
+    coordinates: { latitude: 1.29400, longitude: 103.77600 },
   },
   {
     id: '21',
@@ -185,6 +205,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['lt13', 'lecture', 'theatre', 'theater'],
+    coordinates: { latitude: 1.29464, longitude: 103.77131 },
   },
   {
     id: '22',
@@ -192,6 +213,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['kent', 'ridge', 'bus', 'terminal', 'interchange'],
+    coordinates: { latitude: 1.29481, longitude: 103.76986 },
   },
   {
     id: '23',
@@ -199,6 +221,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['sde3', 'school', 'design', 'environment', 'architecture'],
+    coordinates: { latitude: 1.29450, longitude: 103.77200 },
   },
   {
     id: '24',
@@ -206,6 +229,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['college', 'green', 'residential', 'utown'],
+    coordinates: { latitude: 1.30450, longitude: 103.77350 },
   },
   {
     id: '25',
@@ -213,6 +237,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['lt27', 'lecture', 'theatre', 'theater'],
+    coordinates: { latitude: 1.29650, longitude: 103.77000 },
   },
   {
     id: '26',
@@ -220,6 +245,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['yusof', 'ishak', 'house', 'yih', 'building'],
+    coordinates: { latitude: 1.29869, longitude: 103.77463 },
   },
   {
     id: '27',
@@ -227,6 +253,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['japanese', 'primary', 'school', 'education'],
+    coordinates: { latitude: 1.30250, longitude: 103.76850 },
   },
   {
     id: '28',
@@ -234,6 +261,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'medical',
     icon: getIconForType('medical'),
     keywords: ['university', 'health', 'centre', 'medical', 'clinic', 'doctor'],
+    coordinates: { latitude: 1.29800, longitude: 103.77500 },
   },
   {
     id: '29',
@@ -241,6 +269,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'kent', 'ridge', 'mrt', 'opp'],
+    coordinates: { latitude: 1.29400, longitude: 103.78400 },
   },
   {
     id: '30',
@@ -248,6 +277,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'tcoms', 'tropical', 'marine', 'opp'],
+    coordinates: { latitude: 1.29250, longitude: 103.77700 },
   },
   {
     id: '31',
@@ -255,6 +285,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'general',
     icon: getIconForType('general'),
     keywords: ['opposite', 'hssml', 'humanities', 'social', 'sciences', 'opp'],
+    coordinates: { latitude: 1.29350, longitude: 103.77450 },
   },
   {
     id: '32',
@@ -262,6 +293,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['information', 'technology', 'it', 'computing'],
+    coordinates: { latitude: 1.29700, longitude: 103.77300 },
   },
   {
     id: '33',
@@ -269,6 +301,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['as5', 'arts', 'social', 'sciences', 'building'],
+    coordinates: { latitude: 1.29440, longitude: 103.77190 },
   },
   {
     id: '34',
@@ -276,6 +309,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'residential',
     icon: getIconForType('residential'),
     keywords: ['raffles', 'hall', 'residential', 'rh'],
+    coordinates: { latitude: 1.30050, longitude: 103.77150 },
   },
   {
     id: '35',
@@ -283,6 +317,7 @@ export const BUS_STATIONS: BusStation[] = [
     type: 'academic',
     icon: getIconForType('academic'),
     keywords: ['oei', 'tiong', 'ham', 'building', 'oth'],
+    coordinates: { latitude: 1.29450, longitude: 103.77380 },
   },
 ];
 

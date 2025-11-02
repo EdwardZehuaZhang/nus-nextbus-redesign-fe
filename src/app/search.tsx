@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as React from 'react';
 import { TextInput } from 'react-native';
 
@@ -94,6 +94,12 @@ const popularSearches: PopularSearchItem[] = [
 
 export default function SearchPage() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const selectingOrigin = params.selectingOrigin === 'true';
+  const destination = typeof params.destination === 'string' ? params.destination : undefined;
+  const userLat = params.userLat;
+  const userLng = params.userLng;
+  
   const [searchText, setSearchText] = React.useState('');
   const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
   const [recentSearches, setRecentSearches] = React.useState<
@@ -165,14 +171,31 @@ export default function SearchPage() {
     const IconComponent = item.icon;
 
     const handleRecentPress = () => {
-      // Navigate to navigation page with the selected destination
-      router.push({
-        pathname: '/navigation' as any,
-        params: { destination: item.title },
-      });
+      // Get station details
+      const station = getBusStationById(item.id);
+      
+      if (selectingOrigin && station) {
+        // Navigate back to navigation page with selected origin
+        router.push({
+          pathname: '/navigation' as any,
+          params: {
+            destination: destination,
+            customOrigin: item.title,
+            customOriginLat: station.coordinates?.latitude?.toString(),
+            customOriginLng: station.coordinates?.longitude?.toString(),
+            userLat,
+            userLng,
+          },
+        });
+      } else {
+        // Navigate to navigation page with the selected destination
+        router.push({
+          pathname: '/navigation' as any,
+          params: { destination: item.title },
+        });
+      }
 
       // Add to recent searches (this will update the timestamp)
-      const station = getBusStationById(item.id);
       if (station) {
         addRecentSearch(station);
       }
@@ -219,10 +242,26 @@ export default function SearchPage() {
         [newRecentItem, ...prev.filter((r) => r.id !== item.id)].slice(0, 10)
       );
 
-      router.push({
-        pathname: '/navigation' as any,
-        params: { destination: item.name },
-      });
+      if (selectingOrigin) {
+        // Navigate back to navigation page with selected origin
+        router.push({
+          pathname: '/navigation' as any,
+          params: {
+            destination: destination,
+            customOrigin: item.name,
+            customOriginLat: item.coordinates?.latitude?.toString(),
+            customOriginLng: item.coordinates?.longitude?.toString(),
+            userLat,
+            userLng,
+          },
+        });
+      } else {
+        // Navigate to navigation page with the selected destination
+        router.push({
+          pathname: '/navigation' as any,
+          params: { destination: item.name },
+        });
+      }
     };
 
     return (
