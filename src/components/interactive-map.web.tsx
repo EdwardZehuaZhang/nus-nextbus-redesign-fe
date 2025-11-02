@@ -86,6 +86,15 @@ const DEFAULT_REGION = {
 
 const PADDING = { top: 50, right: 50, bottom: 50, left: 50 };
 
+// Residence overlay stroke weight - adjust this to make boundary lines thinner/thicker
+const RESIDENCE_STROKE_WEIGHT = 1;
+
+// Academic overlay stroke weight - adjust this to make boundary lines thinner/thicker
+const ACADEMIC_STROKE_WEIGHT = 2;
+
+// Bus route stroke weight - adjust this to make bus route lines thinner/thicker
+const BUS_ROUTE_STROKE_WEIGHT = 3;
+
 // Dark mode styles for Google Maps
 const DARK_MODE_STYLES: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
@@ -1743,7 +1752,7 @@ const createD1BusRoute = (map: google.maps.Map): google.maps.Polyline => {
     geodesic: true,
     strokeColor: '#C77DE2', // D1 light purple color
     strokeOpacity: 1.0,
-    strokeWeight: 4,
+    strokeWeight: BUS_ROUTE_STROKE_WEIGHT,
   });
   d1Route.setMap(map);
   return d1Route;
@@ -1773,7 +1782,7 @@ const createOrangeAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: ORANGE_AREA_BOUNDARY,
     strokeColor: '#FF0000', // Red color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#FF0000', // Red fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1789,7 +1798,7 @@ const createBlueAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: BLUE_AREA_BOUNDARY,
     strokeColor: '#1E90FF', // Blue color (Dodger Blue)
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#1E90FF', // Blue fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1807,7 +1816,7 @@ const createDarkBlueAreaOverlay = (
     paths: DARK_BLUE_AREA_BOUNDARY,
     strokeColor: '#00008B', // Dark blue color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#00008B', // Dark blue fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1823,7 +1832,7 @@ const createYellowAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: YELLOW_AREA_BOUNDARY,
     strokeColor: '#FA9E0D', // Kent Ridge color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#FA9E0D', // Kent Ridge fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1841,7 +1850,7 @@ const createDarkOrangeAreaOverlay = (
     paths: DARK_ORANGE_AREA_BOUNDARY,
     strokeColor: '#800080', // Purple color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#800080', // Purple fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1857,7 +1866,7 @@ const createCDEAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: CDE_AREA_BOUNDARY,
     strokeColor: '#D7AE63', // CDE color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#D7AE63', // CDE fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1873,7 +1882,7 @@ const createFASSAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: FASS_AREA_BOUNDARY,
     strokeColor: '#006400', // Dark green color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#006400', // Dark green fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1889,7 +1898,7 @@ const createCOMBIZAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: COMBIZ_AREA_BOUNDARY,
     strokeColor: '#8B0000', // Dark red color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#8B0000', // Dark red fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1905,7 +1914,7 @@ const createLAWAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: LAW_AREA_BOUNDARY,
     strokeColor: '#FFFFFF', // White color
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: ACADEMIC_STROKE_WEIGHT,
     fillColor: '#FFFFFF', // White fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1921,7 +1930,7 @@ const createPGPROverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: PGPR_BOUNDARY,
     strokeColor: '#136207', // PGPR green
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#136207', // PGPR green fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1937,7 +1946,7 @@ const createLightHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: LIGHTHOUSE_BOUNDARY,
     strokeColor: '#DDB42A', // Light House gold
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#DDB42A', // Light House gold fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1953,7 +1962,7 @@ const createPioneerHouseOverlay = (map: google.maps.Map): google.maps.Polygon =>
     paths: PIONEER_HOUSE_BOUNDARY,
     strokeColor: '#2F3487', // Pioneer House deep blue
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#2F3487', // Pioneer House deep blue fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1969,7 +1978,7 @@ const createHelixHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: HELIX_HOUSE_BOUNDARY,
     strokeColor: '#A51C38', // Helix House burgundy
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#A51C38', // Helix House burgundy fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -1985,7 +1994,7 @@ const createKingEdwardVIIHallOverlay = (map: google.maps.Map): google.maps.Polyg
     paths: KING_EDWARD_VII_HALL_BOUNDARY,
     strokeColor: '#8B0000', // Deep dark red
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#8B0000', // Deep dark red
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2001,7 +2010,7 @@ const createShearesHallOverlay = (map: google.maps.Map): google.maps.Polygon => 
     paths: SHEARES_HALL_BOUNDARY,
     strokeColor: '#CC5500', // Deep burnt orange
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#CC5500', // Deep burnt orange
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2017,7 +2026,7 @@ const createKentRidgeHallOverlay = (map: google.maps.Map): google.maps.Polygon =
     paths: KENT_RIDGE_HALL_BOUNDARY,
     strokeColor: '#1E3A8A', // Deep royal blue
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#1E3A8A', // Deep royal blue
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2033,7 +2042,7 @@ const createTemasekHallOverlay = (map: google.maps.Map): google.maps.Polygon => 
     paths: TEMASEK_HALL_BOUNDARY,
     strokeColor: '#4A5568', // Deep slate gray
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#4A5568', // Deep slate gray
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2049,7 +2058,7 @@ const createEusoffHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: EUSOFF_HALL_BOUNDARY,
     strokeColor: '#B8860B', // Deep golden yellow
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#B8860B', // Deep golden yellow
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2065,7 +2074,7 @@ const createRafflesHallOverlay = (map: google.maps.Map): google.maps.Polygon => 
     paths: RAFFLES_HALL_BOUNDARY,
     strokeColor: '#2D5016', // Deep forest green
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#2D5016', // Deep forest green
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2081,7 +2090,7 @@ const createCAPTOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: CAPT_BOUNDARY,
     strokeColor: '#7B123A', // CAPT burgundy
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#7B123A', // CAPT burgundy fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2097,7 +2106,7 @@ const createRC4Overlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: RC4_BOUNDARY,
     strokeColor: '#219181', // RC4 teal
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#219181', // RC4 teal fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2113,7 +2122,7 @@ const createRVRCOverlay = (map: google.maps.Map): google.maps.Polygon => {
     paths: RVRC_BOUNDARY,
     strokeColor: '#48256A', // RVRC purple
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#48256A', // RVRC purple fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2129,7 +2138,7 @@ const createTembusuCollegeOverlay = (map: google.maps.Map): google.maps.Polygon 
     paths: TEMBUSU_COLLEGE_BOUNDARY,
     strokeColor: '#02522F', // Tembusu dark green
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#02522F', // Tembusu dark green fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -2145,7 +2154,7 @@ const createValourHouseOverlay = (map: google.maps.Map): google.maps.Polygon => 
     paths: VALOUR_HOUSE_BOUNDARY,
     strokeColor: '#340860', // Valour deep purple
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: RESIDENCE_STROKE_WEIGHT,
     fillColor: '#340860', // Valour deep purple fill
     fillOpacity: 0.2, // Transparent overlay
     geodesic: true,
@@ -3776,7 +3785,7 @@ const useRouteCheckpoints = (
       geodesic: true,
       strokeColor: routeColor,
       strokeOpacity: 0.8,
-      strokeWeight: 4,
+      strokeWeight: BUS_ROUTE_STROKE_WEIGHT,
       map,
     });
 
@@ -3876,7 +3885,7 @@ const useFilteredBusRoutes = (
             geodesic: true,
             strokeColor: routeColor,
             strokeOpacity: 0.8,
-            strokeWeight: 4,
+            strokeWeight: BUS_ROUTE_STROKE_WEIGHT,
             map,
           });
 

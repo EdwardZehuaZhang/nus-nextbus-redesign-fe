@@ -272,7 +272,8 @@ const BusRouteCard = ({
         style={{
           borderWidth: isSelected ? 3 : 0,
           borderColor: isSelected ? route.color : 'transparent',
-          borderRadius: 6,
+          borderTopLeftRadius: 6,
+          borderTopRightRadius: 6,
           overflow: 'hidden',
         }}
       >
@@ -290,22 +291,40 @@ const BusRouteCard = ({
         </View>
 
         {/* Times List - Only show first 2 times (next bus and next next bus) */}
-        <View className="border border-t-0 border-neutral-200">
-          {route.times.slice(0, 2).map((timeItem, index) => (
-            <View key={index}>
-              <View className="flex-row items-center justify-between bg-white px-3 py-2">
-                <DynamicBusTime
-                  time={timeItem.time}
-                  textColor={timeItem.textColor}
-                />
-                <CrowdingIndicator crowding={timeItem.crowding} />
-              </View>
-              {index < 1 && <View className="h-px bg-neutral-200" />}
-            </View>
-          ))}
-        </View>
+        <BusTimingRows times={route.times.slice(0, 2)} />
       </View>
     </Pressable>
+  );
+};
+
+const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
+  return (
+    <View
+      className="border border-t-0 border-neutral-200"
+      style={{
+        borderBottomLeftRadius: 6,
+        borderBottomRightRadius: 6,
+        overflow: 'hidden',
+      }}
+    >
+      {times.map((timeItem, index) => {
+        const isLast = index === times.length - 1;
+        return (
+          <View key={index}>
+            <View className="flex-row items-center justify-between bg-white px-3 py-2">
+              <DynamicBusTime
+                time={timeItem.time}
+                textColor={timeItem.textColor}
+              />
+              <CrowdingIndicator crowding={timeItem.crowding} />
+            </View>
+            {!isLast && (
+              <View className="h-px bg-neutral-200" style={{ marginTop: -1 }} />
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 };
 
@@ -439,31 +458,41 @@ const TabBar = ({
 }) => {
   return (
     <View className="flex-row">
-      {tabs.map((tab, index) => (
-        <View key={tab.id} className="flex-row" style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}>
-          <Pressable
-            className={`border-neutral-200 px-4 py-2 ${
-              activeTab === tab.id
-                ? 'rounded-t-md border-x border-b-0 border-t bg-white'
-                : 'rounded-tr-md border-y border-r bg-white opacity-60'
-            } ${index === 0 ? 'border-l' : ''}`}
-            onPress={() => onTabChange(tab.id)}
-            style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}
+      {tabs.map((tab, index) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <View
+            key={tab.id}
+            className="flex-row"
+            style={
+              isActive
+                ? { flexShrink: 0 }
+                : { flexShrink: 1, maxWidth: '100%', minWidth: 0 }
+            }
           >
-            <Text
-              className={`text-base ${
-                activeTab === tab.id
-                  ? 'font-medium text-neutral-900'
-                  : 'font-normal text-neutral-500'
-              }`}
-              numberOfLines={1}
-              ellipsizeMode="tail"
+            <Pressable
+              className={`border-neutral-200 px-4 py-2 ${
+                isActive
+                  ? 'rounded-t-md border-x border-b-0 border-t bg-white'
+                  : 'rounded-tr-md border-y border-r bg-white opacity-60'
+              } ${index === 0 ? 'border-l' : ''}`}
+              onPress={() => onTabChange(tab.id)}
             >
-              {tab.label}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
+              <Text
+                className={`text-base ${
+                  isActive
+                    ? 'font-medium text-neutral-900'
+                    : 'font-normal text-neutral-500'
+                }`}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -1363,21 +1392,31 @@ const useDragHandlers = () => {
 export default function TransitPage() {
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
-  const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('map-filters');
-      if (stored) {
-        return JSON.parse(stored);
+  const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(
+    () => {
+      const defaultFilters = {
+        important: true,
+        academic: false,
+        residences: false,
+        'bus-stops': false,
+        'bus-route-d2': true,
+      };
+
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('map-filters');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            // Always override academic to be false on initial load
+            return { ...parsed, academic: false };
+          } catch (error) {
+            console.error('Error loading map filters:', error);
+          }
+        }
       }
+      return defaultFilters;
     }
-    return {
-      important: true,
-      academic: false,
-      residences: false,
-      'bus-stops': false,
-      'bus-route-d2': true,
-    };
-  });
+  );
 
   const {
     isCollapsed,
