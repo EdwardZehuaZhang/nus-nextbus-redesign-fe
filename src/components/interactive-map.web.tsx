@@ -2896,6 +2896,7 @@ const addMarkersAndFitBounds = ({
   waypoints,
   destination,
   onMarkerPress,
+  shouldFitBounds = true,
 }: {
   map: google.maps.Map;
   origin?: LatLng;
@@ -2905,6 +2906,7 @@ const addMarkersAndFitBounds = ({
     type: 'origin' | 'destination' | 'waypoint',
     index?: number
   ) => void;
+  shouldFitBounds?: boolean;
 }): google.maps.Marker[] => {
   const markers: google.maps.Marker[] = [];
   const bounds = new google.maps.LatLngBounds();
@@ -2946,7 +2948,7 @@ const addMarkersAndFitBounds = ({
     hasMarkers = true;
   }
 
-  if (hasMarkers) {
+  if (hasMarkers && shouldFitBounds) {
     map.fitBounds(bounds, PADDING);
   }
 
@@ -2972,6 +2974,7 @@ const useMapMarkers = ({
   activeRoute?: RouteCode | null;
 }) => {
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const hasFitBoundsRef = useRef(false);
 
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
@@ -2986,19 +2989,35 @@ const useMapMarkers = ({
       return;
     }
 
+    // Only fit bounds on the first render or when there are no markers yet
+    const shouldFitBounds = !hasFitBoundsRef.current;
+    
     markersRef.current = addMarkersAndFitBounds({
       map: mapRef.current,
       origin,
       waypoints,
       destination,
       onMarkerPress,
+      shouldFitBounds,
     });
+
+    // Mark that we've done the initial fit
+    if (shouldFitBounds) {
+      hasFitBoundsRef.current = true;
+    }
 
     return () => {
       markersRef.current.forEach((marker) => marker.setMap(null));
       markersRef.current = [];
     };
   }, [origin, destination, waypoints, onMarkerPress, mapRef, activeRoute]);
+
+  // Reset hasFitBoundsRef when activeRoute changes to null (user clears route)
+  useEffect(() => {
+    if (!activeRoute) {
+      hasFitBoundsRef.current = false;
+    }
+  }, [activeRoute]);
 };
 
 const useMapPolyline = (
@@ -3007,6 +3026,7 @@ const useMapPolyline = (
   routeSteps?: RouteStep[]
 ) => {
   const polylinesRef = useRef<google.maps.Polyline[]>([]);
+  const hasFitBoundsRef = useRef(false);
 
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
@@ -3015,6 +3035,9 @@ const useMapPolyline = (
     // Clear existing polylines
     polylinesRef.current.forEach((poly) => poly.setMap(null));
     polylinesRef.current = [];
+
+    // Only fit bounds on first render
+    const shouldFitBounds = !hasFitBoundsRef.current;
 
     // If we have individual steps, render them with different colors
     if (routeSteps && routeSteps.length > 0) {
@@ -3080,13 +3103,14 @@ const useMapPolyline = (
       });
 
       // Fit map to show all steps
-      if (!bounds.isEmpty()) {
+      if (!bounds.isEmpty() && shouldFitBounds) {
         mapRef.current.fitBounds(bounds, {
           top: 100,
           right: 50,
           bottom: 400,
           left: 50,
         });
+        hasFitBoundsRef.current = true;
       }
     }
     // Fallback to single polyline if no steps provided
@@ -3109,12 +3133,15 @@ const useMapPolyline = (
       // Fit map bounds to show entire route
       const bounds = new google.maps.LatLngBounds();
       decodedPath.forEach((point) => bounds.extend(point));
-      mapRef.current.fitBounds(bounds, {
-        top: 100,
-        right: 50,
-        bottom: 400,
-        left: 50,
-      });
+      if (shouldFitBounds) {
+        mapRef.current.fitBounds(bounds, {
+          top: 100,
+          right: 50,
+          bottom: 400,
+          left: 50,
+        });
+        hasFitBoundsRef.current = true;
+      }
     }
 
     return () => {

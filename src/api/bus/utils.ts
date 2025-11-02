@@ -25,11 +25,11 @@ export const formatArrivalTime = (time: number | string): string => {
 
   // 1 minute
   if (minutes === 1) {
-    return '1 Min';
+    return '1 m';
   }
 
   // Multiple minutes
-  return `${minutes} Min`;
+  return `${minutes} m`;
 };
 
 /**
