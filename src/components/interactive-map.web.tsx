@@ -67,6 +67,11 @@ interface InteractiveMapProps {
   showUserLocation?: boolean; // Control user location marker visibility (default true)
   showMapControls?: boolean; // Control map type/layer controls visibility (default true)
   showBusStops?: boolean; // Control bus stop markers visibility (default false)
+  mapFilters?: Record<string, boolean>; // External map filters state
+  onMapFiltersChange?: (filters: Record<string, boolean>) => void; // Callback when filters change
+  onMapTypeChangeReady?: (
+    handler: (mapType: google.maps.MapTypeId | 'dark' | 'light') => void
+  ) => void; // Callback to receive map type change handler
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -278,8 +283,15 @@ const addCoordinateListener = (map: google.maps.Map) => {
     if (event.latLng) {
       const lat = event.latLng.lat();
       const lng = event.latLng.lng();
-      // Just output the coordinate in the console for easy copying later
-      console.log(`{ lat: ${lat}, lng: ${lng} },`);
+      const coordString = `{ lat: ${lat}, lng: ${lng} },`;
+      
+      // Copy to clipboard
+      navigator.clipboard.writeText(coordString).then(() => {
+        console.log('Coordinates copied to clipboard:', coordString);
+      }).catch((err) => {
+        console.error('Failed to copy coordinates:', err);
+        console.log(coordString); // Fallback: still log it
+      });
     }
   });
 };
@@ -457,7 +469,12 @@ const useGoogleMapsInit = (
       });
       mapRef.current.setZoom(15); // Zoom level for city-scale view
     }
-  }, [initialRegion.latitude, initialRegion.longitude, isMapCreated, hasRoutePolyline]);
+  }, [
+    initialRegion.latitude,
+    initialRegion.longitude,
+    isMapCreated,
+    hasRoutePolyline,
+  ]);
 
   return { mapRef, isMapCreated };
 };
@@ -475,7 +492,8 @@ const usePOIVisibilityControl = (
 
     const updatePOIVisibility = () => {
       const zoom = map.getZoom() || 16;
-      const showDetails = zoom >= 17; // Show POIs and road labels when zoomed in to 17 or more
+      console.log('Current zoom level:', zoom);
+      const showDetails = zoom >= 16; // Show POIs and road labels when zoomed in to 17 or more
 
       // Update map styles dynamically
       map.setOptions({
@@ -539,6 +557,52 @@ const usePOIVisibilityControl = (
     return () => {
       if (zoomListener) {
         google.maps.event.removeListener(zoomListener);
+      }
+    };
+  }, [mapRef, isMapCreated]);
+};
+
+// Control tilt (45-degree view) based on zoom level for satellite/hybrid views
+// Only enable tilt at zoom level 19+, not at 18
+const useTiltControl = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  isMapCreated: boolean
+) => {
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapCreated) {
+      return;
+    }
+
+    const updateTilt = () => {
+      const zoom = map.getZoom() || 16;
+      const mapTypeId = map.getMapTypeId();
+
+      // Only control tilt for satellite and hybrid views
+      if (mapTypeId === 'satellite' || mapTypeId === 'hybrid') {
+        // Enable 45-degree tilt only at zoom level 19 or higher
+        // At zoom 18 and below, keep it top-down (tilt = 0)
+        if (zoom >= 19) {
+          map.setTilt(45);
+        } else {
+          map.setTilt(0);
+        }
+      }
+    };
+
+    // Set up listeners for both zoom and map type changes
+    const zoomListener = map.addListener('zoom_changed', updateTilt);
+    const mapTypeListener = map.addListener('maptypeid_changed', updateTilt);
+
+    // Initial update
+    updateTilt();
+
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+      if (mapTypeListener) {
+        google.maps.event.removeListener(mapTypeListener);
       }
     };
   }, [mapRef, isMapCreated]);
@@ -647,7 +711,55 @@ const D1_BUS_ROUTE = [
   { lat: 1.2996237843583898, lng: 103.77467516392747 },
   { lat: 1.2994988447681044, lng: 103.77474069965551 },
   { lat: 1.2992896862640684, lng: 103.77477288616369 },
-  { lat: 1.2992376778515882, lng: 103.77464139390793 },{ lat: 1.2992023711240488, lng: 103.77450594235268 },{ lat: 1.2991433776946506, lng: 103.77441742945518 },{ lat: 1.2988533483799471, lng: 103.77426680045423 },{ lat: 1.2987063663315235, lng: 103.77417203546094 },{ lat: 1.2985240229640997, lng: 103.77401110292004 },{ lat: 1.2982780546546064, lng: 103.7737248383048 },{ lat: 1.2981463680081078, lng: 103.7735306553492 },{ lat: 1.2978755344123467, lng: 103.77317123934121 },{ lat: 1.2978755344123467, lng: 103.77317123934121 },{ lat: 1.2974253952461479, lng: 103.77297552166989 },{ lat: 1.296984141988323, lng: 103.77275089330755 },{ lat: 1.2966248180364428, lng: 103.77247666956511 },{ lat: 1.296375784471599, lng: 103.7721067872154 },{ lat: 1.296251253552375, lng: 103.771722723362 },{ lat: 1.2962673426880174, lng: 103.77108703982547 },{ lat: 1.2961788524407367, lng: 103.77097975146488 },{ lat: 1.2957724010832452, lng: 103.77090080678208 },{ lat: 1.2956595034812397, lng: 103.7708731088678 },{ lat: 1.2953473990741131, lng: 103.7707094941179 },{ lat: 1.2951409217506769, lng: 103.77060757017533 },{ lat: 1.295009332061492, lng: 103.77062069349252 },{ lat: 1.2948993895779914, lng: 103.77073602848016 },{ lat: 1.2947995028429624, lng: 103.77075204722705 },{ lat: 1.2944669938263527, lng: 103.77079228036227 },{ lat: 1.294349796625622, lng: 103.7708236767887 },{ lat: 1.2941307944675133, lng: 103.77091730179104 },{ lat: 1.2938143745144493, lng: 103.77130353988919 },{ lat: 1.2938143745144493, lng: 103.77130353988919 },{ lat: 1.2935755154858273, lng: 103.77217628419358 },{ lat: 1.2934339041367455, lng: 103.7721964479735 },{ lat: 1.2932843067076605, lng: 103.7725896212637 },{ lat: 1.2931917940674906, lng: 103.77282565565702 },{ lat: 1.2932104591923195, lng: 103.77320137608498 },{ lat: 1.2932104591923195, lng: 103.77320137608498 },{ lat: 1.2927787334967482, lng: 103.77354469883889 },{ lat: 1.292730045671177, lng: 103.77346989226791 },{ lat: 1.2923903959903105, lng: 103.77386085395541 },{ lat: 1.2923179947684342, lng: 103.77403653864589 },{ lat: 1.2922241413296127, lng: 103.77421758775439 },{ lat: 1.2922241413296127, lng: 103.77421758775439 },{ lat: 1.292512844821077, lng: 103.77468678676368 },{ lat: 1.2928666775438622, lng: 103.77492104279938 },{ lat: 1.2929843602452984, lng: 103.77499272581862 },{ lat: 1.2936859324952368, lng: 103.7752584200203 },{ lat: 1.2937607775220779, lng: 103.77534787113605 },{ lat: 1.2937607775220779, lng: 103.77534787113605 },{ lat: 1.2937953690843786, lng: 103.77545907054424 },{ lat: 1.2949434575337568, lng: 103.7749126471301 },
+  { lat: 1.2992376778515882, lng: 103.77464139390793 },
+  { lat: 1.2992023711240488, lng: 103.77450594235268 },
+  { lat: 1.2991433776946506, lng: 103.77441742945518 },
+  { lat: 1.2988533483799471, lng: 103.77426680045423 },
+  { lat: 1.2987063663315235, lng: 103.77417203546094 },
+  { lat: 1.2985240229640997, lng: 103.77401110292004 },
+  { lat: 1.2982780546546064, lng: 103.7737248383048 },
+  { lat: 1.2981463680081078, lng: 103.7735306553492 },
+  { lat: 1.2978755344123467, lng: 103.77317123934121 },
+  { lat: 1.2978755344123467, lng: 103.77317123934121 },
+  { lat: 1.2974253952461479, lng: 103.77297552166989 },
+  { lat: 1.296984141988323, lng: 103.77275089330755 },
+  { lat: 1.2966248180364428, lng: 103.77247666956511 },
+  { lat: 1.296375784471599, lng: 103.7721067872154 },
+  { lat: 1.296251253552375, lng: 103.771722723362 },
+  { lat: 1.2962673426880174, lng: 103.77108703982547 },
+  { lat: 1.2961788524407367, lng: 103.77097975146488 },
+  { lat: 1.2957724010832452, lng: 103.77090080678208 },
+  { lat: 1.2956595034812397, lng: 103.7708731088678 },
+  { lat: 1.2953473990741131, lng: 103.7707094941179 },
+  { lat: 1.2951409217506769, lng: 103.77060757017533 },
+  { lat: 1.295009332061492, lng: 103.77062069349252 },
+  { lat: 1.2948993895779914, lng: 103.77073602848016 },
+  { lat: 1.2947995028429624, lng: 103.77075204722705 },
+  { lat: 1.2944669938263527, lng: 103.77079228036227 },
+  { lat: 1.294349796625622, lng: 103.7708236767887 },
+  { lat: 1.2941307944675133, lng: 103.77091730179104 },
+  { lat: 1.2938143745144493, lng: 103.77130353988919 },
+  { lat: 1.2938143745144493, lng: 103.77130353988919 },
+  { lat: 1.2935755154858273, lng: 103.77217628419358 },
+  { lat: 1.2934339041367455, lng: 103.7721964479735 },
+  { lat: 1.2932843067076605, lng: 103.7725896212637 },
+  { lat: 1.2931917940674906, lng: 103.77282565565702 },
+  { lat: 1.2932104591923195, lng: 103.77320137608498 },
+  { lat: 1.2932104591923195, lng: 103.77320137608498 },
+  { lat: 1.2927787334967482, lng: 103.77354469883889 },
+  { lat: 1.292730045671177, lng: 103.77346989226791 },
+  { lat: 1.2923903959903105, lng: 103.77386085395541 },
+  { lat: 1.2923179947684342, lng: 103.77403653864589 },
+  { lat: 1.2922241413296127, lng: 103.77421758775439 },
+  { lat: 1.2922241413296127, lng: 103.77421758775439 },
+  { lat: 1.292512844821077, lng: 103.77468678676368 },
+  { lat: 1.2928666775438622, lng: 103.77492104279938 },
+  { lat: 1.2929843602452984, lng: 103.77499272581862 },
+  { lat: 1.2936859324952368, lng: 103.7752584200203 },
+  { lat: 1.2937607775220779, lng: 103.77534787113605 },
+  { lat: 1.2937607775220779, lng: 103.77534787113605 },
+  { lat: 1.2937953690843786, lng: 103.77545907054424 },
+  { lat: 1.2949434575337568, lng: 103.7749126471301 },
 ];
 
 // NUS campus boundary coordinates - manually obtained by user
@@ -1196,6 +1308,290 @@ const LAW_AREA_BOUNDARY = [
   { lat: 1.3199493917504048, lng: 103.81764301797025 },
 ];
 
+const PGPR_BOUNDARY = [
+  { lat: 1.2917537464076685, lng: 103.78287524836298 },
+  { lat: 1.291522585034507, lng: 103.78232408961475 },
+  { lat: 1.2913911901780486, lng: 103.78204782208621 },
+  { lat: 1.2912142093402417, lng: 103.78171522816837 },
+  { lat: 1.2910613622431364, lng: 103.78138799866855 },
+  { lat: 1.2910157762650192, lng: 103.78106613358676 },
+  { lat: 1.2912302985078297, lng: 103.78063698014438 },
+  { lat: 1.2915413557277469, lng: 103.78038217028796 },
+  { lat: 1.2917961008363805, lng: 103.78033657273471 },
+  { lat: 1.2921152025680014, lng: 103.78019441565692 },
+  { lat: 1.292249278913866, lng: 103.77996374568164 },
+  { lat: 1.2921098395140258, lng: 103.77985645732105 },
+  { lat: 1.2919569924707737, lng: 103.77977330884158 },
+  { lat: 1.2917129734879405, lng: 103.77983768185794 },
+  { lat: 1.2915011328135158, lng: 103.77991010150134 },
+  { lat: 1.2914260500385968, lng: 103.7800093432349 },
+  { lat: 1.2911034900467933, lng: 103.78021050891101 },
+  { lat: 1.2909131015477124, lng: 103.78039021691501 },
+  { lat: 1.290765617489316, lng: 103.78058333596408 },
+  { lat: 1.290695897749658, lng: 103.78091592988193 },
+  { lat: 1.2906610378791101, lng: 103.78133971890628 },
+  { lat: 1.2907763436029411, lng: 103.78165085515201 },
+  { lat: 1.2909506429430215, lng: 103.78200758895099 },
+  { lat: 1.2910981269906676, lng: 103.78241796693027 },
+  { lat: 1.2912161142226322, lng: 103.78269155224979 },
+  { lat: 1.2913716428382138, lng: 103.78301073512256 },
+  { lat: 1.291505719223314, lng: 103.78322799405277 },
+  { lat: 1.291682700040829, lng: 103.78309656581104 },
+];
+
+const LIGHTHOUSE_BOUNDARY = [
+  { lat: 1.2906559719698172, lng: 103.78141793942494 },
+  { lat: 1.2907672554012772, lng: 103.78168213701291 },
+  { lat: 1.2908235674972561, lng: 103.78184843397183 },
+  { lat: 1.2907122840682768, lng: 103.7819329235558 },
+  { lat: 1.2905862522271312, lng: 103.78200802540822 },
+  { lat: 1.290458879615399, lng: 103.78204423522992 },
+  { lat: 1.290352959228131, lng: 103.78210726714177 },
+  { lat: 1.2902684910680502, lng: 103.78211933708234 },
+  { lat: 1.2902108381952762, lng: 103.78205228185696 },
+  { lat: 1.2901411184403897, lng: 103.78195572233243 },
+  { lat: 1.2900754209773144, lng: 103.78182295298619 },
+  { lat: 1.2900258126877429, lng: 103.78174516892476 },
+  { lat: 1.289988271278783, lng: 103.7815721664433 },
+  { lat: 1.2900807840355901, lng: 103.78148633575482 },
+  { lat: 1.2901746375535568, lng: 103.78149438238187 },
+  { lat: 1.2903221216462013, lng: 103.78149170017285 },
+  { lat: 1.2904897171956624, lng: 103.78147963023228 },
+  { lat: 1.290618430570157, lng: 103.78145817256016 },
+  { lat: 1.2906479273842102, lng: 103.78145012593312 },
+];
+
+const PIONEER_HOUSE_BOUNDARY = [
+  { lat: 1.290754061448813, lng: 103.779810883653 },
+  { lat: 1.2909015455078583, lng: 103.77998522723897 },
+  { lat: 1.2909685837136966, lng: 103.78015152419789 },
+  { lat: 1.2909953989955332, lng: 103.78025613034947 },
+  { lat: 1.2908800932816256, lng: 103.78038219417317 },
+  { lat: 1.290783558261314, lng: 103.78048948253377 },
+  { lat: 1.290719201579054, lng: 103.78061018193944 },
+  { lat: 1.290670934066303, lng: 103.78077647889836 },
+  { lat: 1.2906602079522325, lng: 103.78082475866063 },
+  { lat: 1.2903893735569818, lng: 103.78076038564427 },
+  { lat: 1.290123902191051, lng: 103.78070674146397 },
+  { lat: 1.2900112779668425, lng: 103.78067723716481 },
+  { lat: 1.2900809977252783, lng: 103.7804224273084 },
+  { lat: 1.2901936219463954, lng: 103.78027758802159 },
+  { lat: 1.2903142907492267, lng: 103.78014079536183 },
+  { lat: 1.2904510487188188, lng: 103.78001204932912 },
+  { lat: 1.2906065773812059, lng: 103.77988866771443 },
+  { lat: 1.2906736155948046, lng: 103.77979747260792 },
+];
+
+const HELIX_HOUSE_BOUNDARY = [
+  { lat: 1.2915629106059112, lng: 103.77915551860289 },
+  { lat: 1.2914395603346527, lng: 103.77921989161925 },
+  { lat: 1.2912974393625207, lng: 103.77928962905364 },
+  { lat: 1.291107050877956, lng: 103.77944787938551 },
+  { lat: 1.2909622483590406, lng: 103.77954712111907 },
+  { lat: 1.290841579586959, lng: 103.77967318494277 },
+  { lat: 1.2907879490197491, lng: 103.77975901563124 },
+  { lat: 1.2909515222461914, lng: 103.77998700339751 },
+  { lat: 1.2910480572601417, lng: 103.78014525372939 },
+  { lat: 1.291208948941887, lng: 103.78008088071303 },
+  { lat: 1.2913591145023484, lng: 103.78000846106963 },
+  { lat: 1.2914422418623528, lng: 103.77994677026228 },
+  { lat: 1.2914261526961006, lng: 103.77981265981154 },
+  { lat: 1.2915763182437252, lng: 103.77973755795912 },
+  { lat: 1.2916192226842826, lng: 103.77961149413542 },
+  { lat: 1.291613859629251, lng: 103.77944787938551 },
+  { lat: 1.2916299487942946, lng: 103.77928962905364 },
+  { lat: 1.2916540825416882, lng: 103.77923062045531 },
+];
+
+const SHEARES_HALL_BOUNDARY = [
+  { lat: 1.2917204394295219, lng: 103.77518667776113 },
+  { lat: 1.291446923619519, lng: 103.77507938940053 },
+  { lat: 1.291119777219864, lng: 103.77500965196614 },
+  { lat: 1.290937433306708, lng: 103.77560510236745 },
+  { lat: 1.2907765416077621, lng: 103.77609862882619 },
+  { lat: 1.2913825669540522, lng: 103.77623273927694 },
+  { lat: 1.291495191117525, lng: 103.77591623861318 },
+  { lat: 1.291581000000637, lng: 103.77561583120351 },
+  { lat: 1.2916775349906695, lng: 103.77540125448232 },
+];
+
+const KENT_RIDGE_HALL_BOUNDARY = [
+  { lat: 1.2917540342179064, lng: 103.77393380400119 },
+  { lat: 1.29178455208978, lng: 103.77395902360622 },
+  { lat: 1.2919400806705665, lng: 103.77403412545864 },
+  { lat: 1.292036615646948, lng: 103.77418432916348 },
+  { lat: 1.2920634309175256, lng: 103.77440963472073 },
+  { lat: 1.2919186284530868, lng: 103.77467249120419 },
+  { lat: 1.291763099870977, lng: 103.77501044954006 },
+  { lat: 1.2917362845972444, lng: 103.77511237348263 },
+  { lat: 1.2911517115594238, lng: 103.77495144094173 },
+  { lat: 1.291264335733125, lng: 103.77472077096645 },
+  { lat: 1.2913769599018394, lng: 103.77450619424526 },
+  { lat: 1.2914734948996198, lng: 103.77429161752407 },
+  { lat: 1.291591482114155, lng: 103.77409313405697 },
+  { lat: 1.2917094693232194, lng: 103.77396438802425 },
+];
+
+const TEMASEK_HALL_BOUNDARY = [
+  { lat: 1.2926717723804764, lng: 103.770244052354 },
+  { lat: 1.292886294483457, lng: 103.77037816280475 },
+  { lat: 1.2929989185802526, lng: 103.77042107814898 },
+  { lat: 1.2931598101384525, lng: 103.77055518859973 },
+  { lat: 1.2931919884488712, lng: 103.77072684997668 },
+  { lat: 1.2930847274125647, lng: 103.77108626598468 },
+  { lat: 1.2930096446844506, lng: 103.77137594455829 },
+  { lat: 1.2929560141630152, lng: 103.77160125011554 },
+  { lat: 1.2928809314310972, lng: 103.77188019985309 },
+  { lat: 1.292827300906939, lng: 103.77207331890216 },
+  { lat: 1.2927254029079167, lng: 103.77239518398395 },
+  { lat: 1.2925698743752074, lng: 103.77240591282 },
+  { lat: 1.2924679763658673, lng: 103.77243273491015 },
+  { lat: 1.2924518872061288, lng: 103.77204113239398 },
+  { lat: 1.2924304349929747, lng: 103.77152078384509 },
+  { lat: 1.2924626133126296, lng: 103.77098434204211 },
+  { lat: 1.2924626133126296, lng: 103.77072148555865 },
+  { lat: 1.2924733394190921, lng: 103.77053909534564 },
+  { lat: 1.2926556832220355, lng: 103.77030842537036 },
+];
+
+const EUSOFF_HALL_BOUNDARY = [
+  { lat: 1.292711071423188, lng: 103.77020076098947 },
+  { lat: 1.2928344216327057, lng: 103.76999959531335 },
+  { lat: 1.2930462621959382, lng: 103.76979842963723 },
+  { lat: 1.29324469511254, lng: 103.76962676826028 },
+  { lat: 1.2934726247949142, lng: 103.7694497424653 },
+  { lat: 1.2936603315767847, lng: 103.76959726396112 },
+  { lat: 1.293826586143402, lng: 103.76962140384225 },
+  { lat: 1.2940116113740996, lng: 103.76968041244058 },
+  { lat: 1.294137643045251, lng: 103.76977965417413 },
+  { lat: 1.2943628911227647, lng: 103.7699191290429 },
+  { lat: 1.2944326107617645, lng: 103.77002373519448 },
+  { lat: 1.294392387893346, lng: 103.77015784564523 },
+  { lat: 1.2941912735417127, lng: 103.7702061254075 },
+  { lat: 1.2938775351213234, lng: 103.77029195609597 },
+  { lat: 1.2936764207288645, lng: 103.77045288863687 },
+  { lat: 1.2935208922544355, lng: 103.77064600768594 },
+  { lat: 1.2933331854622474, lng: 103.77075866046457 },
+  { lat: 1.2932554212156948, lng: 103.7707640248826 },
+  { lat: 1.2931964276477643, lng: 103.7706030923417 },
+  { lat: 1.293118663397039, lng: 103.77044752421884 },
+  { lat: 1.292995313201325, lng: 103.77037510457544 },
+];
+
+const KING_EDWARD_VII_HALL_BOUNDARY = [
+  { lat: 1.293567911673002, lng: 103.7795887398512 },
+  { lat: 1.2933533896276275, lng: 103.77954582450697 },
+  { lat: 1.29311205230492, lng: 103.77963165519544 },
+  { lat: 1.2928868041163413, lng: 103.77963701961347 },
+  { lat: 1.292613288431932, lng: 103.77985159633467 },
+  { lat: 1.2925489317960188, lng: 103.78031830070326 },
+  { lat: 1.292355861878509, lng: 103.78037194488356 },
+  { lat: 1.2921520658385446, lng: 103.78048459766218 },
+  { lat: 1.2918517348024792, lng: 103.78051678417036 },
+  { lat: 1.2916425756671155, lng: 103.78053824184248 },
+  { lat: 1.2914655948468143, lng: 103.78053824184248 },
+  { lat: 1.2912886140141853, lng: 103.7807045388014 },
+  { lat: 1.2911759898415525, lng: 103.78089229343244 },
+  { lat: 1.2911545376176352, lng: 103.78117660758802 },
+  { lat: 1.2911706267855922, lng: 103.78138581989118 },
+  { lat: 1.2915084992892292, lng: 103.78192226169416 },
+  { lat: 1.2916693909418404, lng: 103.78179888007948 },
+  { lat: 1.2918141934204774, lng: 103.78158430335829 },
+  { lat: 1.2919160914560632, lng: 103.78143946407148 },
+  { lat: 1.2923129574504066, lng: 103.78133217571089 },
+  { lat: 1.2926293775906526, lng: 103.78123025176832 },
+  { lat: 1.2929082563256407, lng: 103.7811015057356 },
+  { lat: 1.293230039443338, lng: 103.78093520877668 },
+  { lat: 1.293482102857025, lng: 103.78067771671125 },
+  { lat: 1.2935840008256667, lng: 103.78032902953932 },
+  { lat: 1.2936537204860652, lng: 103.77984623191664 },
+  { lat: 1.293605453029063, lng: 103.77956191776106 },
+];
+
+const RAFFLES_HALL_BOUNDARY = [
+  { lat: 1.3004130289907179, lng: 103.77229770375949 },
+  { lat: 1.3001180619714199, lng: 103.77245863630039 },
+  { lat: 1.2998445470681932, lng: 103.77261956884128 },
+  { lat: 1.299780190616065, lng: 103.77280732347232 },
+  { lat: 1.2995442169442344, lng: 103.77284487439853 },
+  { lat: 1.2994959495995566, lng: 103.77315601064426 },
+  { lat: 1.2992438867845773, lng: 103.77321501924258 },
+  { lat: 1.2993404214826474, lng: 103.77351006223422 },
+  { lat: 1.2994637713692625, lng: 103.7738480205701 },
+  { lat: 1.2996568407449076, lng: 103.77420207216007 },
+  { lat: 1.299871362256089, lng: 103.77423962308627 },
+  { lat: 1.3001287880454537, lng: 103.77425035192233 },
+  { lat: 1.3003164943336512, lng: 103.77398749543887 },
+  { lat: 1.300477385426714, lng: 103.77385874940616 },
+  { lat: 1.3006490025813426, lng: 103.77355834199649 },
+  { lat: 1.3007777154396458, lng: 103.773290121095 },
+  { lat: 1.300842071866342, lng: 103.7730004425214 },
+  { lat: 1.3008957022206584, lng: 103.77272149278384 },
+  { lat: 1.3009225173973968, lng: 103.77246400071841 },
+  { lat: 1.300809893653185, lng: 103.7722440595792 },
+];
+
+const CAPT_BOUNDARY = [
+  { lat: 1.308151989494033, lng: 103.77306929149049 },
+  { lat: 1.3079562392597364, lng: 103.77358159341233 },
+  { lat: 1.3074038481053056, lng: 103.77343675412553 },
+  { lat: 1.307527197596934, lng: 103.77285203256028 },
+  { lat: 1.3081198113743842, lng: 103.77303442277329 },
+];
+
+const RC4_BOUNDARY = [
+  { lat: 1.3086564463131918, lng: 103.77293036596032 },
+  { lat: 1.308189863631594, lng: 103.77274797574731 },
+  { lat: 1.30808260323276, lng: 103.77298669234963 },
+  { lat: 1.308197908161325, lng: 103.77306447641107 },
+  { lat: 1.3080075209508395, lng: 103.77356336728784 },
+  { lat: 1.308291761006248, lng: 103.77371625320168 },
+  { lat: 1.308455333099001, lng: 103.77319858686181 },
+  { lat: 1.308565274991427, lng: 103.77324954883309 },
+];
+
+const RVRC_BOUNDARY = [
+  { lat: 1.2983193593335998, lng: 103.77555838794795 },
+  { lat: 1.2987913068839976, lng: 103.77579442234126 },
+  { lat: 1.2987591286447342, lng: 103.77588561744777 },
+  { lat: 1.2989146567974181, lng: 103.77602509231654 },
+  { lat: 1.2987537656048167, lng: 103.77642742366878 },
+  { lat: 1.298651867844196, lng: 103.77655080528346 },
+  { lat: 1.2984641614322876, lng: 103.77651861877528 },
+  { lat: 1.2982871810883063, lng: 103.77674392433254 },
+  { lat: 1.2978259595276067, lng: 103.776647364808 },
+  { lat: 1.2973915530969806, lng: 103.77637377948848 },
+  { lat: 1.2975363552488217, lng: 103.77605727882472 },
+  { lat: 1.2976918834767321, lng: 103.77567640514461 },
+  { lat: 1.2980619333598646, lng: 103.77556375236598 },
+  { lat: 1.2983837158229277, lng: 103.77559593887416 },
+];
+
+const TEMBUSU_COLLEGE_BOUNDARY = [
+  { lat: 1.306409076576148, lng: 103.7738888595609 },
+  { lat: 1.3061811480614827, lng: 103.77343288402837 },
+  { lat: 1.3061007026984375, lng: 103.77340069752019 },
+  { lat: 1.3058754556681913, lng: 103.77337923984807 },
+  { lat: 1.3057494245829235, lng: 103.77336851101201 },
+  { lat: 1.3057386985328203, lng: 103.77362332086842 },
+  { lat: 1.305727972482679, lng: 103.77378425340932 },
+  { lat: 1.305760150632976, lng: 103.77399078350346 },
+  { lat: 1.3058888632300791, lng: 103.77407929640096 },
+  { lat: 1.3060363464061389, lng: 103.77410880070012 },
+  { lat: 1.3062052816698988, lng: 103.77398541908543 },
+];
+
+const VALOUR_HOUSE_BOUNDARY = [
+  { lat: 1.3008185460907922, lng: 103.77471833132181 },
+  { lat: 1.300679107162921, lng: 103.77528159521493 },
+  { lat: 1.3005289421550492, lng: 103.77545862100992 },
+  { lat: 1.3003465989191987, lng: 103.77540497682962 },
+  { lat: 1.3001803447809133, lng: 103.77530305288705 },
+  { lat: 1.300148166559334, lng: 103.774932908043 },
+  { lat: 1.3001696187071086, lng: 103.77476124666605 },
+  { lat: 1.3005557573356805, lng: 103.774573492035 },
+];
+
 // Helper function to create test polyline
 const createTestPolyline = (map: google.maps.Map): google.maps.Polyline => {
   console.log('🎨 Creating test polyline using Google Maps example...');
@@ -1519,6 +1915,246 @@ const createLAWAreaOverlay = (map: google.maps.Map): google.maps.Polygon => {
   return lawArea;
 };
 
+// Helper function to create PGPR overlay
+const createPGPROverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const pgprOverlay = new google.maps.Polygon({
+    paths: PGPR_BOUNDARY,
+    strokeColor: '#136207', // PGPR green
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#136207', // PGPR green fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  pgprOverlay.setMap(map);
+  return pgprOverlay;
+};
+
+// Helper function to create Light House overlay
+const createLightHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const lightHouseOverlay = new google.maps.Polygon({
+    paths: LIGHTHOUSE_BOUNDARY,
+    strokeColor: '#DDB42A', // Light House gold
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#DDB42A', // Light House gold fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  lightHouseOverlay.setMap(map);
+  return lightHouseOverlay;
+};
+
+// Helper function to create Pioneer House overlay
+const createPioneerHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const pioneerHouseOverlay = new google.maps.Polygon({
+    paths: PIONEER_HOUSE_BOUNDARY,
+    strokeColor: '#2F3487', // Pioneer House deep blue
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#2F3487', // Pioneer House deep blue fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  pioneerHouseOverlay.setMap(map);
+  return pioneerHouseOverlay;
+};
+
+// Helper function to create Helix House overlay
+const createHelixHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const helixHouseOverlay = new google.maps.Polygon({
+    paths: HELIX_HOUSE_BOUNDARY,
+    strokeColor: '#A51C38', // Helix House burgundy
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#A51C38', // Helix House burgundy fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  helixHouseOverlay.setMap(map);
+  return helixHouseOverlay;
+};
+
+// Helper function to create King Edward VII Hall overlay
+const createKingEdwardVIIHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const kingEdwardVIIHallOverlay = new google.maps.Polygon({
+    paths: KING_EDWARD_VII_HALL_BOUNDARY,
+    strokeColor: '#8B0000', // Deep dark red
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#8B0000', // Deep dark red
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  kingEdwardVIIHallOverlay.setMap(map);
+  return kingEdwardVIIHallOverlay;
+};
+
+// Helper function to create Sheares Hall overlay
+const createShearesHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const shearesHallOverlay = new google.maps.Polygon({
+    paths: SHEARES_HALL_BOUNDARY,
+    strokeColor: '#CC5500', // Deep burnt orange
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#CC5500', // Deep burnt orange
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  shearesHallOverlay.setMap(map);
+  return shearesHallOverlay;
+};
+
+// Helper function to create Kent Ridge Hall overlay
+const createKentRidgeHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const kentRidgeHallOverlay = new google.maps.Polygon({
+    paths: KENT_RIDGE_HALL_BOUNDARY,
+    strokeColor: '#1E3A8A', // Deep royal blue
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#1E3A8A', // Deep royal blue
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  kentRidgeHallOverlay.setMap(map);
+  return kentRidgeHallOverlay;
+};
+
+// Helper function to create Temasek Hall overlay
+const createTemasekHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const temasekHallOverlay = new google.maps.Polygon({
+    paths: TEMASEK_HALL_BOUNDARY,
+    strokeColor: '#4A5568', // Deep slate gray
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#4A5568', // Deep slate gray
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  temasekHallOverlay.setMap(map);
+  return temasekHallOverlay;
+};
+
+// Helper function to create Eusoff Hall overlay
+const createEusoffHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const eusoffHallOverlay = new google.maps.Polygon({
+    paths: EUSOFF_HALL_BOUNDARY,
+    strokeColor: '#B8860B', // Deep golden yellow
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#B8860B', // Deep golden yellow
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  eusoffHallOverlay.setMap(map);
+  return eusoffHallOverlay;
+};
+
+// Helper function to create Raffles Hall overlay
+const createRafflesHallOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const rafflesHallOverlay = new google.maps.Polygon({
+    paths: RAFFLES_HALL_BOUNDARY,
+    strokeColor: '#2D5016', // Deep forest green
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#2D5016', // Deep forest green
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  rafflesHallOverlay.setMap(map);
+  return rafflesHallOverlay;
+};
+
+// Helper function to create CAPT overlay
+const createCAPTOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const captOverlay = new google.maps.Polygon({
+    paths: CAPT_BOUNDARY,
+    strokeColor: '#7B123A', // CAPT burgundy
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#7B123A', // CAPT burgundy fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  captOverlay.setMap(map);
+  return captOverlay;
+};
+
+// Helper function to create RC4 overlay
+const createRC4Overlay = (map: google.maps.Map): google.maps.Polygon => {
+  const rc4Overlay = new google.maps.Polygon({
+    paths: RC4_BOUNDARY,
+    strokeColor: '#219181', // RC4 teal
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#219181', // RC4 teal fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  rc4Overlay.setMap(map);
+  return rc4Overlay;
+};
+
+// Helper function to create RVRC overlay
+const createRVRCOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const rvrcOverlay = new google.maps.Polygon({
+    paths: RVRC_BOUNDARY,
+    strokeColor: '#48256A', // RVRC purple
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#48256A', // RVRC purple fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  rvrcOverlay.setMap(map);
+  return rvrcOverlay;
+};
+
+// Helper function to create Tembusu College overlay
+const createTembusuCollegeOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const tembusuOverlay = new google.maps.Polygon({
+    paths: TEMBUSU_COLLEGE_BOUNDARY,
+    strokeColor: '#02522F', // Tembusu dark green
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#02522F', // Tembusu dark green fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  tembusuOverlay.setMap(map);
+  return tembusuOverlay;
+};
+
+// Helper function to create Valour House overlay
+const createValourHouseOverlay = (map: google.maps.Map): google.maps.Polygon => {
+  const valourOverlay = new google.maps.Polygon({
+    paths: VALOUR_HOUSE_BOUNDARY,
+    strokeColor: '#340860', // Valour deep purple
+    strokeOpacity: 1.0,
+    strokeWeight: 3,
+    fillColor: '#340860', // Valour deep purple fill
+    fillOpacity: 0.2, // Transparent overlay
+    geodesic: true,
+    clickable: false, // Allow clicks to pass through to the map
+  });
+  valourOverlay.setMap(map);
+  return valourOverlay;
+};
+
 // Helper function to create area label with outline
 const createAreaLabel = (
   map: google.maps.Map,
@@ -1533,12 +2169,9 @@ const createAreaLabel = (
     private text: string;
     private color: string;
     private div: HTMLDivElement | null = null;
+    private fontSize: number = 14; // Default font size
 
-    constructor(
-      position: google.maps.LatLng,
-      text: string,
-      color: string
-    ) {
+    constructor(position: google.maps.LatLng, text: string, color: string) {
       super();
       this.position = position;
       this.text = text;
@@ -1548,7 +2181,7 @@ const createAreaLabel = (
     onAdd() {
       const div = document.createElement('div');
       div.style.position = 'absolute';
-      div.style.fontSize = '14px';
+      div.style.fontSize = `${this.fontSize}px`;
       div.style.fontWeight = 'bold';
       div.style.color = this.color;
       div.style.textShadow = `
@@ -1562,7 +2195,8 @@ const createAreaLabel = (
         0 2px 0 #fff
       `;
       div.style.padding = '4px 8px';
-      div.style.whiteSpace = 'nowrap';
+      div.style.whiteSpace = 'pre-line';
+      div.style.textAlign = 'center';
       div.style.userSelect = 'none';
       div.style.pointerEvents = 'none';
       div.textContent = this.text;
@@ -1588,6 +2222,16 @@ const createAreaLabel = (
         this.div = null;
       }
     }
+
+    // Method to update font size dynamically
+    updateFontSize(newSize: number) {
+      this.fontSize = newSize;
+      if (this.div) {
+        this.div.style.fontSize = `${this.fontSize}px`;
+        // Redraw to recenter the label with new size
+        this.draw();
+      }
+    }
   }
 
   const overlay = new TextOverlay(
@@ -1604,7 +2248,8 @@ const useNUSCampusHighlight = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapLoaded: boolean,
   showD1Route: boolean = false,
-  showAcademicOverlays: boolean = false
+  showAcademicOverlays: boolean = false,
+  showResidences: boolean = false
 ) => {
   const campusBorderRef = useRef<google.maps.Polyline | null>(null);
   const campusOverlayRef = useRef<google.maps.Polygon | null>(null);
@@ -1618,6 +2263,21 @@ const useNUSCampusHighlight = (
   const fassAreaRef = useRef<google.maps.Polygon | null>(null);
   const combizAreaRef = useRef<google.maps.Polygon | null>(null);
   const lawAreaRef = useRef<google.maps.Polygon | null>(null);
+  const greenAreaRef = useRef<google.maps.Polygon | null>(null);
+  const yellowOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const blueOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const redOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const red2OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const blue2OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const green2OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const yellow3OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const blue3OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const red3OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const captOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const rc4OverlayRef = useRef<google.maps.Polygon | null>(null);
+  const rvrcOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const tembusuOverlayRef = useRef<google.maps.Polygon | null>(null);
+  const valourOverlayRef = useRef<google.maps.Polygon | null>(null);
   const orangeLabelRef = useRef<google.maps.OverlayView | null>(null);
   const blueLabelRef = useRef<google.maps.OverlayView | null>(null);
   const darkBlueLabelRef = useRef<google.maps.OverlayView | null>(null);
@@ -1627,6 +2287,21 @@ const useNUSCampusHighlight = (
   const fassLabelRef = useRef<google.maps.OverlayView | null>(null);
   const combizLabelRef = useRef<google.maps.OverlayView | null>(null);
   const lawLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const greenLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const yellowOverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const blueOverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const redOverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const red2OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const blue2OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const green2OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const yellow3OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const blue3OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const red3OverlayLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const captLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const rc4LabelRef = useRef<google.maps.OverlayView | null>(null);
+  const rvrcLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const tembusuLabelRef = useRef<google.maps.OverlayView | null>(null);
+  const valourLabelRef = useRef<google.maps.OverlayView | null>(null);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1755,6 +2430,186 @@ const useNUSCampusHighlight = (
             '#000000'
           );
           lawLabelRef.current?.setMap(null); // Hide by default
+
+          // Create PGPR overlay
+          greenAreaRef.current = createPGPROverlay(map);
+          greenAreaRef.current.setMap(map); // Show by default
+          // Create PGPR label
+          greenLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2908564398572488, lng: 103.78115242371081 },
+            'PGPR',
+            '#136207'
+          );
+          greenLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Light House overlay
+          yellowOverlayRef.current = createLightHouseOverlay(map);
+          yellowOverlayRef.current.setMap(map); // Show by default
+          // Create Light House label
+          yellowOverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2903737647145226, lng: 103.78176933178423 },
+            'Light\nHouse',
+            '#DDB42A'
+          );
+          yellowOverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Pioneer House overlay
+          blueOverlayRef.current = createPioneerHouseOverlay(map);
+          blueOverlayRef.current.setMap(map); // Show by default
+          // Create Pioneer House label
+          blueOverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2905329951204991, lng: 103.78035117482061 },
+            'Pioneer\nHouse',
+            '#2F3487'
+          );
+          blueOverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Helix House overlay
+          redOverlayRef.current = createHelixHouseOverlay(map);
+          redOverlayRef.current.setMap(map); // Show by default
+          // Create Helix House label
+          redOverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2912349696754788, lng: 103.77971375085811 },
+            'Helix\nHouse',
+            '#A51C38'
+          );
+          redOverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create King Edward VII Hall overlay
+          red2OverlayRef.current = createKingEdwardVIIHallOverlay(map);
+          red2OverlayRef.current.setMap(map); // Show by default
+          // Create King Edward VII Hall label
+          red2OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2923996774032545, lng: 103.78080979615915 },
+            'King\nEdward VII\nHall',
+            '#8B0000'
+          );
+          red2OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Sheares Hall overlay
+          blue2OverlayRef.current = createShearesHallOverlay(map);
+          blue2OverlayRef.current.setMap(map); // Show by default
+          // Create Sheares Hall label
+          blue2OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2912160923055316, lng: 103.77564572758939 },
+            'Sheares\nHall',
+            '#CC5500'
+          );
+          blue2OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Kent Ridge Hall overlay
+          green2OverlayRef.current = createKentRidgeHallOverlay(map);
+          green2OverlayRef.current.setMap(map); // Show by default
+          // Create Kent Ridge Hall label
+          green2OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2916305737435196, lng: 103.77455217105798 },
+            'Kent Ridge\nHall',
+            '#1E3A8A'
+          );
+          green2OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Temasek Hall overlay
+          yellow3OverlayRef.current = createTemasekHallOverlay(map);
+          yellow3OverlayRef.current.setMap(map); // Show by default
+          // Create Temasek Hall label
+          yellow3OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2927025650139552, lng: 103.7712758453672 },
+            'Temasek\nHall',
+            '#4A5568'
+          );
+          yellow3OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Eusoff Hall overlay
+          blue3OverlayRef.current = createEusoffHallOverlay(map);
+          blue3OverlayRef.current.setMap(map); // Show by default
+          // Create Eusoff Hall label
+          blue3OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2934533922859488, lng: 103.77004202922035 },
+            'Eusoff\nHall',
+            '#B8860B'
+          );
+          blue3OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Raffles Hall overlay
+          red3OverlayRef.current = createRafflesHallOverlay(map);
+          red3OverlayRef.current.setMap(map); // Show by default
+          // Create Raffles Hall label
+          red3OverlayLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3001223325818445, lng: 103.77323746139996 },
+            'Raffles\nHall',
+            '#2D5016'
+          );
+          red3OverlayLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create CAPT overlay
+          captOverlayRef.current = createCAPTOverlay(map);
+          captOverlayRef.current.setMap(map); // Show by default
+          // Create CAPT label
+          captLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3077614832236284, lng: 103.77323095140937 },
+            'CAPT',
+            '#7B123A'
+          );
+          captLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create RC4 overlay
+          rc4OverlayRef.current = createRC4Overlay(map);
+          rc4OverlayRef.current.setMap(map); // Show by default
+          // Create RC4 label
+          rc4LabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3082848566232612, lng: 103.773192677322 },
+            'RC4',
+            '#219181'
+          );
+          rc4LabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create RVRC overlay
+          rvrcOverlayRef.current = createRVRCOverlay(map);
+          rvrcOverlayRef.current.setMap(map); // Show by default
+          // Create RVRC label
+          rvrcLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.2981, lng: 103.77615 },
+            'RVRC',
+            '#48256A'
+          );
+          rvrcLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Tembusu College overlay
+          tembusuOverlayRef.current = createTembusuCollegeOverlay(map);
+          tembusuOverlayRef.current.setMap(map); // Show by default
+          // Create Tembusu College label
+          tembusuLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.3059935426292466, lng: 103.77373965317965 },
+            'Tembusu',
+            '#02522F'
+          );
+          tembusuLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
+
+          // Create Valour House overlay
+          valourOverlayRef.current = createValourHouseOverlay(map);
+          valourOverlayRef.current.setMap(map); // Show by default
+          // Create Valour House label
+          valourLabelRef.current = createAreaLabel(
+            map,
+            { lat: 1.300447491985533, lng: 103.7750264300059 },
+            'Valour\nHouse',
+            '#340860'
+          );
+          valourLabelRef.current?.setMap(null); // Hidden by default, controlled by zoom
         }
       }, 500);
 
@@ -1787,6 +2642,13 @@ const useNUSCampusHighlight = (
 
   // Separate effect for academic overlays visibility
   useEffect(() => {
+    const map = mapRef.current;
+
+    // Don't run if map isn't loaded or overlays aren't created yet
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
     // Toggle visibility of all academic overlays
     const overlays = [
       orangeAreaRef.current,
@@ -1812,8 +2674,6 @@ const useNUSCampusHighlight = (
       lawLabelRef.current,
     ];
 
-    const map = mapRef.current;
-
     overlays.forEach((overlay) => {
       if (overlay) {
         overlay.setMap(showAcademicOverlays ? map : null);
@@ -1825,7 +2685,209 @@ const useNUSCampusHighlight = (
         label.setMap(showAcademicOverlays ? map : null);
       }
     });
-  }, [showAcademicOverlays, mapRef]);
+  }, [showAcademicOverlays, mapRef, isMapLoaded]);
+
+  // Separate effect for residence overlays visibility
+  useEffect(() => {
+    const map = mapRef.current;
+
+    // Don't run if map isn't loaded or overlays aren't created yet
+    if (!map || !isMapLoaded) {
+      return;
+    }
+
+    // Toggle visibility of all residence overlays
+    const overlays = [
+      greenAreaRef.current,
+      yellowOverlayRef.current,
+      blueOverlayRef.current,
+      redOverlayRef.current,
+      red2OverlayRef.current,
+      blue2OverlayRef.current,
+      green2OverlayRef.current,
+      yellow3OverlayRef.current,
+      blue3OverlayRef.current,
+      red3OverlayRef.current,
+      captOverlayRef.current,
+      rc4OverlayRef.current,
+      rvrcOverlayRef.current,
+      tembusuOverlayRef.current,
+      valourOverlayRef.current,
+    ];
+
+    const labels = [
+      greenLabelRef.current,
+      yellowOverlayLabelRef.current,
+      blueOverlayLabelRef.current,
+      redOverlayLabelRef.current,
+      red2OverlayLabelRef.current,
+      blue2OverlayLabelRef.current,
+      green2OverlayLabelRef.current,
+      yellow3OverlayLabelRef.current,
+      blue3OverlayLabelRef.current,
+      red3OverlayLabelRef.current,
+      captLabelRef.current,
+      rc4LabelRef.current,
+      rvrcLabelRef.current,
+      tembusuLabelRef.current,
+      valourLabelRef.current,
+    ];
+
+    overlays.forEach((overlay) => {
+      if (overlay) {
+        overlay.setMap(showResidences ? map : null);
+      }
+    });
+
+    labels.forEach((label) => {
+      if (label) {
+        label.setMap(showResidences ? map : null);
+      }
+    });
+  }, [showResidences, mapRef, isMapLoaded]);
+
+  // Effect to handle zoom-based font size updates for academic area labels
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !isMapLoaded ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      return;
+    }
+
+    // Function to calculate font size based on zoom level
+    const getFontSizeForZoom = (zoom: number): number => {
+      // Base font size at zoom 16 (default)
+      if (zoom <= 13) {
+        return 0; // Hidden at zoom 13 and below
+      } else if (zoom === 14) {
+        return 9; // Smaller at far zoom
+      } else if (zoom === 15) {
+        return 12; // Slightly smaller
+      } else if (zoom === 16) {
+        return 14; // Default size
+      } else if (zoom === 17) {
+        return 16; // Slightly larger
+      } else if (zoom === 18) {
+        return 18; // Larger
+      } else {
+        return 20; // Maximum size at high zoom
+      }
+    };
+
+    // Function to update all label font sizes and visibility
+    const updateLabelSizes = () => {
+      const zoom = map.getZoom() || 16;
+      const fontSize = getFontSizeForZoom(zoom);
+      const shouldHide = zoom <= 13;
+
+      const labels = [
+        orangeLabelRef.current,
+        blueLabelRef.current,
+        darkBlueLabelRef.current,
+        yellowLabelRef.current,
+        darkOrangeLabelRef.current,
+        cdeLabelRef.current,
+        fassLabelRef.current,
+        combizLabelRef.current,
+        lawLabelRef.current,
+      ];
+
+      labels.forEach((label) => {
+        if (label) {
+          if (shouldHide) {
+            // Hide the label by setting map to null
+            label.setMap(null);
+          } else {
+            // Show the label if academic overlays are enabled
+            if (showAcademicOverlays) {
+              label.setMap(map);
+            }
+            // Update font size
+            if (typeof (label as any).updateFontSize === 'function') {
+              (label as any).updateFontSize(fontSize);
+            }
+          }
+        }
+      });
+    };
+
+    // Set up zoom change listener
+    const zoomListener = map.addListener('zoom_changed', updateLabelSizes);
+
+    // Initial update
+    updateLabelSizes();
+
+    // Cleanup
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+    };
+  }, [mapRef, isMapLoaded, showAcademicOverlays]);
+
+  // Effect to handle zoom-based visibility for hall labels (show only at zoom >= 17)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !isMapLoaded ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      return;
+    }
+
+    // Function to update hall label visibility based on zoom level
+    const updateHallLabelVisibility = () => {
+      const zoom = map.getZoom() || 16;
+      const shouldShow = zoom >= 17 && showResidences;
+
+      const hallLabels = [
+        greenLabelRef.current, // PGPR
+        yellowOverlayLabelRef.current, // Light House
+        blueOverlayLabelRef.current, // Pioneer House
+        redOverlayLabelRef.current, // Helix House
+        red2OverlayLabelRef.current, // King Edward VII Hall
+        blue2OverlayLabelRef.current, // Sheares Hall
+        green2OverlayLabelRef.current, // Kent Ridge Hall
+        yellow3OverlayLabelRef.current, // Temasek Hall
+        blue3OverlayLabelRef.current, // Eusoff Hall
+        red3OverlayLabelRef.current, // Raffles Hall
+        captLabelRef.current, // CAPT
+        rc4LabelRef.current, // RC4
+        rvrcLabelRef.current, // Ridge View Residential College
+        tembusuLabelRef.current, // Tembusu College
+        valourLabelRef.current, // Valour House
+      ];
+
+      hallLabels.forEach((label) => {
+        if (label) {
+          if (shouldShow) {
+            label.setMap(map);
+          } else {
+            label.setMap(null);
+          }
+        }
+      });
+    };
+
+    // Set up zoom change listener
+    const zoomListener = map.addListener('zoom_changed', updateHallLabelVisibility);
+
+    // Initial update
+    updateHallLabelVisibility();
+
+    // Cleanup
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+    };
+  }, [mapRef, isMapLoaded, showResidences]);
 };
 
 const addMarkersAndFitBounds = ({
@@ -1975,10 +3037,12 @@ const useMapPolyline = (
           strokeWeight: 6,
           map: mapRef.current,
         };
-        
+
         if (step.travelMode === 'TRANSIT' && step.transitDetails) {
-          const lineName = step.transitDetails.transitLine.nameShort || step.transitDetails.transitLine.name;
-          
+          const lineName =
+            step.transitDetails.transitLine.nameShort ||
+            step.transitDetails.transitLine.name;
+
           // Try to get color from API first
           const apiColor = step.transitDetails.transitLine.color;
           if (apiColor) {
@@ -1993,22 +3057,24 @@ const useMapPolyline = (
           // Make walking segments dotted
           polylineOptions.strokeColor = strokeColor;
           polylineOptions.strokeOpacity = 0;
-          polylineOptions.icons = [{
-            icon: {
-              path: 'M 0,-1 0,1',
-              strokeOpacity: 1,
-              strokeWeight: 3,
-              scale: 1,
+          polylineOptions.icons = [
+            {
+              icon: {
+                path: 'M 0,-1 0,1',
+                strokeOpacity: 1,
+                strokeWeight: 3,
+                scale: 1,
+              },
+              offset: '0',
+              repeat: '10px', // Increased gap between dots
             },
-            offset: '0',
-            repeat: '10px', // Increased gap between dots
-          }];
+          ];
         }
 
         const stepPolyline = new google.maps.Polyline(polylineOptions);
 
         polylinesRef.current.push(stepPolyline);
-        
+
         // Extend bounds for this step
         decodedPath.forEach((point) => bounds.extend(point));
       });
@@ -2022,7 +3088,7 @@ const useMapPolyline = (
           left: 50,
         });
       }
-    } 
+    }
     // Fallback to single polyline if no steps provided
     else if (routePolyline) {
       const decodedPath = polyline
@@ -2121,7 +3187,10 @@ const useConnectorLines = (
 
         // Draw dotted line from route end to destination
         if (destination) {
-          const destinationLocation = { lat: destination.lat, lng: destination.lng };
+          const destinationLocation = {
+            lat: destination.lat,
+            lng: destination.lng,
+          };
           endConnectorRef.current = new google.maps.Polyline({
             path: [routeEnd, destinationLocation],
             geodesic: true,
@@ -2174,7 +3243,12 @@ const useBusStopMarkers = (
   const { data: pickupPointsData } = usePickupPoints(activeRoute as RouteCode);
 
   useEffect(() => {
-    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+    if (
+      !mapRef.current ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
       return;
     }
 
@@ -2200,13 +3274,32 @@ const useBusStopMarkers = (
     }
 
     // Log all bus stop names to debug
-    console.log('All bus stops:', busStops.map((s: BusStop) => ({
-      name: s.name,
-      ShortName: s.ShortName,
-      caption: s.caption
-    })));
+    console.log(
+      'All bus stops:',
+      busStops.map((s: BusStop) => ({
+        name: s.name,
+        ShortName: s.ShortName,
+        caption: s.caption,
+      }))
+    );
 
-    // Priority stops that should always be shown (key locations)
+    // Priority stops shown at zoom level 14 (minimal set of key locations)
+    const zoom14PriorityStops = [
+      'KR MRT',
+      'PGP',
+      'COM 3',
+      'KR Bus Ter',
+      'CLB',
+      'EA',
+      'Museum',
+      'UTown',
+      'UHC',
+      'S 17',
+      'UHall',
+      'TCOMS',
+    ];
+
+    // Priority stops that should be shown at zoom level 15-16 (expanded key locations)
     // Use exact matches for ShortName to avoid partial matching issues
     const priorityStops = [
       'BIZ 2',
@@ -2233,12 +3326,20 @@ const useBusStopMarkers = (
       'OTH Bldg',
     ];
 
-    // Function to check if a stop is a priority stop
+    // Function to check if a stop is a zoom 14 priority stop
+    const isZoom14PriorityStop = (stop: BusStop) => {
+      return zoom14PriorityStops.some(
+        (priority) =>
+          stop.ShortName === priority || stop.ShortName.trim() === priority
+      );
+    };
+
+    // Function to check if a stop is a priority stop (zoom 15-16)
     const isPriorityStop = (stop: BusStop) => {
       // Use exact match for ShortName to avoid "UHall" matching "Opp UHall"
-      const isMatch = priorityStops.some((priority) =>
-        stop.ShortName === priority ||
-        stop.ShortName.trim() === priority
+      const isMatch = priorityStops.some(
+        (priority) =>
+          stop.ShortName === priority || stop.ShortName.trim() === priority
       );
       return isMatch;
     };
@@ -2258,14 +3359,18 @@ const useBusStopMarkers = (
         // Handle circle markers - show only route stops AND only when zoomed in
         circleMarkersRef.current.forEach((marker) => {
           const title = marker.getTitle();
-          const belongsToActiveRoute = title ? routeStopNames.has(title) : false;
+          const belongsToActiveRoute = title
+            ? routeStopNames.has(title)
+            : false;
           marker.setVisible(belongsToActiveRoute && showAllStops); // Added zoom check
         });
 
         // Handle label markers - show route stops (labels visible at all zoom levels)
         labelMarkersRef.current.forEach((marker) => {
           const title = marker.getTitle();
-          const belongsToActiveRoute = title ? routeStopNames.has(title) : false;
+          const belongsToActiveRoute = title
+            ? routeStopNames.has(title)
+            : false;
           marker.setVisible(belongsToActiveRoute);
         });
       } else {
@@ -2279,12 +3384,27 @@ const useBusStopMarkers = (
         labelMarkersRef.current.forEach((marker) => {
           const title = marker.getTitle();
           // Use exact match instead of includes to avoid "UHall" matching "Opp UHall"
+          const isZoom14Priority = title
+            ? zoom14PriorityStops.some((p) => title === p || title.trim() === p)
+            : false;
           const isPriority = title
             ? priorityStops.some((p) => title === p || title.trim() === p)
             : false;
 
-          // Show all stops when zoomed in, or only priority stops when zoomed out
-          marker.setVisible(showAllStops || isPriority);
+          // Show based on zoom level:
+          // - Zoom 17+: Show all stops
+          // - Zoom 15-16: Show priority stops
+          // - Zoom 14 and below: Show only zoom14 priority stops
+          let shouldShow = false;
+          if (showAllStops) {
+            shouldShow = true; // Zoom 17+
+          } else if (zoom >= 15) {
+            shouldShow = isPriority; // Zoom 15-16
+          } else {
+            shouldShow = isZoom14Priority; // Zoom 14 and below
+          }
+
+          marker.setVisible(shouldShow);
         });
       }
     };
@@ -2299,7 +3419,7 @@ const useBusStopMarkers = (
       // At zoom 19+: 18px
       let fontSize = 12;
       let strokeWidth = 3;
-      
+
       if (zoom >= 17) {
         fontSize = Math.min(18, 12 + (zoom - 16) * 2);
         strokeWidth = Math.min(4, 3 + (zoom - 16) * 0.3);
@@ -2311,12 +3431,15 @@ const useBusStopMarkers = (
 
         const isStopPriority = isPriorityStop(stop);
         const isRouteStop = belongsToRoute(stop);
-        const stopColor = (activeRoute && isRouteStop && routeColor) ? routeColor : '#274F9C';
+        const stopColor =
+          activeRoute && isRouteStop && routeColor ? routeColor : '#274F9C';
         const labelBelow = shouldLabelBelow(stop);
         const svgAnchorY = labelBelow ? 5 : 25;
 
         const newIcon = {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          url:
+            'data:image/svg+xml;charset=UTF-8,' +
+            encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="250" height="40">
               <text x="125" y="25" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" 
                     fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="${strokeWidth}" paint-order="stroke">
@@ -2344,30 +3467,31 @@ const useBusStopMarkers = (
         const lngDiff = Math.abs(otherStop.longitude - stop.longitude);
         return latDiff < 0.0005 && lngDiff < 0.0005;
       });
-      
+
       // If there are nearby stops, check if this stop is more southern (lower latitude)
       if (nearbyStops.length > 0) {
-        const hasStopToNorth = nearbyStops.some((otherStop: BusStop) => 
-          otherStop.latitude > stop.latitude
+        const hasStopToNorth = nearbyStops.some(
+          (otherStop: BusStop) => otherStop.latitude > stop.latitude
         );
         return hasStopToNorth; // Label below if this stop is more south (has stops north of it)
       }
-      
+
       return false; // Default to label above
     };
 
     busStops.forEach((stop: BusStop) => {
       const isStopPriority = isPriorityStop(stop);
       const isRouteStop = belongsToRoute(stop);
-      
+
       // Determine the color to use
-      const stopColor = (activeRoute && isRouteStop && routeColor) ? routeColor : '#274F9C';
-      
+      const stopColor =
+        activeRoute && isRouteStop && routeColor ? routeColor : '#274F9C';
+
       // Determine label position based on nearby stops
       const labelBelow = shouldLabelBelow(stop);
       const labelOffsetLat = labelBelow ? -0.0001 : 0.0001; // Negative offset moves south
       const svgAnchorY = labelBelow ? 5 : 25; // Anchor point changes based on position
-      
+
       // Create circle marker
       const marker = new google.maps.Marker({
         position: { lat: stop.latitude, lng: stop.longitude },
@@ -2390,7 +3514,9 @@ const useBusStopMarkers = (
         position: { lat: stop.latitude + labelOffsetLat, lng: stop.longitude },
         map: map,
         icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          url:
+            'data:image/svg+xml;charset=UTF-8,' +
+            encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="200" height="30">
               <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
                     fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
@@ -2432,7 +3558,15 @@ const useBusStopMarkers = (
       circleMarkersRef.current = [];
       labelMarkersRef.current = [];
     };
-  }, [mapRef, isMapCreated, showBusStops, busStopsData, activeRoute, pickupPointsData, routeColor]);
+  }, [
+    mapRef,
+    isMapCreated,
+    showBusStops,
+    busStopsData,
+    activeRoute,
+    pickupPointsData,
+    routeColor,
+  ]);
 };
 
 // Hook to render destination marker with Google Maps pin icon
@@ -2445,7 +3579,12 @@ const useDestinationMarker = (
   const markerRef = useRef<google.maps.Marker | null>(null);
 
   useEffect(() => {
-    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+    if (
+      !mapRef.current ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
       return;
     }
 
@@ -2693,8 +3832,10 @@ const useFilteredBusRoutes = (
 
       // Add route polyline if not exists
       if (!polylinesRef.current.has(routeCode)) {
-        const checkpoints = (routeCheckpointsData as Record<string, any>)[routeCode];
-        
+        const checkpoints = (routeCheckpointsData as Record<string, any>)[
+          routeCode
+        ];
+
         if (checkpoints && checkpoints.length > 0) {
           const path = checkpoints.map((point: any) => ({
             lat: point.latitude,
@@ -2840,7 +3981,12 @@ const useLandmarkMarkers = (
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isMapCreated || typeof window === 'undefined' || !window.google) {
+    if (
+      !map ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
       return;
     }
 
@@ -2853,15 +3999,61 @@ const useLandmarkMarkers = (
       return;
     }
 
+    // Function to calculate scale based on zoom level
+    const getScaleForZoom = (zoom: number): number => {
+      // Base scale at zoom 16 (default)
+      // Scale smaller when zoomed out, larger when zoomed in
+      if (zoom <= 14) {
+        return 0.7; // Smaller at far zoom
+      } else if (zoom <= 15) {
+        return 0.85; // Slightly smaller
+      } else if (zoom === 16) {
+        return 1; // Default size
+      } else if (zoom === 17) {
+        return 1.15; // Slightly larger
+      } else if (zoom === 18) {
+        return 1.3; // Larger
+      } else {
+        return 1.5; // Maximum size at high zoom
+      }
+    };
+
+    // Function to update landmark marker sizes based on zoom
+    const updateLandmarkSizes = () => {
+      const zoom = map.getZoom() || 16;
+      const scale = getScaleForZoom(zoom);
+      const baseWidth = 40;
+      const baseHeight = 52;
+
+      landmarkMarkersRef.current.forEach((marker, index) => {
+        const landmark = NUS_LANDMARKS[index];
+        if (!landmark) return;
+
+        const scaledWidth = baseWidth * scale;
+        const scaledHeight = baseHeight * scale;
+
+        marker.setIcon({
+          url: getLandmarkMarkerSVG(landmark.type),
+          scaledSize: new google.maps.Size(scaledWidth, scaledHeight),
+          anchor: new google.maps.Point(scaledWidth / 2, scaledHeight),
+        });
+      });
+    };
+
     // Create markers for each landmark
     NUS_LANDMARKS.forEach((landmark) => {
+      const initialZoom = map.getZoom() || 16;
+      const initialScale = getScaleForZoom(initialZoom);
+      const initialWidth = 40 * initialScale;
+      const initialHeight = 52 * initialScale;
+
       const marker = new google.maps.Marker({
         position: landmark.coordinates,
         map,
         icon: {
           url: getLandmarkMarkerSVG(landmark.type),
-          scaledSize: new google.maps.Size(40, 52),
-          anchor: new google.maps.Point(20, 52),
+          scaledSize: new google.maps.Size(initialWidth, initialHeight),
+          anchor: new google.maps.Point(initialWidth / 2, initialHeight),
         },
         title: landmark.name,
         zIndex: 500, // Below buses but above routes
@@ -2888,8 +4080,14 @@ const useLandmarkMarkers = (
       landmarkMarkersRef.current.push(marker);
     });
 
+    // Add zoom change listener to update sizes
+    const zoomListener = map.addListener('zoom_changed', updateLandmarkSizes);
+
     // Cleanup
     return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
       landmarkMarkersRef.current.forEach((marker) => marker.setMap(null));
     };
   }, [mapRef, isMapCreated, activeRoute]);
@@ -2909,7 +4107,12 @@ const useUserLocationMarker = (
   const { coords: userLocation } = useLocation();
 
   useEffect(() => {
-    if (!mapRef.current || !isMapCreated || typeof window === 'undefined' || !window.google) {
+    if (
+      !mapRef.current ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
       return;
     }
 
@@ -2954,13 +4157,23 @@ const useUserLocationMarker = (
       if (event.alpha !== null) {
         // alpha is the compass heading (0-360)
         // Convert to match map north (0 = north)
-        const heading =
-          (event as any).webkitCompassHeading || event.alpha || 0;
+        const heading = (event as any).webkitCompassHeading || event.alpha || 0;
         headingRef.current = heading;
 
         // Update marker rotation if we have location
-        if (userLocation && userMarkerRef.current) {
-          updateUserMarker(userLocation.latitude, userLocation.longitude, heading);
+        if (
+          userLocation &&
+          typeof userLocation.latitude === 'number' &&
+          typeof userLocation.longitude === 'number' &&
+          !isNaN(userLocation.latitude) &&
+          !isNaN(userLocation.longitude) &&
+          userMarkerRef.current
+        ) {
+          updateUserMarker(
+            userLocation.latitude,
+            userLocation.longitude,
+            heading
+          );
         }
       }
     };
@@ -2990,8 +4203,18 @@ const useUserLocationMarker = (
     requestOrientationPermission();
 
     // Update marker when userLocation changes
-    if (userLocation) {
-      updateUserMarker(userLocation.latitude, userLocation.longitude, headingRef.current);
+    if (
+      userLocation &&
+      typeof userLocation.latitude === 'number' &&
+      typeof userLocation.longitude === 'number' &&
+      !isNaN(userLocation.latitude) &&
+      !isNaN(userLocation.longitude)
+    ) {
+      updateUserMarker(
+        userLocation.latitude,
+        userLocation.longitude,
+        headingRef.current
+      );
     }
 
     // Cleanup
@@ -3061,7 +4284,11 @@ const PlaceDetailsCompact: React.FC<{
   const placeDetailsRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current || typeof window === 'undefined' || !window.google) {
+    if (
+      !containerRef.current ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
       return;
     }
 
@@ -3072,9 +4299,15 @@ const PlaceDetailsCompact: React.FC<{
         await google.maps.importLibrary('places');
 
         // Create the custom elements
-        const placeDetails = document.createElement('gmp-place-details-compact') as HTMLElement;
-        const placeRequest = document.createElement('gmp-place-details-place-request') as HTMLElement;
-        const contentConfig = document.createElement('gmp-place-standard-content') as HTMLElement;
+        const placeDetails = document.createElement(
+          'gmp-place-details-compact'
+        ) as HTMLElement;
+        const placeRequest = document.createElement(
+          'gmp-place-details-place-request'
+        ) as HTMLElement;
+        const contentConfig = document.createElement(
+          'gmp-place-standard-content'
+        ) as HTMLElement;
 
         // Set the place ID
         placeRequest.setAttribute('place', placeId);
@@ -3139,7 +4372,7 @@ const PlaceDetailsCompact: React.FC<{
       >
         ×
       </button>
-      
+
       {/* Place details container */}
       <div
         ref={containerRef}
@@ -3168,26 +4401,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   showUserLocation = true, // Default to true for backward compatibility
   showMapControls = true, // Default to true for backward compatibility
   showBusStops = false, // Default to false for backward compatibility
+  mapFilters: externalMapFilters,
+  onMapFiltersChange,
+  onMapTypeChangeReady,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const previousActiveRouteRef = useRef<RouteCode | null>(null);
   const isSyncingFromActiveRouteRef = useRef(false); // Track if we're syncing from activeRoute to prevent loops
-  
-  // Map filter state - controlled internally with localStorage persistence
-  const [mapFilters, setMapFilters] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('nus-nextbus-map-filters');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('Error loading map filters:', error);
-    }
-    return {
+
+  // Map filter state - use external state if provided, otherwise use internal state with localStorage persistence
+  const [internalMapFilters, setInternalMapFilters] = useState<
+    Record<string, boolean>
+  >(() => {
+    const defaultFilters = {
       important: true,
       'bus-stops': true,
-      academic: false,
+      academic: false, // Always default to false
       residences: false,
       'bus-route-a1': false,
       'bus-route-a2': false,
@@ -3198,11 +4428,41 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       'bus-route-k': false,
       'bus-route-l': false,
     };
+
+    try {
+      const saved = localStorage.getItem('nus-nextbus-map-filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Always override academic to be false on initial load
+        return { ...parsed, academic: false };
+      }
+    } catch (error) {
+      console.error('Error loading map filters:', error);
+    }
+    return defaultFilters;
   });
+
+  // Use external filters if provided, otherwise use internal state
+  const mapFilters = externalMapFilters || internalMapFilters;
+  const setMapFilters = (filters: Record<string, boolean>) => {
+    if (onMapFiltersChange) {
+      onMapFiltersChange(filters);
+    } else {
+      setInternalMapFilters(filters);
+      try {
+        localStorage.setItem(
+          'nus-nextbus-map-filters',
+          JSON.stringify(filters)
+        );
+      } catch (error) {
+        console.error('Error saving map filters:', error);
+      }
+    }
+  };
 
   // Determine if landmarks should be shown based on filters
   const shouldShowLandmarks = mapFilters.important && showLandmarks;
-  
+
   // Determine which bus route is selected from filters (radio button selection)
   const selectedFilterRoute = React.useMemo(() => {
     const routeKeys = Object.keys(mapFilters).filter(
@@ -3213,45 +4473,38 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
     return null;
   }, [mapFilters]);
-  
+
   // Create a single source of truth for the active route
   // Priority: selectedFilterRoute (from filter panel) > activeRoute (from nearest stops)
   // But when activeRoute changes from outside, update the filter to match
   const effectiveActiveRoute = selectedFilterRoute || activeRoute;
-  
+
   // Sync filter panel when activeRoute changes from "nearest stops"
   React.useEffect(() => {
     const previousActiveRoute = previousActiveRouteRef.current;
-    
+
     if (activeRoute && activeRoute !== previousActiveRoute) {
       // When a route is selected from "nearest stops" (new selection)
       // Update the filter panel to match
       isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
-      
+
       const routeFilterKey = `bus-route-${activeRoute.toLowerCase()}`;
       const updatedFilters = { ...mapFilters };
-      
+
       // Deselect all bus-view radio buttons first
       Object.keys(updatedFilters).forEach((key) => {
         if (key === 'bus-stops' || key.startsWith('bus-route-')) {
           updatedFilters[key] = false;
         }
       });
-      
+
       // Select the active route in the filter
       updatedFilters[routeFilterKey] = true;
-      
+
       setMapFilters(updatedFilters);
-      
-      // Save to localStorage
-      try {
-        localStorage.setItem('nus-nextbus-map-filters', JSON.stringify(updatedFilters));
-      } catch (error) {
-        console.error('Error saving filters:', error);
-      }
-      
+
       previousActiveRouteRef.current = activeRoute;
-      
+
       // Reset flag after a short delay to allow state to settle
       setTimeout(() => {
         isSyncingFromActiveRouteRef.current = false;
@@ -3260,46 +4513,44 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       // When activeRoute becomes null (deselected from "nearest stops")
       // Revert to "Bus Stops" as default
       isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
-      
+
       const updatedFilters = { ...mapFilters };
-      
+
       // Deselect all bus routes
       Object.keys(updatedFilters).forEach((key) => {
         if (key.startsWith('bus-route-')) {
           updatedFilters[key] = false;
         }
       });
-      
+
       // Select "Bus Stops"
       updatedFilters['bus-stops'] = true;
-      
+
       setMapFilters(updatedFilters);
-      
-      // Save to localStorage
-      try {
-        localStorage.setItem('nus-nextbus-map-filters', JSON.stringify(updatedFilters));
-      } catch (error) {
-        console.error('Error saving filters:', error);
-      }
-      
+
       previousActiveRouteRef.current = null;
-      
+
       // Reset flag after a short delay
       setTimeout(() => {
         isSyncingFromActiveRouteRef.current = false;
       }, 100);
     }
   }, [activeRoute]); // Only depend on activeRoute
-  
+
   // When filter route is selected, notify parent to clear activeRoute
   React.useEffect(() => {
     // Don't notify parent if we're syncing from activeRoute (to prevent loop)
-    if (selectedFilterRoute && activeRoute && onActiveRouteChange && !isSyncingFromActiveRouteRef.current) {
+    if (
+      selectedFilterRoute &&
+      activeRoute &&
+      onActiveRouteChange &&
+      !isSyncingFromActiveRouteRef.current
+    ) {
       // Filter route is selected, so clear the activeRoute from parent
       onActiveRouteChange(null);
     }
   }, [selectedFilterRoute]); // Only depend on selectedFilterRoute
-  
+
   // Determine if bus stops should be shown based on filters
   // Show bus stops if:
   // 1. effectiveActiveRoute is set (from either filter or nearest stops)
@@ -3307,7 +4558,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const shouldShowBusStops = effectiveActiveRoute
     ? true
     : mapFilters['bus-stops'] && showBusStops;
-  
+
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
     initialRegion,
@@ -3360,7 +4611,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const routes: RouteCode[] = [];
     Object.keys(mapFilters).forEach((key) => {
       if (key.startsWith('bus-route-') && mapFilters[key]) {
-        const routeCode = key.replace('bus-route-', '').toUpperCase() as RouteCode;
+        const routeCode = key
+          .replace('bus-route-', '')
+          .toUpperCase() as RouteCode;
         routes.push(routeCode);
       }
     });
@@ -3368,14 +4621,38 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [mapFilters]);
 
   // Fetch active buses for all filtered routes
-  const filteredBusData1 = useActiveBuses(filteredRouteCodes[0], !!filteredRouteCodes[0]);
-  const filteredBusData2 = useActiveBuses(filteredRouteCodes[1], !!filteredRouteCodes[1]);
-  const filteredBusData3 = useActiveBuses(filteredRouteCodes[2], !!filteredRouteCodes[2]);
-  const filteredBusData4 = useActiveBuses(filteredRouteCodes[3], !!filteredRouteCodes[3]);
-  const filteredBusData5 = useActiveBuses(filteredRouteCodes[4], !!filteredRouteCodes[4]);
-  const filteredBusData6 = useActiveBuses(filteredRouteCodes[5], !!filteredRouteCodes[5]);
-  const filteredBusData7 = useActiveBuses(filteredRouteCodes[6], !!filteredRouteCodes[6]);
-  const filteredBusData8 = useActiveBuses(filteredRouteCodes[7], !!filteredRouteCodes[7]);
+  const filteredBusData1 = useActiveBuses(
+    filteredRouteCodes[0],
+    !!filteredRouteCodes[0]
+  );
+  const filteredBusData2 = useActiveBuses(
+    filteredRouteCodes[1],
+    !!filteredRouteCodes[1]
+  );
+  const filteredBusData3 = useActiveBuses(
+    filteredRouteCodes[2],
+    !!filteredRouteCodes[2]
+  );
+  const filteredBusData4 = useActiveBuses(
+    filteredRouteCodes[3],
+    !!filteredRouteCodes[3]
+  );
+  const filteredBusData5 = useActiveBuses(
+    filteredRouteCodes[4],
+    !!filteredRouteCodes[4]
+  );
+  const filteredBusData6 = useActiveBuses(
+    filteredRouteCodes[5],
+    !!filteredRouteCodes[5]
+  );
+  const filteredBusData7 = useActiveBuses(
+    filteredRouteCodes[6],
+    !!filteredRouteCodes[6]
+  );
+  const filteredBusData8 = useActiveBuses(
+    filteredRouteCodes[7],
+    !!filteredRouteCodes[7]
+  );
 
   // Fetch pickup points for all filtered routes
   const filteredStopData1 = usePickupPoints(filteredRouteCodes[0]);
@@ -3390,108 +4667,190 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Combine bus and stop data into Maps
   const busDataByRoute = React.useMemo(() => {
     const map = new Map<string, any>();
-    const busDataArray = [filteredBusData1, filteredBusData2, filteredBusData3, filteredBusData4,
-                          filteredBusData5, filteredBusData6, filteredBusData7, filteredBusData8];
+    const busDataArray = [
+      filteredBusData1,
+      filteredBusData2,
+      filteredBusData3,
+      filteredBusData4,
+      filteredBusData5,
+      filteredBusData6,
+      filteredBusData7,
+      filteredBusData8,
+    ];
     filteredRouteCodes.forEach((routeCode, index) => {
       const buses = busDataArray[index]?.data?.ActiveBusResult?.activebus || [];
       map.set(routeCode, buses);
     });
     return map;
-  }, [filteredRouteCodes, filteredBusData1.data, filteredBusData2.data, filteredBusData3.data, 
-      filteredBusData4.data, filteredBusData5.data, filteredBusData6.data, filteredBusData7.data, filteredBusData8.data]);
+  }, [
+    filteredRouteCodes,
+    filteredBusData1.data,
+    filteredBusData2.data,
+    filteredBusData3.data,
+    filteredBusData4.data,
+    filteredBusData5.data,
+    filteredBusData6.data,
+    filteredBusData7.data,
+    filteredBusData8.data,
+  ]);
 
   const stopDataByRoute = React.useMemo(() => {
     const map = new Map<string, any>();
-    const stopDataArray = [filteredStopData1, filteredStopData2, filteredStopData3, filteredStopData4,
-                           filteredStopData5, filteredStopData6, filteredStopData7, filteredStopData8];
+    const stopDataArray = [
+      filteredStopData1,
+      filteredStopData2,
+      filteredStopData3,
+      filteredStopData4,
+      filteredStopData5,
+      filteredStopData6,
+      filteredStopData7,
+      filteredStopData8,
+    ];
     filteredRouteCodes.forEach((routeCode, index) => {
-      const stops = stopDataArray[index]?.data?.PickupPointResult?.pickuppoint || [];
+      const stops =
+        stopDataArray[index]?.data?.PickupPointResult?.pickuppoint || [];
       map.set(routeCode, stops);
     });
     return map;
-  }, [filteredRouteCodes, filteredStopData1.data, filteredStopData2.data, filteredStopData3.data,
-      filteredStopData4.data, filteredStopData5.data, filteredStopData6.data, filteredStopData7.data, filteredStopData8.data]);
+  }, [
+    filteredRouteCodes,
+    filteredStopData1.data,
+    filteredStopData2.data,
+    filteredStopData3.data,
+    filteredStopData4.data,
+    filteredStopData5.data,
+    filteredStopData6.data,
+    filteredStopData7.data,
+    filteredStopData8.data,
+  ]);
 
-  useMapMarkers({ mapRef, origin, destination, waypoints, onMarkerPress, activeRoute: effectiveActiveRoute }); // Hide origin/waypoint markers when route selected
+  useMapMarkers({
+    mapRef,
+    origin,
+    destination,
+    waypoints,
+    onMarkerPress,
+    activeRoute: effectiveActiveRoute,
+  }); // Hide origin/waypoint markers when route selected
   useMapPolyline(mapRef, routePolyline, routeSteps);
   useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
-  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic);
+  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic, mapFilters.residences);
   useBusMarkers(mapRef, activeBuses, routeColor);
   useRouteCheckpoints(mapRef, effectiveActiveRoute, routeColor);
   // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)
   useFilteredBusRoutes(
     mapRef,
-    selectedFilterRoute ? { [`bus-route-${selectedFilterRoute.toLowerCase()}`]: true } : {},
+    selectedFilterRoute
+      ? { [`bus-route-${selectedFilterRoute.toLowerCase()}`]: true }
+      : {},
     busDataByRoute,
     stopDataByRoute
   );
-  useLandmarkMarkers(mapRef, isMapCreated && shouldShowLandmarks, effectiveActiveRoute); // Control landmarks with filter
-  useBusStopMarkers(mapRef, isMapCreated, shouldShowBusStops, effectiveActiveRoute, routeColor); // Control bus stops with filter, but always show when route selected
+  useLandmarkMarkers(
+    mapRef,
+    isMapCreated && shouldShowLandmarks,
+    effectiveActiveRoute
+  ); // Control landmarks with filter
+  useBusStopMarkers(
+    mapRef,
+    isMapCreated,
+    shouldShowBusStops,
+    effectiveActiveRoute,
+    routeColor
+  ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)
   usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceId); // Handle place clicks
   usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
+  useTiltControl(mapRef, isMapCreated); // Control 45-degree tilt in satellite/hybrid view based on zoom level
 
-  const handleMapTypeChange = (mapType: google.maps.MapTypeId | 'dark' | 'light') => {
-    if (mapRef.current) {
-      if (mapType === 'dark') {
-        // Apply dark mode styles
-        mapRef.current.setMapTypeId('roadmap');
-        const currentStyles = mapRef.current.get('styles') || [];
-        // Filter out old dark mode styles and POI hiding styles, then re-add them
-        const poiStyles = currentStyles.filter((style: any) => 
-          style.featureType === 'poi' || 
-          style.featureType === 'poi.business' || 
-          style.featureType === 'transit'
-        );
-        mapRef.current.setOptions({
-          styles: [...DARK_MODE_STYLES, ...poiStyles],
-        });
-      } else if (mapType === 'light') {
-        // Apply light mode (standard roadmap with only POI hiding)
-        mapRef.current.setMapTypeId('roadmap');
-        mapRef.current.setOptions({
-          styles: [
-            {
-              featureType: 'poi',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'poi.business',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'transit',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'transit.station',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'transit.station.rail',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-            {
-              featureType: 'transit.line',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }],
-            },
-          ],
-        });
-      } else {
-        // Standard map types (satellite, terrain, hybrid)
-        mapRef.current.setMapTypeId(mapType);
+  const handleMapTypeChange = React.useCallback(
+    (mapType: google.maps.MapTypeId | 'dark' | 'light') => {
+      if (mapRef.current) {
+        if (mapType === 'dark') {
+          // Apply dark mode styles
+          mapRef.current.setMapTypeId('roadmap');
+          const currentStyles = mapRef.current.get('styles') || [];
+          // Filter out old dark mode styles and POI hiding styles, then re-add them
+          const poiStyles = currentStyles.filter(
+            (style: any) =>
+              style.featureType === 'poi' ||
+              style.featureType === 'poi.business' ||
+              style.featureType === 'transit'
+          );
+          mapRef.current.setOptions({
+            styles: [...DARK_MODE_STYLES, ...poiStyles],
+          });
+        } else if (mapType === 'light') {
+          // Apply light mode (standard roadmap with only POI hiding)
+          mapRef.current.setMapTypeId('roadmap');
+          mapRef.current.setOptions({
+            styles: [
+              {
+                featureType: 'poi',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+              {
+                featureType: 'poi.business',
+                stylers: [{ visibility: 'off' }],
+              },
+              {
+                featureType: 'transit',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+              {
+                featureType: 'transit.station',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+              {
+                featureType: 'transit.station.rail',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+              {
+                featureType: 'transit.line',
+                elementType: 'labels',
+                stylers: [{ visibility: 'off' }],
+              },
+            ],
+          });
+        } else if (mapType === 'satellite') {
+          // IMPORTANT: Google Maps styles API does NOT work with satellite imagery
+          // The satellite map type shows imagery without labels by design
+          // To show satellite imagery WITH labels, use 'hybrid' map type instead
+          // Here we automatically convert 'satellite' to 'hybrid' to show labels
+          mapRef.current.setMapTypeId('hybrid');
+          // Clear any custom styles (styles don't apply to satellite/hybrid anyway)
+          mapRef.current.setOptions({
+            styles: [],
+          });
+        } else {
+          // Standard map types (terrain, hybrid)
+          mapRef.current.setMapTypeId(mapType);
+          // Clear custom styles for these map types
+          mapRef.current.setOptions({
+            styles: [],
+          });
+        }
       }
+    },
+    []
+  );
+
+  // Pass map type change handler to parent when map is ready
+  React.useEffect(() => {
+    if (isMapCreated && onMapTypeChangeReady) {
+      onMapTypeChangeReady(handleMapTypeChange);
     }
-  };
+  }, [isMapCreated, onMapTypeChangeReady, handleMapTypeChange]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', ...style }}>
+    <div
+      style={{ position: 'relative', width: '100%', height: '100%', ...style }}
+    >
       {!isMapCreated && (
         <div
           style={{
@@ -3537,7 +4896,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       {showMapControls && (
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: '56px',
             right: '20px',
             zIndex: 9999,
@@ -3553,7 +4912,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           />
         </div>
       )}
-      
+
       {/* Place Details Compact Element */}
       {selectedPlaceId && isMapCreated && (
         <div

@@ -20,6 +20,7 @@ import {
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
+import { MapTypeSelector } from '@/components/map-type-selector';
 import {
   FocusAwareStatusBar,
   Image,
@@ -625,7 +626,7 @@ const NearestStopsSection = ({
 
         return {
           id: stop.name, // Use 'name' field (API code like 'YIH', 'CLB', 'UHC-OPP') for ShuttleService endpoint
-          label: `${stop.caption} (${formatDistance(distance)})`,
+          label: `${stop.ShortName} (${formatDistance(distance)})`,
           distance,
         };
       })
@@ -1236,6 +1237,9 @@ const useDragHandlers = () => {
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
   const translateY = React.useRef(new Animated.Value(0)).current;
   const startHeight = React.useRef(45);
+  const dragStartY = React.useRef(0);
+  const dragStartTime = React.useRef(0);
+  const isDragging = React.useRef(false);
 
   const MIN_HEIGHT = 10; // Minimum height - just search bar visible
   const MAX_HEIGHT = 85; // Maximum height - like search mode
@@ -1346,6 +1350,9 @@ const useDragHandlers = () => {
     handleEnterSearchMode,
     handleExitSearchMode,
     animatedStyle,
+    dragStartY,
+    dragStartTime,
+    isDragging,
   };
 };
 
@@ -1353,21 +1360,60 @@ const useDragHandlers = () => {
 export default function TransitPage() {
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
+  const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('map-filters');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    }
+    return {
+      important: true,
+      academic: true,
+      residences: false,
+      'bus-stops': false,
+      'bus-route-d2': true,
+    };
+  });
+
   const {
     isCollapsed,
     isSearchMode,
     containerHeight,
     handleDrag,
     handleDragMove,
-    handleDragEnd,
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
     animatedStyle,
+    dragStartY,
+    dragStartTime,
+    isDragging,
   } = useDragHandlers();
 
   const handleRouteClick = (routeName: string) => {
     setSelectedRoute((prev) => (prev === routeName ? null : routeName));
+  };
+
+  // Store the map type change handler from InteractiveMap
+  const mapTypeChangeHandlerRef = React.useRef<
+    ((mapType: google.maps.MapTypeId | 'dark' | 'light') => void) | null
+  >(null);
+
+  const handleMapTypeChange = (
+    mapType: google.maps.MapTypeId | 'dark' | 'light'
+  ) => {
+    if (mapTypeChangeHandlerRef.current) {
+      mapTypeChangeHandlerRef.current(mapType);
+    }
+  };
+
+  const handleFilterChange = (filters: Record<string, boolean>) => {
+    console.log('Filter changes:', filters);
+    setMapFilters(filters);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('map-filters', JSON.stringify(filters));
+    }
   };
 
   return (
@@ -1398,6 +1444,12 @@ export default function TransitPage() {
           onActiveRouteChange={(route) => setSelectedRoute(route)} // Sync filter selection back to transit page
           showBusStops={true} // Show bus stop markers with labels
           showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
+          showMapControls={false} // Disable map controls in InteractiveMap, we'll render them at top level
+          mapFilters={mapFilters} // Pass filters from parent
+          onMapFiltersChange={handleFilterChange} // Handle filter changes
+          onMapTypeChangeReady={(handler) => {
+            mapTypeChangeHandlerRef.current = handler;
+          }}
         />
       </View>
 
@@ -1417,16 +1469,41 @@ export default function TransitPage() {
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
             height: `${containerHeight}%`,
             marginTop: 'auto',
+            position: 'relative',
+            zIndex: 1,
           },
           animatedStyle,
         ]}
+        onTouchStart={(e: any) => {
+          const touch = e.nativeEvent.touches?.[0];
+          if (touch && dragStartY && isDragging && dragStartTime) {
+            dragStartY.current = touch.pageY;
+            dragStartTime.current = Date.now();
+            isDragging.current = true;
+          }
+        }}
+        onTouchMove={(e: any) => {
+          if (!isDragging || !isDragging.current) return;
+          const touch = e.nativeEvent.touches?.[0];
+          if (touch && dragStartY) {
+            const dy = touch.pageY - dragStartY.current;
+            handleDragMove(dy);
+          }
+        }}
+        onTouchEnd={(e: any) => {
+          if (!isDragging || !isDragging.current) return;
+          const touch = e.nativeEvent.changedTouches?.[0];
+          if (touch && dragStartY && dragStartTime) {
+            const dy = touch.pageY - dragStartY.current;
+            const dt = Date.now() - dragStartTime.current;
+            const vy = dy / dt;
+            handleDrag({ dy, vy });
+            isDragging.current = false;
+          }
+        }}
       >
         <View className="mb-3 items-center">
-          <Frame
-            onDrag={handleDrag}
-            onDragMove={handleDragMove}
-            onDragEnd={handleDragEnd}
-          />
+          <Frame />
         </View>
 
         <BottomSheetContent
@@ -1441,6 +1518,23 @@ export default function TransitPage() {
           onRouteClick={handleRouteClick}
         />
       </Animated.View>
+
+      {/* Map controls - rendered at top level to ensure proper z-index stacking */}
+      <View
+        style={{
+          position: 'absolute' as any,
+          top: 56,
+          right: 20,
+          zIndex: 99999,
+        }}
+        pointerEvents="box-none"
+      >
+        <MapTypeSelector
+          onMapTypeChange={handleMapTypeChange}
+          onFilterChange={handleFilterChange}
+          filters={mapFilters}
+        />
+      </View>
     </View>
   );
 }

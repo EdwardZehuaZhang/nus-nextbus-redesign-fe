@@ -55,14 +55,6 @@ const initializeGeolocationWatcher = () => {
 
   globalWatchId = navigator.geolocation.watchPosition(
     (position) => {
-      console.log('[useLocation] Position updated:', {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        heading: position.coords.heading,
-        speed: position.coords.speed,
-      });
-
       store.setLocation({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,

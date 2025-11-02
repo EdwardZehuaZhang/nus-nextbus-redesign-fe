@@ -129,7 +129,7 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
   };
 
   return (
-    <div className="border-shadcn-ui-app-border flex flex-col items-start rounded-md border border-solid bg-white px-4 py-2">
+    <div className="border-shadcn-ui-app-border relative flex flex-col items-start rounded-md border border-solid bg-white px-4 py-2" style={{ zIndex: 10000 }}>
       {items.map((item) => (
         <div
           key={item.id}

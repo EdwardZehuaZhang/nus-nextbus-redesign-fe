@@ -15,12 +15,18 @@ const createPinMarkerWithIcon = (
   IconComponent: React.ComponentType<any>,
   color: string = DEFAULT_LANDMARK_COLOR
 ): string => {
+  const width = 40;
+  const height = 52;
+  const iconSize = 22;
+  const iconOffset = 9;
+  
   // Create the SVG marker with the icon
+  // Scaling is handled by Google Maps API via the scaledSize parameter
   const svgString = `
-    <svg width="40" height="52" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${width}" height="${height}" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg">
       <path d="M20 0C9 0 0 9 0 20C0 35 20 52 20 52C20 52 40 35 40 20C40 9 31 0 20 0Z" fill="${color}"/>
-      <g transform="translate(9, 9)">
-        ${renderToString(<IconComponent size={22} color="white" weight="fill" />)}
+      <g transform="translate(${iconOffset}, ${iconOffset})">
+        ${renderToString(<IconComponent size={iconSize} color="white" weight="fill" />)}
       </g>
     </svg>
   `.trim();
@@ -62,7 +68,10 @@ export const NUS_LANDMARKS: Landmark[] = [
   },
 ];
 
-export const getLandmarkMarkerSVG = (type: Landmark['type'], color: string = DEFAULT_LANDMARK_COLOR): string => {
+export const getLandmarkMarkerSVG = (
+  type: Landmark['type'],
+  color: string = DEFAULT_LANDMARK_COLOR
+): string => {
   switch (type) {
     case 'hospital':
       return createPinMarkerWithIcon(FirstAid, color);
