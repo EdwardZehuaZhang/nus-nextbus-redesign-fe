@@ -41,7 +41,7 @@ const NavigationArrow = () => (
 );
 
 const NavigationArrowWhite = () => (
-  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+  <Svg width={16} height={16} viewBox="0 0 20 20" fill="none">
     <Path
       d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
       fill="#FFFFFF"
@@ -102,7 +102,7 @@ const PersonIcon = () => (
 );
 
 const BookmarkIcon = ({ fill = 'black' }: { fill?: string }) => (
-  <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+  <Svg width={16} height={16} viewBox="0 0 20 20" fill="none">
     <Path
       d="M14.375 2.50562H5.625C5.29348 2.50562 4.97554 2.63731 4.74112 2.87173C4.5067 3.10615 4.375 3.42409 4.375 3.75562V17.5056C4.37506 17.6172 4.40496 17.7266 4.46161 17.8227C4.51826 17.9188 4.59959 17.998 4.69716 18.052C4.79473 18.1061 4.90498 18.133 5.01648 18.1301C5.12798 18.1271 5.23666 18.0944 5.33125 18.0353L10 15.1173L14.6695 18.0353C14.7641 18.0942 14.8727 18.1268 14.9841 18.1296C15.0955 18.1325 15.2056 18.1055 15.303 18.0514C15.4005 17.9974 15.4817 17.9183 15.5383 17.8224C15.5949 17.7264 15.6249 17.617 15.625 17.5056V3.75562C15.625 3.42409 15.4933 3.10615 15.2589 2.87173C15.0245 2.63731 14.7065 2.50562 14.375 2.50562ZM14.375 16.3783L10.3305 13.8509C10.2311 13.7888 10.1164 13.7559 9.99922 13.7559C9.88208 13.7559 9.7673 13.7888 9.66797 13.8509L5.625 16.3783V3.75562H14.375V16.3783Z"
       fill={fill}
@@ -570,8 +570,6 @@ export default function NavigationPage() {
             marginHorizontal: 10,
             marginTop: 12,
             borderRadius: 12,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
             backgroundColor: '#FFFFFF',
             padding: 12,
             paddingHorizontal: 20,
@@ -735,21 +733,19 @@ export default function NavigationPage() {
             right: 0,
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
-            borderWidth: 1,
-            borderColor: '#E5E5E5',
             backgroundColor: '#FFFFFF',
             paddingHorizontal: 20,
-            paddingBottom: 20,
             paddingTop: 4,
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
             elevation: 5,
-            maxHeight: '55%',
+            maxHeight: '35%',
           }}
         >
           <Frame />
           <ScrollView
             showsVerticalScrollIndicator={false}
             style={{ marginTop: 12 }}
+            contentContainerStyle={{ paddingBottom: 20 }}
           >
             {/* Journey Time Header */}
             <View
@@ -1318,7 +1314,7 @@ export default function NavigationPage() {
             {/* Divider */}
             <View
               style={{
-                width: 390,
+                alignSelf: 'stretch',
                 height: 1,
                 backgroundColor: '#E4E7E7',
                 marginBottom: 16,

@@ -2433,7 +2433,7 @@ const useNUSCampusHighlight = (
 
           // Create PGPR overlay
           greenAreaRef.current = createPGPROverlay(map);
-          greenAreaRef.current.setMap(map); // Show by default
+          greenAreaRef.current.setMap(showResidences ? map : null);
           // Create PGPR label
           greenLabelRef.current = createAreaLabel(
             map,
@@ -2445,7 +2445,7 @@ const useNUSCampusHighlight = (
 
           // Create Light House overlay
           yellowOverlayRef.current = createLightHouseOverlay(map);
-          yellowOverlayRef.current.setMap(map); // Show by default
+          yellowOverlayRef.current.setMap(showResidences ? map : null);
           // Create Light House label
           yellowOverlayLabelRef.current = createAreaLabel(
             map,
@@ -2457,7 +2457,7 @@ const useNUSCampusHighlight = (
 
           // Create Pioneer House overlay
           blueOverlayRef.current = createPioneerHouseOverlay(map);
-          blueOverlayRef.current.setMap(map); // Show by default
+          blueOverlayRef.current.setMap(showResidences ? map : null);
           // Create Pioneer House label
           blueOverlayLabelRef.current = createAreaLabel(
             map,
@@ -2469,7 +2469,7 @@ const useNUSCampusHighlight = (
 
           // Create Helix House overlay
           redOverlayRef.current = createHelixHouseOverlay(map);
-          redOverlayRef.current.setMap(map); // Show by default
+          redOverlayRef.current.setMap(showResidences ? map : null);
           // Create Helix House label
           redOverlayLabelRef.current = createAreaLabel(
             map,
@@ -2481,7 +2481,7 @@ const useNUSCampusHighlight = (
 
           // Create King Edward VII Hall overlay
           red2OverlayRef.current = createKingEdwardVIIHallOverlay(map);
-          red2OverlayRef.current.setMap(map); // Show by default
+          red2OverlayRef.current.setMap(showResidences ? map : null);
           // Create King Edward VII Hall label
           red2OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2493,7 +2493,7 @@ const useNUSCampusHighlight = (
 
           // Create Sheares Hall overlay
           blue2OverlayRef.current = createShearesHallOverlay(map);
-          blue2OverlayRef.current.setMap(map); // Show by default
+          blue2OverlayRef.current.setMap(showResidences ? map : null);
           // Create Sheares Hall label
           blue2OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2505,7 +2505,7 @@ const useNUSCampusHighlight = (
 
           // Create Kent Ridge Hall overlay
           green2OverlayRef.current = createKentRidgeHallOverlay(map);
-          green2OverlayRef.current.setMap(map); // Show by default
+          green2OverlayRef.current.setMap(showResidences ? map : null);
           // Create Kent Ridge Hall label
           green2OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2517,7 +2517,7 @@ const useNUSCampusHighlight = (
 
           // Create Temasek Hall overlay
           yellow3OverlayRef.current = createTemasekHallOverlay(map);
-          yellow3OverlayRef.current.setMap(map); // Show by default
+          yellow3OverlayRef.current.setMap(showResidences ? map : null);
           // Create Temasek Hall label
           yellow3OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2529,7 +2529,7 @@ const useNUSCampusHighlight = (
 
           // Create Eusoff Hall overlay
           blue3OverlayRef.current = createEusoffHallOverlay(map);
-          blue3OverlayRef.current.setMap(map); // Show by default
+          blue3OverlayRef.current.setMap(showResidences ? map : null);
           // Create Eusoff Hall label
           blue3OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2541,7 +2541,7 @@ const useNUSCampusHighlight = (
 
           // Create Raffles Hall overlay
           red3OverlayRef.current = createRafflesHallOverlay(map);
-          red3OverlayRef.current.setMap(map); // Show by default
+          red3OverlayRef.current.setMap(showResidences ? map : null);
           // Create Raffles Hall label
           red3OverlayLabelRef.current = createAreaLabel(
             map,
@@ -2553,7 +2553,7 @@ const useNUSCampusHighlight = (
 
           // Create CAPT overlay
           captOverlayRef.current = createCAPTOverlay(map);
-          captOverlayRef.current.setMap(map); // Show by default
+          captOverlayRef.current.setMap(showResidences ? map : null);
           // Create CAPT label
           captLabelRef.current = createAreaLabel(
             map,
@@ -2565,7 +2565,7 @@ const useNUSCampusHighlight = (
 
           // Create RC4 overlay
           rc4OverlayRef.current = createRC4Overlay(map);
-          rc4OverlayRef.current.setMap(map); // Show by default
+          rc4OverlayRef.current.setMap(showResidences ? map : null);
           // Create RC4 label
           rc4LabelRef.current = createAreaLabel(
             map,
@@ -2577,7 +2577,7 @@ const useNUSCampusHighlight = (
 
           // Create RVRC overlay
           rvrcOverlayRef.current = createRVRCOverlay(map);
-          rvrcOverlayRef.current.setMap(map); // Show by default
+          rvrcOverlayRef.current.setMap(showResidences ? map : null);
           // Create RVRC label
           rvrcLabelRef.current = createAreaLabel(
             map,
@@ -2589,7 +2589,7 @@ const useNUSCampusHighlight = (
 
           // Create Tembusu College overlay
           tembusuOverlayRef.current = createTembusuCollegeOverlay(map);
-          tembusuOverlayRef.current.setMap(map); // Show by default
+          tembusuOverlayRef.current.setMap(showResidences ? map : null);
           // Create Tembusu College label
           tembusuLabelRef.current = createAreaLabel(
             map,
@@ -2601,7 +2601,7 @@ const useNUSCampusHighlight = (
 
           // Create Valour House overlay
           valourOverlayRef.current = createValourHouseOverlay(map);
-          valourOverlayRef.current.setMap(map); // Show by default
+          valourOverlayRef.current.setMap(showResidences ? map : null);
           // Create Valour House label
           valourLabelRef.current = createAreaLabel(
             map,
@@ -2615,7 +2615,7 @@ const useNUSCampusHighlight = (
 
       return () => clearTimeout(timer);
     }
-  }, [mapRef, isMapLoaded]);
+  }, [mapRef, isMapLoaded, showResidences]);
 
   // Separate effect for D1 route visibility
   useEffect(() => {
@@ -3075,11 +3075,13 @@ const useMapPolyline = (
             strokeColor = getTransitLineColor(lineName);
           }
           polylineOptions.strokeColor = strokeColor;
+          polylineOptions.zIndex = 10; // Higher z-index for solid transit lines
         } else if (step.travelMode === 'WALK') {
           strokeColor = '#7D7D7D'; // Gray for walking
           // Make walking segments dotted
           polylineOptions.strokeColor = strokeColor;
           polylineOptions.strokeOpacity = 0;
+          polylineOptions.zIndex = 5; // Lower z-index for dotted walking lines
           polylineOptions.icons = [
             {
               icon: {
@@ -4761,7 +4763,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }); // Hide origin/waypoint markers when route selected
   useMapPolyline(mapRef, routePolyline, routeSteps);
   useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
-  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic, mapFilters.residences);
+  useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
   useBusMarkers(mapRef, activeBuses, routeColor);
   useRouteCheckpoints(mapRef, effectiveActiveRoute, routeColor);
   // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)
@@ -4924,7 +4926,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <div
           style={{
             position: 'fixed',
-            top: '56px',
+            top: '12px',
             right: '20px',
             zIndex: 9999,
           }}

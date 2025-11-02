@@ -440,7 +440,7 @@ const TabBar = ({
   return (
     <View className="flex-row">
       {tabs.map((tab, index) => (
-        <View key={tab.id} className="flex-row">
+        <View key={tab.id} className="flex-row" style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}>
           <Pressable
             className={`border-neutral-200 px-4 py-2 ${
               activeTab === tab.id
@@ -448,6 +448,7 @@ const TabBar = ({
                 : 'rounded-tr-md border-y border-r bg-white opacity-60'
             } ${index === 0 ? 'border-l' : ''}`}
             onPress={() => onTabChange(tab.id)}
+            style={{ flex: 1, maxWidth: '100%', minWidth: 0 }}
           >
             <Text
               className={`text-base ${
@@ -455,6 +456,8 @@ const TabBar = ({
                   ? 'font-medium text-neutral-900'
                   : 'font-normal text-neutral-500'
               }`}
+              numberOfLines={1}
+              ellipsizeMode="tail"
             >
               {tab.label}
             </Text>
@@ -1369,7 +1372,7 @@ export default function TransitPage() {
     }
     return {
       important: true,
-      academic: true,
+      academic: false,
       residences: false,
       'bus-stops': false,
       'bus-route-d2': true,
@@ -1460,8 +1463,6 @@ export default function TransitPage() {
           {
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
-            borderWidth: 1,
-            borderColor: '#e5e5e5',
             backgroundColor: 'white',
             paddingHorizontal: 20,
             paddingBottom: 20,
@@ -1523,7 +1524,7 @@ export default function TransitPage() {
       <View
         style={{
           position: 'absolute' as any,
-          top: 56,
+          top: 12,
           right: 20,
           zIndex: 99999,
         }}
