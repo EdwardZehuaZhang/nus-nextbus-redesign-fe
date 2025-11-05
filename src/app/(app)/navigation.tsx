@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Animated, TextInput, Platform } from 'react-native';
+import { Animated, TextInput, Platform, ActivityIndicator } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import {
@@ -1079,9 +1079,9 @@ export default function NavigationPage() {
       <View className="flex-1">
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          routePolyline={routes[0]?.polyline?.encodedPolyline}
-          routeSteps={routes[0]?.legs?.[0]?.steps}
-          internalRoutePolylines={memoizedInternalRoutePolylines}
+          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes ? routes[0]?.polyline?.encodedPolyline : undefined}
+          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes ? routes[0]?.legs?.[0]?.steps : undefined}
+          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes ? memoizedInternalRoutePolylines : undefined}
           origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
           destination={destinationCoords || undefined}
           initialRegion={
@@ -1632,9 +1632,9 @@ export default function NavigationPage() {
             <View style={{ marginBottom: 16 }}>
               {/* Loading/Error States */}
               {(isLoadingRoutes || isLoadingInternalRoutes) && (
-                <Text style={{ fontSize: 14, color: '#666', padding: 16 }}>
-                  Finding best route...
-                </Text>
+                <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center' }}>
+                  <ActivityIndicator size="large" color="#274F9C" />
+                </View>
               )}
               {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && (
                 <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
