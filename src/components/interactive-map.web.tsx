@@ -22,6 +22,14 @@ import { Env } from '@/lib/env';
 import { useLocation } from '@/lib/hooks/use-location';
 import { getTransitLineColor, PUBLIC_BUS_COLOR } from '@/lib/transit-colors';
 
+// Route fit bounds padding - adjust these to change map zoom and position
+const ROUTE_FIT_BOUNDS_PADDING = {
+  top: 150,
+  right: 60,
+  bottom: 250,
+  left: 60,
+};
+
 // Extend HTMLElement for Google Places UI Kit custom elements
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -294,12 +302,12 @@ const createUserLocationSVG = (heading: number = 0): string => {
 // Create SVG for destination marker (pin only, no circle)
 const createDestinationPinSVG = (): string => {
   return `
-    <svg width="32" height="48" viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">
+    <svg width="24" height="36" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">
       <!-- Pin shape -->
-      <path d="M 16 0 C 7.163 0 0 7.163 0 16 C 0 28 16 48 16 48 S 32 28 32 16 C 32 7.163 24.837 0 16 0 Z" 
-            fill="#EA4335" stroke="white" stroke-width="2"/>
+      <path d="M 12 0 C 5.373 0 0 5.373 0 12 C 0 21 12 36 12 36 S 24 21 24 12 C 24 5.373 18.627 0 12 0 Z" 
+            fill="#274F9C" stroke="white" stroke-width="1.5"/>
       <!-- Inner circle -->
-      <circle cx="16" cy="16" r="6" fill="white"/>
+      <circle cx="12" cy="12" r="4.5" fill="white"/>
     </svg>
   `;
 };
@@ -2939,20 +2947,27 @@ const addMarkersAndFitBounds = ({
   const bounds = new google.maps.LatLngBounds();
   let hasMarkers = false;
 
+  // Don't create origin marker - we already have the user location marker
+  // if (origin) {
+  //   const marker = createMarker({
+  //     position: { lat: origin.lat, lng: origin.lng },
+  //     map,
+  //     title: 'Your Location',
+  //     color: '#274F9C',
+  //     scale: 10,
+  //     onClick: () => onMarkerPress?.('origin'),
+  //   });
+  //   if (marker) {
+  //     markers.push(marker);
+  //     bounds.extend(marker.getPosition()!);
+  //     hasMarkers = true;
+  //   }
+  // }
+
+  // Still extend bounds with origin position for proper map fitting
   if (origin) {
-    const marker = createMarker({
-      position: { lat: origin.lat, lng: origin.lng },
-      map,
-      title: 'Your Location',
-      color: '#274F9C',
-      scale: 10,
-      onClick: () => onMarkerPress?.('origin'),
-    });
-    if (marker) {
-      markers.push(marker);
-      bounds.extend(marker.getPosition()!);
-      hasMarkers = true;
-    }
+    bounds.extend({ lat: origin.lat, lng: origin.lng });
+    hasMarkers = true;
   }
 
   waypoints?.forEach((waypoint, index) => {
@@ -3140,12 +3155,7 @@ const useMapPolyline = (
 
       // Fit map to show all steps
       if (!bounds.isEmpty() && shouldFitBounds) {
-        mapRef.current.fitBounds(bounds, {
-          top: 100,
-          right: 50,
-          bottom: 400,
-          left: 50,
-        });
+        mapRef.current.fitBounds(bounds, ROUTE_FIT_BOUNDS_PADDING);
         hasFitBoundsRef.current = true;
       }
     }
@@ -3170,12 +3180,7 @@ const useMapPolyline = (
       const bounds = new google.maps.LatLngBounds();
       decodedPath.forEach((point) => bounds.extend(point));
       if (shouldFitBounds) {
-        mapRef.current.fitBounds(bounds, {
-          top: 100,
-          right: 50,
-          bottom: 400,
-          left: 50,
-        });
+        mapRef.current.fitBounds(bounds, ROUTE_FIT_BOUNDS_PADDING);
         hasFitBoundsRef.current = true;
       }
     }
@@ -3322,12 +3327,7 @@ const useInternalRoutePolyline = (
 
     // Fit map to show entire internal route
     if (!bounds.isEmpty() && shouldFitBounds) {
-      mapRef.current.fitBounds(bounds, {
-        top: 100,
-        right: 50,
-        bottom: 400,
-        left: 50,
-      });
+      mapRef.current.fitBounds(bounds, ROUTE_FIT_BOUNDS_PADDING);
       hasFitBoundsRef.current = true;
     }
 
@@ -3843,8 +3843,8 @@ const useDestinationMarker = (
         map: mapRef.current,
         icon: {
           url: iconUrl,
-          scaledSize: new google.maps.Size(32, 48),
-          anchor: new google.maps.Point(16, 48), // Anchor at bottom center of pin
+          scaledSize: new google.maps.Size(24, 36),
+          anchor: new google.maps.Point(12, 36), // Anchor at bottom center of pin
         },
         title: 'Destination',
         zIndex: 999, // Below user location marker
@@ -4401,8 +4401,8 @@ const useUserLocationMarker = (
         userMarkerRef.current.setPosition({ lat, lng });
         userMarkerRef.current.setIcon({
           url: iconUrl,
-          scaledSize: new google.maps.Size(48, 48),
-          anchor: new google.maps.Point(24, 24),
+          scaledSize: new google.maps.Size(36, 36),
+          anchor: new google.maps.Point(18, 18),
         });
       } else {
         // Create new marker
@@ -4411,8 +4411,8 @@ const useUserLocationMarker = (
           map,
           icon: {
             url: iconUrl,
-            scaledSize: new google.maps.Size(48, 48),
-            anchor: new google.maps.Point(24, 24),
+            scaledSize: new google.maps.Size(36, 36),
+            anchor: new google.maps.Point(18, 18),
           },
           title: 'Your Location',
           zIndex: 1000, // On top of everything
@@ -5164,6 +5164,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       <style>{`
         .google-map-container .gm-style > div:first-child {
           filter: blur(0px) !important;
+        }
+        .google-map-container .gm-style img[src^="data:image/svg"] {
+          overflow: visible !important;
+        }
+        .google-map-container .gm-style > div > div > div > div {
+          overflow: visible !important;
         }
       `}</style>
       {/* Always show controls, not just when map is loaded */}

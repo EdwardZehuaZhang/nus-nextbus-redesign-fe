@@ -333,6 +333,7 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
 
   const handleSearchPress = () => {
+    console.log('[SEARCH BAR] 🖱️ Search bar pressed/focused');
     if (onSearchPress) {
       onSearchPress();
     }
@@ -344,18 +345,20 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   };
 
   return (
-    <View className="mb-4 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
-      <SearchIcon />
-      <TextInput
-        className="flex-1 text-base text-neutral-900"
-        placeholder="Search for location..."
-        placeholderTextColor="#737373"
-        value={searchText}
-        onChangeText={setSearchText}
-        onFocus={handleFocus}
-        style={{ outlineWidth: 0 }}
-      />
-    </View>
+    <Pressable onPress={handleSearchPress}>
+      <View className="mb-4 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+        <SearchIcon />
+        <TextInput
+          className="flex-1 text-base text-neutral-900"
+          placeholder="Search for location..."
+          placeholderTextColor="#737373"
+          value={searchText}
+          onChangeText={setSearchText}
+          onFocus={handleFocus}
+          style={{ outlineWidth: 0 }}
+        />
+      </View>
+    </Pressable>
   );
 };
 
@@ -1269,6 +1272,8 @@ const useDragHandlers = () => {
   const [containerHeight, setContainerHeight] = React.useState(45); // Start at 45%
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
   const translateY = React.useRef(new Animated.Value(0)).current;
+  const heightAnimation = React.useRef(new Animated.Value(45)).current; // Add animated value for height
+  const backdropOpacity = React.useRef(new Animated.Value(0)).current; // Add animated value for backdrop opacity
   const startHeight = React.useRef(45);
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
@@ -1310,23 +1315,33 @@ const useDragHandlers = () => {
     let targetHeight = DEFAULT_HEIGHT;
     let collapsed = false;
 
+    console.log('[DRAG] 📏 Drag ended at height:', currentHeight);
+
     if (currentHeight < 30) {
       // Snap to collapsed (minimum)
       targetHeight = MIN_HEIGHT;
       collapsed = true;
+      console.log('[DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
     } else if (currentHeight > 65) {
       // Snap to expanded (like search mode)
       targetHeight = MAX_HEIGHT;
       collapsed = false;
+      console.log('[DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT) - PANEL IS NOW IN EXPANDED VIEW');
     } else {
       // Snap to default
       targetHeight = DEFAULT_HEIGHT;
       collapsed = false;
+      console.log('[DRAG] 🔄 Snapping to DEFAULT height');
     }
 
     setContainerHeight(targetHeight);
     setIsCollapsed(collapsed);
     setTempHeight(null);
+    
+    // IMPORTANT: Update the heightAnimation value to match the targetHeight
+    // This ensures the animated value stays in sync with the actual height
+    heightAnimation.setValue(targetHeight);
+    console.log('[DRAG] ✅ Final height set to:', targetHeight, '- heightAnimation synced');
   };
 
   const handleDrag = (_gestureState: { dy: number; vy: number }) => {
@@ -1345,14 +1360,65 @@ const useDragHandlers = () => {
   };
 
   const handleEnterSearchMode = () => {
+    // Check current panel height
+    const currentHeight = (heightAnimation as any)._value;
+    console.log('[TRANSIT SEARCH] 🎯 Search bar clicked - Current panel height:', currentHeight, 'MAX_HEIGHT:', MAX_HEIGHT);
+    
+    // If panel is already at MAX_HEIGHT (fully expanded), don't re-animate
+    if (currentHeight >= MAX_HEIGHT - 1) { // Allow 1 unit tolerance
+      console.log('[TRANSIT SEARCH] ⏸️ Panel already at MAX_HEIGHT - skipping animation');
+      // Just ensure search mode is on
+      if (!isSearchMode) {
+        setIsSearchMode(true);
+        setIsCollapsed(false);
+        // Fade in backdrop without height animation
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }).start();
+      }
+      return;
+    }
+    
+    console.log('[TRANSIT SEARCH] 🚀 Expanding panel from', currentHeight, 'to', MAX_HEIGHT);
     setIsSearchMode(true);
     setIsCollapsed(false);
-    setContainerHeight(MAX_HEIGHT); // Use MAX_HEIGHT constant
+    // Animate height expansion
+    Animated.spring(heightAnimation, {
+      toValue: MAX_HEIGHT,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 8,
+    }).start(() => {
+      setContainerHeight(MAX_HEIGHT);
+      console.log('[TRANSIT SEARCH] ✅ Animation complete - height set to MAX_HEIGHT');
+    });
+    // Animate backdrop fade in
+    Animated.timing(backdropOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
   };
 
   const handleExitSearchMode = () => {
-    setIsSearchMode(false);
-    setContainerHeight(DEFAULT_HEIGHT); // Return to normal size
+    // Animate backdrop fade out
+    Animated.timing(backdropOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+    // Animate height back to default
+    Animated.spring(heightAnimation, {
+      toValue: DEFAULT_HEIGHT,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 8,
+    }).start(() => {
+      setIsSearchMode(false); // Set after animation completes
+      setContainerHeight(DEFAULT_HEIGHT);
+    });
     Animated.spring(translateY, {
       toValue: 0,
       useNativeDriver: false,
@@ -1360,8 +1426,14 @@ const useDragHandlers = () => {
   };
 
   const animatedStyle = isSearchMode
-    ? {} // No transform when in search mode
+    ? {
+        height: heightAnimation.interpolate({
+          inputRange: [DEFAULT_HEIGHT, MAX_HEIGHT],
+          outputRange: [`${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
+        }),
+      }
     : {
+        height: `${containerHeight}%` as any,
         transform: [
           {
             translateY: translateY.interpolate({
@@ -1386,6 +1458,7 @@ const useDragHandlers = () => {
     dragStartY,
     dragStartTime,
     isDragging,
+    backdropOpacity,
   };
 };
 
@@ -1432,6 +1505,7 @@ export default function TransitPage() {
     dragStartY,
     dragStartTime,
     isDragging,
+    backdropOpacity,
   } = useDragHandlers();
 
   const handleRouteClick = (routeName: string) => {
@@ -1476,8 +1550,8 @@ export default function TransitPage() {
       >
         <InteractiveMap
           initialRegion={{
-            latitude: 1.2976493,
-            longitude: 103.7766916,
+            latitude: 1.2995493,
+            longitude: 103.7769916,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
@@ -1498,17 +1572,30 @@ export default function TransitPage() {
 
       <ActionButtons />
 
+      {/* Backdrop/Shading - animated opacity for smooth transition */}
+      <Animated.View
+        style={{
+          position: 'absolute' as any,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          opacity: backdropOpacity,
+          pointerEvents: 'none', // Allow touches to pass through
+        }}
+      />
+
       <Animated.View
         style={[
           {
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
-            backgroundColor: 'white',
+            backgroundColor: '#F9FAFB',
             paddingHorizontal: 20,
             paddingBottom: 20,
             paddingTop: 4,
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-            height: `${containerHeight}%`,
             marginTop: 'auto',
             position: 'relative',
             zIndex: 1,

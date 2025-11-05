@@ -269,16 +269,16 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
 
 // Custom hook for drag handlers (similar to transit page)
 const useDragHandlers = () => {
-  const [containerHeight, setContainerHeight] = React.useState(35); // Start at 35%
+  const [containerHeight, setContainerHeight] = React.useState(39); // Start at 39%
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
-  const startHeight = React.useRef(35);
+  const startHeight = React.useRef(39);
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
   const isDragging = React.useRef(false);
 
   const MIN_HEIGHT = 5; // Minimum height - just frame visible
   const MAX_HEIGHT = 90; // Maximum height - based on content
-  const DEFAULT_HEIGHT = 35; // Default state
+  const DEFAULT_HEIGHT = 39; // Default state
 
   const handleDragMove = (dy: number) => {
     // Store the starting height when drag begins
@@ -508,6 +508,8 @@ const IntermediateStops = ({
 };
 
 export default function NavigationPage() {
+  console.log('[COMPONENT] 🔄 NavigationPage rendered');
+  
   const router = useRouter();
   const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -528,12 +530,17 @@ export default function NavigationPage() {
     walkFromStop: google.maps.LatLngLiteral[];
   } | null>(null);
   
-  // Search panel state
-  const [showSearchPanel, setShowSearchPanel] = useState(false);
+  // Search panel state - using a single state to track panel position
+  const [panelState, setPanelState] = useState<'closed' | 'animating' | 'expanded'>('closed');
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState<BusStation[]>([]);
   const [recentSearches, setRecentSearches] = useState<any[]>([]);
   const [searchMode, setSearchMode] = useState<'origin' | 'destination'>('origin'); // Track what we're selecting
+  
+  // Log panel state changes
+  useEffect(() => {
+    console.log('[PANEL STATE] 🔄 State changed to:', panelState);
+  }, [panelState]);
   
   // Animation for search panel slide up
   const searchPanelAnimation = React.useRef(new Animated.Value(0)).current;
@@ -547,6 +554,14 @@ export default function NavigationPage() {
     dragStartTime,
     isDragging,
   } = useDragHandlers();
+  
+  // Log containerHeight changes to see if it's affecting the animation
+  useEffect(() => {
+    console.log('[CONTAINER HEIGHT] 📏 Height changed to:', containerHeight + '%', 'panelState:', panelState);
+    if (panelState === 'expanded') {
+      console.log('[CONTAINER HEIGHT] ⚠️ Height changed while panel is EXPANDED - this might cause re-render!');
+    }
+  }, [containerHeight, panelState]);
 
   // Use global location hook
   const { coords: globalUserLocation } = useLocation();
@@ -672,16 +687,44 @@ export default function NavigationPage() {
     }
   }, [effectiveOrigin]);
 
-  // Animate search panel slide up/down
+  // Animate search panel slide up/down based on panelState
   useEffect(() => {
-    Animated.spring(searchPanelAnimation, {
-      toValue: showSearchPanel ? 1 : 0,
-      useNativeDriver: false,
-      tension: 65,
-      friction: 10,
-      velocity: 2,
-    }).start();
-  }, [showSearchPanel, searchPanelAnimation]);
+    console.log('[PANEL STATE] useEffect triggered - panelState:', panelState);
+    
+    if (panelState === 'expanded') {
+      // Already expanded, don't re-animate
+      console.log('[PANEL STATE] ✅ Already in EXPANDED state - skipping animation');
+      return;
+    }
+    
+    if (panelState === 'animating') {
+      // Start animation to expand
+      console.log('[PANEL STATE] 🎬 Starting animation to EXPAND (0 → 1)');
+      Animated.spring(searchPanelAnimation, {
+        toValue: 1,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 10,
+        velocity: 2,
+      }).start(() => {
+        // Mark as fully expanded after animation completes
+        console.log('[PANEL STATE] ✨ Animation complete - setting state to EXPANDED');
+        setPanelState('expanded');
+      });
+    } else if (panelState === 'closed') {
+      // Animate back to closed
+      console.log('[PANEL STATE] 📉 Animating back to CLOSED (1 → 0)');
+      Animated.spring(searchPanelAnimation, {
+        toValue: 0,
+        useNativeDriver: false,
+        tension: 65,
+        friction: 10,
+        velocity: 2,
+      }).start(() => {
+        console.log('[PANEL STATE] ✅ Panel fully closed');
+      });
+    }
+  }, [panelState, searchPanelAnimation]);
 
   // Load recent searches on component mount
   useEffect(() => {
@@ -1029,7 +1072,7 @@ export default function NavigationPage() {
     }
     
     // Close search panel
-    setShowSearchPanel(false);
+    setPanelState('closed');
     setSearchText('');
   };
 
@@ -1076,7 +1119,7 @@ export default function NavigationPage() {
       <FocusAwareStatusBar />
 
       {/* Map Background */}
-      <View className="flex-1">
+      <View className="flex-1" style={{ overflow: 'visible' }}>
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes ? routes[0]?.polyline?.encodedPolyline : undefined}
@@ -1087,7 +1130,7 @@ export default function NavigationPage() {
           initialRegion={
             userLocation
               ? {
-                  latitude: userLocation.latitude,
+                  latitude: userLocation.latitude - 0.044,
                   longitude: userLocation.longitude,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
@@ -1147,11 +1190,25 @@ export default function NavigationPage() {
                   onPress={() => {
                     // Allow clicking on both origin and destination to change them
                     if (isOrigin) {
+                      console.log('[CLICK] 🎯 Origin clicked - Current panelState:', panelState);
                       setSearchMode('origin');
-                      setShowSearchPanel(true);
+                      // Only trigger animation if not already expanded
+                      if (panelState !== 'expanded') {
+                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
+                        setPanelState('animating');
+                      } else {
+                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
+                      }
                     } else if (isDestination) {
+                      console.log('[CLICK] 🎯 Destination clicked - Current panelState:', panelState);
                       setSearchMode('destination');
-                      setShowSearchPanel(true);
+                      // Only trigger animation if not already expanded
+                      if (panelState !== 'expanded') {
+                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
+                        setPanelState('animating');
+                      } else {
+                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
+                      }
                     }
                   }}
                   disabled={!isOrigin && !isDestination}
@@ -1283,14 +1340,27 @@ export default function NavigationPage() {
           </Pressable>
         </View>
 
+        {/* Backdrop/Shading - only appears when in search mode */}
+        {(panelState === 'animating' || panelState === 'expanded') && (
+          <Animated.View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              pointerEvents: 'none', // Allow touches to pass through
+              transition: 'background-color 0.3s ease',
+            } as any}
+          />
+        )}
+
         {/* Journey Details Card */}
         <Animated.View
           style={{
             position: 'absolute',
-            bottom: searchPanelAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, -60], // Slide up by 60 pixels (about 10% on most screens)
-            }),
+            bottom: 0,
             left: 0,
             right: 0,
             borderTopLeftRadius: 12,
@@ -1309,21 +1379,13 @@ export default function NavigationPage() {
               inputRange: [0, 1],
               outputRange: [5, 10],
             }) as any,
-            height: `${containerHeight}%`,
-            transform: [
-              {
-                translateY: searchPanelAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, -10], // Slight additional lift for emphasis
-                }),
-              },
-              {
-                scale: searchPanelAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.02], // Subtle scale up
-                }),
-              },
-            ],
+            height: searchPanelAnimation.interpolate({
+              inputRange: [0, 1],
+              outputRange: [
+                panelState === 'expanded' ? '85%' : `${containerHeight}%`, 
+                '85%'
+              ], // If already expanded, stay at 85%, otherwise expand from containerHeight to 85%
+            }) as any,
           }}
           onTouchStart={(e: any) => {
             const touch = e.nativeEvent.touches?.[0];
@@ -1360,7 +1422,7 @@ export default function NavigationPage() {
             style={{ marginTop: 12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
-            {showSearchPanel ? (
+            {(panelState === 'animating' || panelState === 'expanded') ? (
               // SEARCH PANEL
               <Animated.View
                 style={{
@@ -1417,7 +1479,7 @@ export default function NavigationPage() {
                   </View>
                   <Pressable
                     onPress={() => {
-                      setShowSearchPanel(false);
+                      setPanelState('closed');
                       setSearchText('');
                     }}
                   >
