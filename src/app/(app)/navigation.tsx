@@ -11,6 +11,7 @@ import {
   durationToMinutes,
   formatTime,
 } from '@/api';
+import type { RouteCode } from '@/api/bus';
 import { useNearestBusStop, useStopsBetween } from '@/api/lta/hooks';
 import { BusIndicator } from '@/components/bus-indicator';
 import { Frame } from '@/components/frame';
@@ -528,6 +529,7 @@ export default function NavigationPage() {
     walkToStop: google.maps.LatLngLiteral[];
     busSegment: google.maps.LatLngLiteral[];
     walkFromStop: google.maps.LatLngLiteral[];
+    busRouteColor?: string;
   } | null>(null);
   
   // Search panel state - using a single state to track panel position
@@ -1114,6 +1116,20 @@ export default function NavigationPage() {
     };
   }, [internalRoutePolylines, bestInternalRoute]);
 
+  // Memoize visible bus stops for internal route display
+  const visibleBusStops = useMemo(() => {
+    if (!recommendInternal || !bestInternalRoute) {
+      return undefined; // Don't filter stops if not showing internal route
+    }
+    // Include departure stop (extract code), all intermediate stops, and arrival stop (extract code)
+    // Note: departureStop and arrivalStop are BusStop objects, intermediateStops are strings
+    return [
+      bestInternalRoute.departureStop.code, // Extract code from BusStop object
+      ...bestInternalRoute.intermediateStops, // Already strings
+      bestInternalRoute.arrivalStop.code, // Extract code from BusStop object
+    ];
+  }, [recommendInternal, bestInternalRoute]);
+
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
@@ -1122,9 +1138,9 @@ export default function NavigationPage() {
       <View className="flex-1" style={{ overflow: 'visible' }}>
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes ? routes[0]?.polyline?.encodedPolyline : undefined}
-          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes ? routes[0]?.legs?.[0]?.steps : undefined}
-          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes ? memoizedInternalRoutePolylines : undefined}
+          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !recommendInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
+          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !recommendInternal ? routes[0]?.legs?.[0]?.steps : undefined}
+          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && recommendInternal ? memoizedInternalRoutePolylines : undefined}
           origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
           destination={destinationCoords || undefined}
           initialRegion={
@@ -1139,6 +1155,9 @@ export default function NavigationPage() {
           }
           showLandmarks={false}
           showMapControls={false}
+          activeRoute={recommendInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
+          showBusStops={recommendInternal} // Show bus stops when displaying internal route
+          visibleBusStops={visibleBusStops} // Only show stops on the internal route
           mapFilters={{
             important: true,
             'bus-stops': false,
@@ -1895,7 +1914,6 @@ export default function NavigationPage() {
                                   style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    flex: 1,
                                     height: 37,
                                     borderTopWidth: 1,
                                     borderRightWidth: 1,
@@ -1912,10 +1930,8 @@ export default function NavigationPage() {
                                     style={{
                                       flexDirection: 'row',
                                       alignItems: 'center',
-                                      justifyContent: 'space-between',
                                       paddingVertical: 7,
                                       paddingHorizontal: 10,
-                                      flex: 1,
                                       backgroundColor: '#FFFFFF',
                                       borderRightWidth: 1,
                                       borderBottomWidth: 1,
@@ -1965,7 +1981,10 @@ export default function NavigationPage() {
                                     fontFamily: 'Inter',
                                   }}
                                 >
-                                  Ride {bestInternalRoute.intermediateStops.length + 1} stop{bestInternalRoute.intermediateStops.length + 1 !== 1 ? 's' : ''} ({rideMinutes} min{rideMinutes !== 1 ? 's' : ''})
+                                  {bestInternalRoute.intermediateStops.length > 0 
+                                    ? `${bestInternalRoute.intermediateStops.length} stop${bestInternalRoute.intermediateStops.length !== 1 ? 's' : ''} in between • ${rideMinutes} min${rideMinutes !== 1 ? 's' : ''}`
+                                    : `Direct ride • ${rideMinutes} min${rideMinutes !== 1 ? 's' : ''}`
+                                  }
                                 </Text>
                               </Pressable>
 
@@ -1973,17 +1992,33 @@ export default function NavigationPage() {
                               {showIntermediateStops && bestInternalRoute.intermediateStops.length > 0 && (
                                 <View style={{ paddingLeft: 24, paddingTop: 8, gap: 8 }}>
                                   {bestInternalRoute.intermediateStops.map((stopName, index) => (
-                                    <Text
+                                    <View
                                       key={index}
                                       style={{
-                                        fontSize: 12,
-                                        fontWeight: '400',
-                                        color: '#09090B',
-                                        fontFamily: 'Inter',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 8,
                                       }}
                                     >
-                                      {stopName}
-                                    </Text>
+                                      <View
+                                        style={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: 3,
+                                          backgroundColor: '#A3A3A3',
+                                        }}
+                                      />
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: '400',
+                                          color: '#525252',
+                                          fontFamily: 'Inter',
+                                        }}
+                                      >
+                                        {stopName}
+                                      </Text>
+                                    </View>
                                   ))}
                                 </View>
                               )}
@@ -2000,6 +2035,33 @@ export default function NavigationPage() {
                       </View>
                     );
                   })()}
+
+                  {/* Live bus tracking info */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingTop: 12,
+                      paddingLeft: 36,
+                    }}
+                  >
+                    <Svg width={14} height={14} viewBox="0 0 20 20" fill="none">
+                      <Circle cx="10" cy="10" r="8" fill="#00B050" opacity={0.2} />
+                      <Circle cx="10" cy="10" r="4" fill="#00B050" />
+                    </Svg>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '400',
+                        color: '#737373',
+                        fontFamily: 'Inter',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      Live bus position shown on map
+                    </Text>
+                  </View>
 
                   {/* Connecting line before walking */}
                   {bestInternalRoute.walkFromStopTime > 0 && (

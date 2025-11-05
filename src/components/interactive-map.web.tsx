@@ -82,6 +82,7 @@ interface InteractiveMapProps {
   showUserLocation?: boolean; // Control user location marker visibility (default true)
   showMapControls?: boolean; // Control map type/layer controls visibility (default true)
   showBusStops?: boolean; // Control bus stop markers visibility (default false)
+  visibleBusStops?: string[]; // Array of bus stop short names to display (if provided, only these stops will be shown)
   mapFilters?: Record<string, boolean>; // External map filters state
   onMapFiltersChange?: (filters: Record<string, boolean>) => void; // Callback when filters change
   onMapTypeChangeReady?: (
@@ -3030,11 +3031,7 @@ const useMapMarkers = ({
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
 
-    // Don't create markers if a route is selected
-    if (activeRoute) {
-      return;
-    }
-
+    // Note: We now allow markers even when activeRoute is set, so internal routes show origin/dest
     // Only fit bounds on the first render or when there are no markers yet
     const shouldFitBounds = !hasFitBoundsRef.current;
     
@@ -3449,7 +3446,8 @@ const useBusStopMarkers = (
   isMapCreated: boolean,
   showBusStops: boolean,
   activeRoute?: RouteCode | null,
-  routeColor?: string
+  routeColor?: string,
+  visibleBusStops?: string[] // Optional array of stop names to show
 ) => {
   const circleMarkersRef = useRef<google.maps.Marker[]>([]);
   const labelMarkersRef = useRef<google.maps.Marker[]>([]);
@@ -3567,6 +3565,26 @@ const useBusStopMarkers = (
     const updateMarkersVisibility = () => {
       const zoom = map.getZoom() || 16;
       const showAllStops = zoom >= 17; // Show all stops when zoomed in (17+ is close zoom)
+
+      // If visibleBusStops is provided, ONLY show those stops (used for internal route display)
+      if (visibleBusStops && visibleBusStops.length > 0) {
+        const visibleStopsSet = new Set(visibleBusStops);
+        
+        // Handle circle markers - show only specified stops when zoomed in
+        circleMarkersRef.current.forEach((marker) => {
+          const title = marker.getTitle();
+          const isVisible = title ? visibleStopsSet.has(title) : false;
+          marker.setVisible(isVisible && showAllStops);
+        });
+
+        // Handle label markers - show only specified stops (labels visible at all zoom levels)
+        labelMarkersRef.current.forEach((marker) => {
+          const title = marker.getTitle();
+          const isVisible = title ? visibleStopsSet.has(title) : false;
+          marker.setVisible(isVisible);
+        });
+        return; // Skip all other logic
+      }
 
       // If a route is selected, only show stops belonging to that route
       if (activeRoute) {
@@ -3794,6 +3812,7 @@ const useBusStopMarkers = (
     activeRoute,
     pickupPointsData,
     routeColor,
+    visibleBusStops,
   ]);
 };
 
@@ -3822,8 +3841,9 @@ const useDestinationMarker = (
       markerRef.current = null;
     }
 
-    // Create new destination marker if destination exists and no route is selected
-    if (destination && !activeRoute) {
+    // Create new destination marker if destination exists
+    // Always show destination marker (removed activeRoute check to show it with internal routes)
+    if (destination) {
       // Validate destination coordinates
       if (
         typeof destination.lat !== 'number' ||
@@ -4670,6 +4690,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   showUserLocation = true, // Default to true for backward compatibility
   showMapControls = true, // Default to true for backward compatibility
   showBusStops = false, // Default to false for backward compatibility
+  visibleBusStops, // Optional array of bus stop names to show
   mapFilters: externalMapFilters,
   onMapFiltersChange,
   onMapTypeChangeReady,
@@ -5010,7 +5031,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
   useBusMarkers(mapRef, activeBuses, routeColor);
-  useRouteCheckpoints(mapRef, effectiveActiveRoute, routeColor);
+  // Don't render full route checkpoints when showing internal route polylines (which shows only the segment)
+  useRouteCheckpoints(mapRef, internalRoutePolylines ? null : effectiveActiveRoute, routeColor);
   // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)
   useFilteredBusRoutes(
     mapRef,
@@ -5030,7 +5052,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     isMapCreated,
     shouldShowBusStops,
     effectiveActiveRoute,
-    routeColor
+    routeColor,
+    visibleBusStops
   ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)

@@ -216,9 +216,10 @@ async function routeConnectsStops(
     }
 
     // Get intermediate stops (excluding departure and arrival)
+    // Use ShortName to match the format used by map markers
     const intermediateStops = stops
       .slice(departureIndex + 1, arrivalIndex)
-      .map(stop => stop.pickupname);
+      .map(stop => stop.ShortName);
 
     // Estimate travel time: ~2 minutes per stop on average
     const stopsInBetween = arrivalIndex - departureIndex;
