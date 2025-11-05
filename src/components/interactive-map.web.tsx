@@ -1,5 +1,5 @@
 import polyline from '@mapbox/polyline';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 
 import type { ActiveBus, BusStop, RouteCode } from '@/api/bus';
 import {
@@ -49,6 +49,13 @@ interface InteractiveMapProps {
   waypoints?: LatLng[];
   routePolyline?: string;
   routeSteps?: RouteStep[]; // Individual route steps for multi-colored rendering
+  // Internal route polylines (for NUS shuttle routes)
+  internalRoutePolylines?: {
+    walkToStop: google.maps.LatLngLiteral[];
+    busSegment: google.maps.LatLngLiteral[];
+    walkFromStop: google.maps.LatLngLiteral[];
+    busRouteColor?: string; // Color for the bus segment
+  } | null;
   onMarkerPress?: (
     type: 'origin' | 'destination' | 'waypoint',
     index?: number
@@ -3179,6 +3186,157 @@ const useMapPolyline = (
   }, [routePolyline, routeSteps, mapRef]);
 };
 
+// Hook to render internal shuttle bus route polylines
+const useInternalRoutePolyline = (
+  mapRef: React.MutableRefObject<google.maps.Map | null>,
+  internalRoutePolylines?: {
+    walkToStop: google.maps.LatLngLiteral[];
+    busSegment: google.maps.LatLngLiteral[];
+    walkFromStop: google.maps.LatLngLiteral[];
+    busRouteColor?: string;
+  } | null
+) => {
+  const polylinesRef = useRef<google.maps.Polyline[]>([]);
+  const hasFitBoundsRef = useRef(false);
+
+  // Serialize the polylines data to create a stable dependency
+  const polylinesKey = useMemo(() => {
+    if (!internalRoutePolylines) return null;
+    
+    // Safely access arrays with fallback to empty arrays
+    const walkToStop = Array.isArray(internalRoutePolylines.walkToStop) 
+      ? internalRoutePolylines.walkToStop 
+      : [];
+    const busSegment = Array.isArray(internalRoutePolylines.busSegment) 
+      ? internalRoutePolylines.busSegment 
+      : [];
+    const walkFromStop = Array.isArray(internalRoutePolylines.walkFromStop) 
+      ? internalRoutePolylines.walkFromStop 
+      : [];
+    
+    return JSON.stringify({
+      walkToStopLength: walkToStop.length,
+      busSegmentLength: busSegment.length,
+      walkFromStopLength: walkFromStop.length,
+      busRouteColor: internalRoutePolylines.busRouteColor || '',
+      // Include first and last points to detect actual route changes
+      walkToStopFirst: walkToStop[0] || null,
+      busSegmentFirst: busSegment[0] || null,
+      walkFromStopLast: walkFromStop[walkFromStop.length - 1] || null,
+    });
+  }, [
+    internalRoutePolylines?.walkToStop,
+    internalRoutePolylines?.busSegment,
+    internalRoutePolylines?.walkFromStop,
+    internalRoutePolylines?.busRouteColor,
+  ]);
+
+  useEffect(() => {
+    if (!mapRef.current || typeof window === 'undefined' || !window.google)
+      return;
+
+    // Clear existing polylines
+    polylinesRef.current.forEach((poly) => poly.setMap(null));
+    polylinesRef.current = [];
+
+    if (!internalRoutePolylines) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    const shouldFitBounds = !hasFitBoundsRef.current;
+
+    // 1. Render walking to stop (dotted blue line)
+    if (Array.isArray(internalRoutePolylines.walkToStop) && internalRoutePolylines.walkToStop.length > 0) {
+      const walkToStopPolyline = new google.maps.Polyline({
+        path: internalRoutePolylines.walkToStop,
+        geodesic: true,
+        strokeColor: '#274F9C',
+        strokeOpacity: 0,
+        strokeWeight: 0,
+        zIndex: 5,
+        icons: [
+          {
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: '#274F9C',
+              fillOpacity: 0.8,
+              strokeColor: '#274F9C',
+              strokeOpacity: 1,
+              strokeWeight: 0,
+              scale: 2,
+            },
+            offset: '0',
+            repeat: '10px',
+          },
+        ],
+        map: mapRef.current,
+      });
+      polylinesRef.current.push(walkToStopPolyline);
+      internalRoutePolylines.walkToStop.forEach((point) => bounds.extend(point));
+    }
+
+    // 2. Render bus segment (solid colored line)
+    if (Array.isArray(internalRoutePolylines.busSegment) && internalRoutePolylines.busSegment.length > 0) {
+      const busColor = internalRoutePolylines.busRouteColor || '#6F1B6F'; // Default to D2 purple
+      const busSegmentPolyline = new google.maps.Polyline({
+        path: internalRoutePolylines.busSegment,
+        geodesic: true,
+        strokeColor: busColor,
+        strokeOpacity: 1.0,
+        strokeWeight: 4,
+        zIndex: 10,
+        map: mapRef.current,
+      });
+      polylinesRef.current.push(busSegmentPolyline);
+      internalRoutePolylines.busSegment.forEach((point) => bounds.extend(point));
+    }
+
+    // 3. Render walking from stop (dotted blue line)
+    if (Array.isArray(internalRoutePolylines.walkFromStop) && internalRoutePolylines.walkFromStop.length > 0) {
+      const walkFromStopPolyline = new google.maps.Polyline({
+        path: internalRoutePolylines.walkFromStop,
+        geodesic: true,
+        strokeColor: '#274F9C',
+        strokeOpacity: 0,
+        strokeWeight: 0,
+        zIndex: 5,
+        icons: [
+          {
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: '#274F9C',
+              fillOpacity: 0.8,
+              strokeColor: '#274F9C',
+              strokeOpacity: 1,
+              strokeWeight: 0,
+              scale: 2,
+            },
+            offset: '0',
+            repeat: '10px',
+          },
+        ],
+        map: mapRef.current,
+      });
+      polylinesRef.current.push(walkFromStopPolyline);
+      internalRoutePolylines.walkFromStop.forEach((point) => bounds.extend(point));
+    }
+
+    // Fit map to show entire internal route
+    if (!bounds.isEmpty() && shouldFitBounds) {
+      mapRef.current.fitBounds(bounds, {
+        top: 100,
+        right: 50,
+        bottom: 400,
+        left: 50,
+      });
+      hasFitBoundsRef.current = true;
+    }
+
+    return () => {
+      polylinesRef.current.forEach((poly) => poly.setMap(null));
+    };
+  }, [polylinesKey, mapRef]);
+};
+
 // Hook to draw dotted connector lines from user location to route start and route end to destination
 const useConnectorLines = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
@@ -4501,6 +4659,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   waypoints = [],
   routePolyline,
   routeSteps,
+  internalRoutePolylines,
   onMarkerPress,
   initialRegion = DEFAULT_REGION,
   style,
@@ -4842,8 +5001,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onMarkerPress,
     activeRoute: effectiveActiveRoute,
   }); // Hide origin/waypoint markers when route selected
-  useMapPolyline(mapRef, routePolyline, routeSteps);
-  useConnectorLines(mapRef, origin, destination, routePolyline); // Draw dotted lines from user to route start and route end to destination
+  
+  // Render internal route polylines if available, otherwise render Google Maps route
+  // Always call all hooks to maintain hook order (Rules of Hooks)
+  useInternalRoutePolyline(mapRef, internalRoutePolylines);
+  useMapPolyline(mapRef, internalRoutePolylines ? undefined : routePolyline, internalRoutePolylines ? undefined : routeSteps);
+  useConnectorLines(mapRef, internalRoutePolylines ? undefined : origin, internalRoutePolylines ? undefined : destination, internalRoutePolylines ? undefined : routePolyline); // Draw dotted lines from user to route start and route end to destination
+  
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
   useBusMarkers(mapRef, activeBuses, routeColor);
   useRouteCheckpoints(mapRef, effectiveActiveRoute, routeColor);

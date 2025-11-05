@@ -218,6 +218,16 @@ GET /RouteMinMaxTime       - Route operating hours
 - **[Jest](https://jestjs.io/)** - Unit testing
 - **[React Testing Library](https://testing-library.com/react)** - Component testing
 
+### 🔍 Debugging & Console Monitoring
+
+**NEW!** You can now monitor browser console logs directly in VS Code:
+
+1. **Press F5** to start debugging - Console logs appear in VS Code Debug Console
+2. **Ask GitHub Copilot** - "Check browser console errors" for quick analysis
+3. **Set breakpoints** - Debug your code with full source map support
+
+📖 See [.vscode/QUICK_START.md](.vscode/QUICK_START.md) for complete debugging guide.
+
 ---
 
 ## 📸 Screenshots

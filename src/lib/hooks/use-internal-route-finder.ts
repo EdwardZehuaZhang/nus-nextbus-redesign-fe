@@ -41,9 +41,15 @@ export function useInternalRouteFinder({
 
   const fetchRoutes = async () => {
     if (!origin || !destination || !enabled) {
+      console.log('⏸️ [useInternalRouteFinder] Skipping fetch:', { 
+        hasOrigin: !!origin, 
+        hasDestination: !!destination, 
+        enabled 
+      });
       return;
     }
 
+    console.log('🔄 [useInternalRouteFinder] Fetching internal routes...');
     setIsLoading(true);
     setError(null);
 
@@ -54,11 +60,23 @@ export function useInternalRouteFinder({
         googleMapsTimeSeconds
       );
 
+      console.log('✅ [useInternalRouteFinder] Route search complete:', {
+        routesFound: result.internalRoutes.length,
+        hasBestRoute: !!result.bestInternalRoute,
+        recommendInternal: result.recommendInternal,
+        bestRouteDetails: result.bestInternalRoute ? {
+          code: result.bestInternalRoute.routeCode,
+          totalTime: `${Math.ceil(result.bestInternalRoute.totalTime / 60)} min`,
+          hasWalkingRoute: !!result.bestInternalRoute.walkToStopRoute
+        } : null
+      });
+
       setRoutes(result.internalRoutes);
       setBestRoute(result.bestInternalRoute);
       setRecommendInternal(result.recommendInternal);
       setGoogleMapsTime(result.googleMapsTime);
     } catch (err) {
+      console.error('❌ [useInternalRouteFinder] Error:', err);
       setError(err instanceof Error ? err : new Error('Failed to find routes'));
       setRoutes([]);
       setBestRoute(null);

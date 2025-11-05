@@ -11,6 +11,8 @@
     "bradlc.vscode-tailwindcss",
     "lokalise.i18n-ally",
     "wesbos.theme-cobalt2",
-    "ChakrounAnas.turbo-console-log"
+    "ChakrounAnas.turbo-console-log",
+    "msjsdiag.debugger-for-chrome",
+    "ms-vscode.vscode-js-profile-flame"
   ]
 }

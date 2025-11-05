@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Web (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8081",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./~/*": "${webRoot}/node_modules/*",
+        "webpack:///./*": "${webRoot}/*",
+        "webpack:///*": "*",
+        "webpack:///src/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "Start Expo Dev Server",
+      "trace": true
+    },
+    {
+      "name": "Debug Web (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:8081",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./~/*": "${webRoot}/node_modules/*",
+        "webpack:///./*": "${webRoot}/*",
+        "webpack:///*": "*",
+        "webpack:///src/*": "${webRoot}/*"
+      },
+      "preLaunchTask": "Start Expo Dev Server",
+      "trace": true
+    },
+    {
+      "name": "Attach to Expo Web",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "url": "http://localhost:8081",
+      "webRoot": "${workspaceFolder}",
+      "sourceMaps": true,
+      "trace": true
+    }
+  ]
+}

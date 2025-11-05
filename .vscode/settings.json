@@ -44,5 +44,11 @@
   "i18n-ally.disabled": false, // make sure to disable i18n-ally in your global setting and only enable it for such projects
   "tailwindCSS.experimental.classRegex": [
     ["tv\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
-  ]
+  ],
+  // Debugging settings
+  "debug.console.fontSize": 13,
+  "debug.console.wordWrap": true,
+  "debug.internalConsoleOptions": "openOnSessionStart",
+  "debug.openDebug": "openOnDebugBreak",
+  "debug.showInStatusBar": "always"
 }

@@ -272,8 +272,7 @@ const BusRouteCard = ({
         style={{
           borderWidth: isSelected ? 3 : 0,
           borderColor: isSelected ? route.color : 'transparent',
-          borderTopLeftRadius: 6,
-          borderTopRightRadius: 6,
+          borderRadius: 6,
           overflow: 'hidden',
         }}
       >

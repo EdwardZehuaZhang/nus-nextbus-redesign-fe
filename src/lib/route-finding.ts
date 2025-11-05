@@ -20,7 +20,8 @@ import {
   getCheckpoints,
   type RouteCode 
 } from '@/api/bus';
-import type { LatLng } from '@/api/google-routes';
+import type { LatLng, Route as GoogleRoute } from '@/api/google-routes';
+import { getWalkingRoute } from '@/api/google-routes';
 
 // Average walking speed in meters per second (1.4 m/s = ~5 km/h)
 const WALKING_SPEED = 1.4;
@@ -32,8 +33,9 @@ const BUS_CATCH_BUFFER = 120; // 2 minutes
 const SHUTTLE_ROUTES: RouteCode[] = ['A1', 'A2', 'D1', 'D2', 'BTC'];
 
 export interface BusStop {
-  name: string;
-  code: string;
+  name: string; // API code (e.g., 'YIH', 'CLB')
+  caption: string; // Display name (e.g., 'Yusof Ishak House', 'Prince George\'s Park')
+  code: string; // Short name (e.g., 'YIH', 'Opp UHC')
   location: LatLng;
 }
 
@@ -41,13 +43,16 @@ export interface InternalBusRoute {
   routeCode: RouteCode;
   departureStop: BusStop;
   arrivalStop: BusStop;
+  intermediateStops: string[]; // list of stop names between departure and arrival
   walkToStopTime: number; // seconds
   walkToStopDistance: number; // meters
+  walkToStopRoute?: GoogleRoute; // actual walking directions from Google Maps
   waitingTime: number; // seconds
   busArrivalTime: string; // when bus arrives at departure stop
   busTravelTime: number; // estimated travel time on bus
   walkFromStopTime: number; // walking time from arrival stop to final destination
   walkFromStopDistance: number; // meters
+  walkFromStopRoute?: GoogleRoute; // actual walking directions to final destination
   totalTime: number; // total journey time in seconds
   canCatchBus: boolean; // whether user can make it in time
 }
@@ -110,6 +115,7 @@ export async function findNearestBusStop(
         minDistance = distance;
         nearestStop = {
           name: stop.name,
+          caption: stop.caption,
           code: stop.ShortName,
           location: stopLocation,
         };
@@ -131,8 +137,10 @@ export async function findNearbyBusStops(
   maxDistance: number = 1000
 ): Promise<BusStop[]> {
   try {
+    console.log(`🔍 [findNearbyBusStops] Searching for stops near:`, location, `within ${maxDistance}m`);
     const busStopsData = await getBusStops();
     const stops = busStopsData.BusStopsResult.busstops;
+    console.log(`📊 [findNearbyBusStops] Total bus stops in database: ${stops.length}`);
 
     const nearbyStops: BusStop[] = [];
 
@@ -145,13 +153,17 @@ export async function findNearbyBusStops(
       const distance = calculateDistance(location, stopLocation);
 
       if (distance <= maxDistance) {
+        console.log(`✓ Stop ${stop.ShortName} (${stop.name}) is ${Math.round(distance)}m away`);
         nearbyStops.push({
           name: stop.name,
+          caption: stop.caption,
           code: stop.ShortName,
           location: stopLocation,
         });
       }
     }
+    
+    console.log(`✅ [findNearbyBusStops] Found ${nearbyStops.length} stops within ${maxDistance}m`);
 
     // Sort by distance
     nearbyStops.sort((a, b) => {
@@ -169,40 +181,55 @@ export async function findNearbyBusStops(
 
 /**
  * Check if a route serves both origin and destination stops
+ * Uses busstopcode to match against BusStop.name (API code like 'PGP', 'UTOWN')
  */
 async function routeConnectsStops(
   routeCode: RouteCode,
-  departureStopName: string,
-  arrivalStopName: string
-): Promise<{ connects: boolean; estimatedTravelTime: number }> {
+  departureStopCode: string,
+  arrivalStopCode: string
+): Promise<{ connects: boolean; estimatedTravelTime: number; intermediateStops: string[] }> {
   try {
+    console.log(`🚌 Checking if route ${routeCode} connects ${departureStopCode} → ${arrivalStopCode}`);
     const pickupPoints = await getPickupPoints(routeCode);
     const stops = pickupPoints.PickupPointResult.pickuppoint;
+    
+    console.log(`📋 Route ${routeCode} stops:`, stops.map(s => `${s.pickupname} (${s.busstopcode})`).join(', '));
 
     const departureIndex = stops.findIndex(
-      (stop) => stop.pickupname === departureStopName
+      (stop) => stop.busstopcode === departureStopCode
     );
     const arrivalIndex = stops.findIndex(
-      (stop) => stop.pickupname === arrivalStopName
+      (stop) => stop.busstopcode === arrivalStopCode
     );
+    
+    console.log(`📍 Departure code "${departureStopCode}" index: ${departureIndex}, Arrival code "${arrivalStopCode}" index: ${arrivalIndex}`);
 
     if (departureIndex === -1 || arrivalIndex === -1) {
-      return { connects: false, estimatedTravelTime: 0 };
+      console.log(`❌ Route ${routeCode} does not serve both stops`);
+      return { connects: false, estimatedTravelTime: 0, intermediateStops: [] };
     }
 
     // Check if arrival stop comes after departure stop in the route
     if (arrivalIndex <= departureIndex) {
-      return { connects: false, estimatedTravelTime: 0 };
+      console.log(`❌ Route ${routeCode}: arrival stop comes before or at same position as departure`);
+      return { connects: false, estimatedTravelTime: 0, intermediateStops: [] };
     }
+
+    // Get intermediate stops (excluding departure and arrival)
+    const intermediateStops = stops
+      .slice(departureIndex + 1, arrivalIndex)
+      .map(stop => stop.pickupname);
 
     // Estimate travel time: ~2 minutes per stop on average
     const stopsInBetween = arrivalIndex - departureIndex;
     const estimatedTravelTime = stopsInBetween * 120; // 2 minutes per stop
+    
+    console.log(`✅ Route ${routeCode} connects! ${stopsInBetween} stops, ~${Math.ceil(estimatedTravelTime/60)} min`);
 
-    return { connects: true, estimatedTravelTime };
+    return { connects: true, estimatedTravelTime, intermediateStops };
   } catch (error) {
-    console.error(`Error checking route ${routeCode}:`, error);
-    return { connects: false, estimatedTravelTime: 0 };
+    console.error(`❌ Error checking route ${routeCode}:`, error);
+    return { connects: false, estimatedTravelTime: 0, intermediateStops: [] };
   }
 }
 
@@ -249,25 +276,42 @@ export async function findInternalBusRoutes(
   origin: LatLng,
   destination: LatLng
 ): Promise<InternalBusRoute[]> {
+  console.log('🚌 [INTERNAL ROUTE FINDER] Starting route search...');
+  console.log('📍 Origin:', origin);
+  console.log('📍 Destination:', destination);
+  
   const routes: InternalBusRoute[] = [];
 
   try {
     // Find nearby bus stops from origin (within 800m)
+    console.log('🔍 Finding nearby bus stops from origin (within 800m)...');
     const nearbyOriginStops = await findNearbyBusStops(origin, 800);
+    console.log(`✅ Found ${nearbyOriginStops.length} bus stops near origin:`, nearbyOriginStops.map(s => s.code).join(', '));
     
     // Find nearby bus stops from destination (within 500m)
+    console.log('🔍 Finding nearby bus stops from destination (within 500m)...');
     const nearbyDestinationStops = await findNearbyBusStops(destination, 500);
+    console.log(`✅ Found ${nearbyDestinationStops.length} bus stops near destination:`, nearbyDestinationStops.map(s => s.code).join(', '));
 
     if (nearbyOriginStops.length === 0 || nearbyDestinationStops.length === 0) {
+      console.warn('⚠️ No nearby bus stops found!');
       return routes;
     }
 
     // Check all combinations of routes and stops
+    // OPTIMIZATION: Only check the nearest 3 stops from origin to reduce API calls
+    const nearestOriginStops = nearbyOriginStops.slice(0, 3);
+    console.log(`🎯 Checking only ${nearestOriginStops.length} nearest origin stops:`, nearestOriginStops.map(s => s.code).join(', '));
+    
+    const nearestDestStops = nearbyDestinationStops.slice(0, 3);
+    console.log(`🎯 Checking only ${nearestDestStops.length} nearest destination stops:`, nearestDestStops.map(s => s.code).join(', '));
+    
     for (const routeCode of SHUTTLE_ROUTES) {
-      for (const departureStop of nearbyOriginStops) {
-        for (const arrivalStop of nearbyDestinationStops) {
+      for (const departureStop of nearestOriginStops) {
+        for (const arrivalStop of nearestDestStops) {
           // Check if this route connects these stops
-          const { connects, estimatedTravelTime } = await routeConnectsStops(
+          // Use API codes (name field) to match with pickup point busstopcode
+          const { connects, estimatedTravelTime, intermediateStops } = await routeConnectsStops(
             routeCode,
             departureStop.name,
             arrivalStop.name
@@ -285,6 +329,66 @@ export async function findInternalBusRoutes(
           );
           const walkFromStopTime = calculateWalkingTime(walkFromStopDistance);
 
+          // Fetch actual walking routes from Google Maps
+          let walkToStopRoute: GoogleRoute | undefined;
+          let walkFromStopRoute: GoogleRoute | undefined;
+          let actualWalkToStopTime = walkToStopTime;
+          let actualWalkFromStopTime = walkFromStopTime;
+
+          try {
+            // Get walking directions to the bus stop
+            console.log(`🚶 Fetching walking route from origin to ${departureStop.code}...`);
+            const walkToStopResponse = await getWalkingRoute(
+              { location: { latLng: origin } },
+              { location: { latLng: departureStop.location } }
+            );
+            
+            if (walkToStopResponse.routes && walkToStopResponse.routes.length > 0) {
+              walkToStopRoute = walkToStopResponse.routes[0];
+              console.log('✅ Got walking route to stop:', {
+                duration: walkToStopRoute.duration,
+                distance: walkToStopRoute.distanceMeters,
+                hasPolyline: !!walkToStopRoute.polyline?.encodedPolyline
+              });
+              // Update walking time with actual Google Maps estimate
+              const durationSeconds = parseInt(walkToStopRoute.duration.replace('s', ''), 10);
+              if (!isNaN(durationSeconds)) {
+                actualWalkToStopTime = durationSeconds;
+                console.log(`⏱️ Updated walk time: ${actualWalkToStopTime}s (${Math.ceil(actualWalkToStopTime / 60)} min)`);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error fetching walking route to stop:', error);
+            // Continue with Haversine estimate if Google Maps fails
+          }
+
+          try {
+            // Get walking directions from bus stop to destination
+            console.log(`🚶 Fetching walking route from ${arrivalStop.code} to destination...`);
+            const walkFromStopResponse = await getWalkingRoute(
+              { location: { latLng: arrivalStop.location } },
+              { location: { latLng: destination } }
+            );
+            
+            if (walkFromStopResponse.routes && walkFromStopResponse.routes.length > 0) {
+              walkFromStopRoute = walkFromStopResponse.routes[0];
+              console.log('✅ Got walking route from stop:', {
+                duration: walkFromStopRoute.duration,
+                distance: walkFromStopRoute.distanceMeters,
+                hasPolyline: !!walkFromStopRoute.polyline?.encodedPolyline
+              });
+              // Update walking time with actual Google Maps estimate
+              const durationSeconds = parseInt(walkFromStopRoute.duration.replace('s', ''), 10);
+              if (!isNaN(durationSeconds)) {
+                actualWalkFromStopTime = durationSeconds;
+                console.log(`⏱️ Updated walk time: ${actualWalkFromStopTime}s (${Math.ceil(actualWalkFromStopTime / 60)} min)`);
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error fetching walking route from stop:', error);
+            // Continue with Haversine estimate if Google Maps fails
+          }
+
           // Get next bus arrival
           const nextBus = await getNextBusArrival(departureStop.name, routeCode);
 
@@ -292,32 +396,52 @@ export async function findInternalBusRoutes(
 
           const waitingTime = nextBus.arrivalTime;
           
-          // Check if user can catch the bus
-          const canCatchBus = walkToStopTime + BUS_CATCH_BUFFER <= waitingTime;
+          // Check if user can catch the bus (using actual walking time)
+          const canCatchBus = actualWalkToStopTime + BUS_CATCH_BUFFER <= waitingTime;
 
           const totalTime =
-            walkToStopTime + waitingTime + estimatedTravelTime + walkFromStopTime;
+            actualWalkToStopTime + waitingTime + estimatedTravelTime + actualWalkFromStopTime;
 
-          routes.push({
+          const route = {
             routeCode,
             departureStop,
             arrivalStop,
-            walkToStopTime,
+            intermediateStops, // Include intermediate stops
+            walkToStopTime: actualWalkToStopTime, // Use actual Google Maps time
             walkToStopDistance,
+            walkToStopRoute, // Include Google Maps walking directions
             waitingTime,
             busArrivalTime: new Date(Date.now() + nextBus.arrivalTime * 1000).toISOString(),
             busTravelTime: estimatedTravelTime,
-            walkFromStopTime,
+            walkFromStopTime: actualWalkFromStopTime, // Use actual Google Maps time
             walkFromStopDistance,
+            walkFromStopRoute, // Include Google Maps walking directions
             totalTime,
             canCatchBus,
+          };
+          
+          console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {
+            totalTime: `${Math.ceil(totalTime / 60)} min`,
+            walkToStop: `${Math.ceil(actualWalkToStopTime / 60)} min`,
+            wait: `${Math.ceil(waitingTime / 60)} min`,
+            busRide: `${Math.ceil(estimatedTravelTime / 60)} min`,
+            walkFromStop: `${Math.ceil(actualWalkFromStopTime / 60)} min`,
+            canCatch: canCatchBus,
+            hasWalkingRoute: !!walkToStopRoute
           });
+          
+          routes.push(route);
         }
       }
     }
 
     // Sort routes by total time
     routes.sort((a, b) => a.totalTime - b.totalTime);
+    
+    console.log(`🎯 Found ${routes.length} total internal routes`);
+    if (routes.length > 0) {
+      console.log('🏆 Best route:', routes[0].routeCode, `(${Math.ceil(routes[0].totalTime / 60)} min)`);
+    }
 
     return routes;
   } catch (error) {
@@ -336,15 +460,20 @@ export async function findBestRoute(
 ): Promise<RouteComparison> {
   const internalRoutes = await findInternalBusRoutes(origin, destination);
   
-  // Filter for routes the user can actually catch
-  const catchableRoutes = internalRoutes.filter(route => route.canCatchBus);
+  // For now, show ALL routes even if user can't catch them (for testing/demonstration)
+  // In production, you might want to filter by canCatchBus or show with warnings
+  const allRoutes = internalRoutes;
   
-  const bestInternalRoute = catchableRoutes.length > 0 ? catchableRoutes[0] : null;
+  // Prefer catchable routes, but fall back to showing any route if none are catchable
+  const catchableRoutes = internalRoutes.filter(route => route.canCatchBus);
+  const bestInternalRoute = catchableRoutes.length > 0 
+    ? catchableRoutes[0] 
+    : (internalRoutes.length > 0 ? internalRoutes[0] : null);
 
   // If no Google Maps time provided, always recommend internal if available
   if (googleMapsTimeSeconds === undefined || googleMapsTimeSeconds === null) {
     return {
-      internalRoutes: catchableRoutes,
+      internalRoutes: allRoutes,
       bestInternalRoute,
       googleMapsTime: null,
       recommendInternal: bestInternalRoute !== null,
@@ -357,7 +486,7 @@ export async function findBestRoute(
     : false;
 
   return {
-    internalRoutes: catchableRoutes,
+    internalRoutes: allRoutes,
     bestInternalRoute,
     googleMapsTime: googleMapsTimeSeconds,
     recommendInternal,

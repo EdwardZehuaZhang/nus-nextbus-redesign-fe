@@ -228,8 +228,8 @@ export const formatDistance = (distanceKm: number): string => {
   const roundedMinutes = Math.round(walkingTimeMinutes);
 
   if (roundedMinutes < 1) {
-    return '< 1 min walk';
+    return '< 1 m walk';
   }
 
-  return `${roundedMinutes} min${roundedMinutes > 1 ? 's' : ''} walk`;
+  return `${roundedMinutes} m walk`;
 };
