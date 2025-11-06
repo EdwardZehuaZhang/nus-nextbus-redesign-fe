@@ -48,7 +48,11 @@ import {
   searchBusStations,
 } from '@/lib/bus-stations';
 import { type LocationCoords, useLocation } from '@/lib/hooks/use-location';
-import { type FavoriteRoute, getFavorites } from '@/lib/storage/favorites';
+import {
+  type FavoriteRoute,
+  getFavorites,
+  updateFavoriteLabel,
+} from '@/lib/storage/favorites';
 import {
   addRecentSearch,
   getRecentSearches,
@@ -504,7 +508,19 @@ const TabBar = ({
   );
 };
 
-const FavoriteButton = ({ item, userLocation }: { item: FavoriteRoute; userLocation: LocationCoords | null }) => {
+const FavoriteButton = ({
+  item,
+  userLocation,
+  onUpdate,
+}: {
+  item: FavoriteRoute;
+  userLocation: LocationCoords | null;
+  onUpdate: () => void;
+}) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editText, setEditText] = React.useState(`${item.from} - ${item.to}`);
+  const inputRef = React.useRef<TextInput>(null);
+
   const renderIcons = () => {
     if (item.icon === 'home-work') {
       return (
@@ -540,27 +556,94 @@ const FavoriteButton = ({ item, userLocation }: { item: FavoriteRoute; userLocat
     router.push({
       pathname: '/(app)/navigation',
       params: {
-        from: item.fromId,
-        to: item.toId,
+        customOrigin: item.fromId,
+        destination: item.toId,
         userLat: userLocation?.latitude?.toString(),
         userLng: userLocation?.longitude?.toString(),
       },
     });
   };
 
+  const handleTextPress = (e: any) => {
+    e.stopPropagation();
+    setIsEditing(true);
+  };
+
+  // Select all text when entering edit mode
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      // Small delay to ensure the input is focused first
+      setTimeout(() => {
+        inputRef.current?.setNativeProps?.({
+          selection: { start: 0, end: editText.length },
+        });
+        // For web, use the DOM API
+        if (typeof window !== 'undefined') {
+          const input = inputRef.current as any;
+          if (input?.select) {
+            input.select();
+          }
+        }
+      }, 100);
+    }
+  }, [isEditing, editText.length]);
+
+  const handleSaveEdit = () => {
+    // Parse the edited text to extract from and to
+    const parts = editText.split('-').map((s) => s.trim());
+    if (parts.length >= 2) {
+      const from = parts[0];
+      const to = parts.slice(1).join(' - '); // In case there are multiple dashes
+      updateFavoriteLabel(item.id, from, to);
+      setIsEditing(false);
+      onUpdate(); // Refresh the favorites list
+    } else {
+      setIsEditing(false);
+    }
+  };
+
   return (
     <Pressable
-      className="min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
+      className="min-w-[64px] max-w-[140px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
       onPress={handlePress}
     >
       {renderIcons()}
-      <Text
-        className="whitespace-nowrap text-center text-sm font-medium leading-tight"
-        style={{ color: '#274F9C' }}
-        numberOfLines={1}
-      >
-        {item.from} - {item.to}
-      </Text>
+      {isEditing ? (
+        <TextInput
+          ref={inputRef}
+          value={editText}
+          onChangeText={setEditText}
+          onBlur={handleSaveEdit}
+          onSubmitEditing={handleSaveEdit}
+          autoFocus
+          selectTextOnFocus
+          multiline
+          numberOfLines={2}
+          style={{
+            color: '#274F9C',
+            fontSize: 14,
+            fontWeight: '500',
+            textAlign: 'center',
+            lineHeight: 18,
+            minHeight: 36,
+            paddingVertical: 2,
+            fontFamily: 'Inter',
+            outline: 'none',
+          }}
+          className="w-full text-center"
+        />
+      ) : (
+        <Pressable onPress={handleTextPress}>
+          <Text
+            className="text-center text-sm font-medium leading-tight"
+            style={{ color: '#274F9C' }}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {item.from} - {item.to}
+          </Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 };
@@ -588,19 +671,19 @@ const FavoritesSection = () => {
   const { coords: userLocation } = useLocation();
 
   // Load favorites from storage
-  React.useEffect(() => {
-    const loadFavorites = () => {
-      const stored = getFavorites();
-      setFavorites(stored);
-    };
+  const loadFavorites = React.useCallback(() => {
+    const stored = getFavorites();
+    setFavorites(stored);
+  }, []);
 
+  React.useEffect(() => {
     loadFavorites();
 
     // Set up an interval to refresh favorites (in case they're added from another screen)
     const interval = setInterval(loadFavorites, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadFavorites]);
 
   return (
     <View>
@@ -620,7 +703,12 @@ const FavoritesSection = () => {
           contentContainerStyle={{ gap: 8 }}
         >
           {favorites.map((item) => (
-            <FavoriteButton key={item.id} item={item} userLocation={userLocation} />
+            <FavoriteButton
+              key={item.id}
+              item={item}
+              userLocation={userLocation}
+              onUpdate={loadFavorites}
+            />
           ))}
           <AddButton />
         </ScrollView>

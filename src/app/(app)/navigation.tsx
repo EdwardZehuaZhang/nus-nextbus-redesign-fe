@@ -824,30 +824,34 @@ export default function NavigationPage() {
   const fromLocation = originName;
   const toLocation = typeof to === 'string' ? to : currentDestination;
 
-  // Check if this route is already favorited
+  // Check if this route is already favorited - use the names consistently
   const [favorited, setFavorited] = useState(() =>
     isFavorite(fromLocation, toLocation)
   );
 
+  // Update favorited state when routes change or location changes
+  useEffect(() => {
+    setFavorited(isFavorite(fromLocation, toLocation));
+  }, [fromLocation, toLocation]);
+
   const handleSaveFavorite = () => {
-    // Get the actual location names from the route data
-    const { fromName, toName } = getActualLocationNames();
+    // Use the same names for consistency - fromLocation and toLocation
+    // These are what we check against in isFavorite()
     
     if (!favorited) {
-      // Save the favorite with actual stop names
+      // Save the favorite
       addFavorite({
-        from: fromName,
-        to: toName,
-        fromId: fromName,
-        toId: toName,
+        from: fromLocation,
+        to: toLocation,
+        fromId: fromLocation,
+        toId: toLocation,
       });
       setFavorited(true);
     } else {
       // Remove the favorite
       const favorites = getFavorites();
       const existingFavorite = favorites.find(
-        (f) => (f.fromId === fromLocation && f.toId === toLocation) ||
-               (f.fromId === fromName && f.toId === toName)
+        (f) => f.fromId === fromLocation && f.toId === toLocation
       );
       if (existingFavorite) {
         removeFavorite(existingFavorite.id);

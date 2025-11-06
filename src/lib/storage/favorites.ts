@@ -101,6 +101,28 @@ export const updateFavoriteIcon = (
 };
 
 /**
+ * Update favorite display name
+ */
+export const updateFavoriteLabel = (
+  id: string,
+  from: string,
+  to: string
+): void => {
+  try {
+    const favorites = getFavorites();
+    const favorite = favorites.find((f) => f.id === id);
+
+    if (favorite) {
+      favorite.from = from;
+      favorite.to = to;
+      storage.set(FAVORITES_KEY, JSON.stringify(favorites));
+    }
+  } catch (error) {
+    console.error('Error updating favorite label:', error);
+  }
+};
+
+/**
  * Clear all favorites
  */
 export const clearFavorites = (): void => {
