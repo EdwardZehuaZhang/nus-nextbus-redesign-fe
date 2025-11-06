@@ -691,7 +691,7 @@ const FavoritesSection = () => {
         Favourites
       </Text>
       {favorites.length === 0 ? (
-        <View className="rounded-2xl bg-white p-4">
+        <View className="rounded-2xl p-4">
           <Text className="text-center text-sm text-neutral-400">
             No favourites added yet
           </Text>

@@ -1794,7 +1794,7 @@ const createCampusBorderPolyline = (
     geodesic: true,
     strokeColor: '#808080',
     strokeOpacity: 1.0,
-    strokeWeight: 3,
+    strokeWeight: 0.5,
   });
   campusBorder.setMap(map);
 
