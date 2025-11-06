@@ -1987,9 +1987,6 @@ export default function NavigationPage() {
                                       paddingVertical: 7,
                                       paddingHorizontal: 10,
                                       backgroundColor: '#FFFFFF',
-                                      borderRightWidth: 1,
-                                      borderBottomWidth: 1,
-                                      borderColor: '#E5E5E5',
                                       gap: 8,
                                     }}
                                   >
@@ -2487,9 +2484,6 @@ export default function NavigationPage() {
                                           paddingVertical: 7,
                                           flex: 1,
                                           backgroundColor: '#FFFFFF',
-                                          borderRightWidth: 1,
-                                          borderBottomWidth: 1,
-                                          borderColor: '#E5E5E5',
                                           gap: 8,
                                         }}
                                       >

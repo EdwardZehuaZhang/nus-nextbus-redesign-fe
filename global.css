@@ -7,6 +7,8 @@
 @layer base {
   * {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   
   body {
@@ -15,6 +17,18 @@
   
   input, textarea, button {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  }
+
+  /* Ensure React Native Web text elements also use Inter font */
+  [dir] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif !important;
+  }
+  
+  /* Force Inter font on all text elements with specific class patterns */
+  [class*="css-"][class*="text"],
+  [class*="css-146c3p1"],
+  div[dir="auto"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif !important;
   }
 
   /* Remove focus outline from inputs and textareas */

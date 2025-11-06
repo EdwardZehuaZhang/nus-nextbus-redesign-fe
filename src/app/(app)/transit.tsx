@@ -246,6 +246,7 @@ const DynamicBusTime = ({
           color: textColor,
           fontSize: fontSize,
           fontWeight: '500',
+          fontFamily: 'Inter',
         }}
       >
         {time}
@@ -287,7 +288,7 @@ const BusRouteCard = ({
         >
           <Text
             className="text-base font-semibold"
-            style={{ color: '#FFFFFF' }}
+            style={{ color: '#FFFFFF', fontFamily: 'Inter', fontWeight: '600' }}
           >
             {route.route}
           </Text>
@@ -306,8 +307,10 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
   
   return (
     <View
-      className="border border-t-0 border-neutral-200"
       style={{
+        borderBottomWidth: 1,
+        borderLeftWidth: 1,
+        borderColor: '#e5e5e5',
         borderBottomLeftRadius: 6,
         borderBottomRightRadius: 6,
         overflow: 'hidden',
@@ -316,17 +319,24 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
       {validTimes.map((timeItem, index) => {
         const isLast = index === validTimes.length - 1;
         return (
-          <View key={index}>
-            <View className="flex-row items-center justify-between bg-white px-3 py-2">
-              <DynamicBusTime
-                time={timeItem.time}
-                textColor={timeItem.textColor}
-              />
-              <CrowdingIndicator crowding={timeItem.crowding} />
-            </View>
-            {!isLast && (
-              <View className="h-px bg-neutral-200" style={{ marginTop: -1 }} />
-            )}
+          <View 
+            key={`timing-${index}`}
+            style={{ 
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#ffffff',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderBottomWidth: isLast ? 0 : 1,
+              borderColor: '#e5e5e5',
+            }}
+          >
+            <DynamicBusTime
+              time={timeItem.time}
+              textColor={timeItem.textColor}
+            />
+            <CrowdingIndicator crowding={timeItem.crowding} />
           </View>
         );
       })}
@@ -693,7 +703,7 @@ const FavoritesSection = () => {
 
   return (
     <View>
-      <Text className="mb-2 text-sm font-medium text-neutral-500">
+      <Text className="mb-2 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
         Favourites
       </Text>
       {favorites.length === 0 ? (
@@ -848,7 +858,7 @@ const NearestStopsSection = ({
 
   return (
     <View className="mb-6">
-      <Text className="mb-2 text-sm font-medium text-neutral-500">
+      <Text className="mb-2 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
         Nearest Stops
       </Text>
 
@@ -1183,7 +1193,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
           />
         </View>
         <Pressable onPress={onCancel}>
-          <Text className="text-base font-medium" style={{ color: '#274F9C' }}>
+          <Text className="text-base font-medium" style={{ color: '#274F9C', fontFamily: 'Inter' }}>
             Cancel
           </Text>
         </Pressable>
@@ -1195,7 +1205,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             {/* Bus Station Results */}
             {searchResults.length > 0 && (
               <View>
-                <Text className="mb-3 text-sm font-medium text-neutral-500">
+                <Text className="mb-3 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
                   Bus Stops ({searchResults.length})
                 </Text>
                 {searchResults.map((item, index, array) => (
@@ -1212,7 +1222,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             {/* Google Places Results */}
             {googlePlaceResults.length > 0 && (
               <View>
-                <Text className="mb-3 text-sm font-medium text-neutral-500">
+                <Text className="mb-3 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
                   Other Locations ({googlePlaceResults.length})
                 </Text>
                 {googlePlaceResults.map((place, index) => (
@@ -1267,13 +1277,13 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             {recentSearches.length > 0 && (
               <View className="mb-8">
                 <View className="mb-2 flex-row items-center justify-between">
-                  <Text className="text-sm font-medium text-neutral-500">
+                  <Text className="text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
                     Recents
                   </Text>
                   <Pressable onPress={() => setShowAllRecent(!showAllRecent)}>
                     <Text
                       className="text-sm font-medium"
-                      style={{ color: '#274F9C' }}
+                      style={{ color: '#274F9C', fontFamily: 'Inter' }}
                     >
                       {showAllRecent ? 'View Less' : 'View More'}
                     </Text>
@@ -1296,13 +1306,13 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             {/* Popular Searches */}
             <View>
               <View className="mb-2 flex-row items-center justify-between">
-                <Text className="text-sm font-medium text-neutral-500">
+                <Text className="text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
                   Popular Searches
                 </Text>
                 <Pressable onPress={() => setShowAllPopular(!showAllPopular)}>
                   <Text
                     className="text-sm font-medium"
-                    style={{ color: '#274F9C' }}
+                    style={{ color: '#274F9C', fontFamily: 'Inter' }}
                   >
                     {showAllPopular ? 'View Less' : 'View More'}
                   </Text>

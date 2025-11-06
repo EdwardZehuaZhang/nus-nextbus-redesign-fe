@@ -112,7 +112,7 @@ export function InternalRouteCard({
             marginBottom: 12,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600', fontFamily: 'Inter' }}>
             ⚡ Fastest with Internal Bus
           </Text>
         </View>
@@ -136,15 +136,15 @@ export function InternalRouteCard({
               borderRadius: 8,
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700', fontFamily: 'Inter' }}>
               {route.routeCode}
             </Text>
           </View>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: '#09090B' }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#09090B', fontFamily: 'Inter' }}>
             Internal Shuttle
           </Text>
         </View>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: '#274F9C' }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#274F9C', fontFamily: 'Inter' }}>
           {formatDuration(route.totalTime)}
         </Text>
       </View>
@@ -154,7 +154,7 @@ export function InternalRouteCard({
         {/* Step 1: Walk to stop */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <WalkingIcon />
-          <Text style={{ fontSize: 14, color: '#737373', flex: 1 }}>
+          <Text style={{ fontSize: 14, color: '#737373', flex: 1, fontFamily: 'Inter', fontWeight: '500' }}>
             Walk {walkToStopMinutes} min to {route.departureStop.code}
           </Text>
         </View>
@@ -162,7 +162,7 @@ export function InternalRouteCard({
         {/* Step 2: Wait for bus */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <ClockIcon />
-          <Text style={{ fontSize: 14, color: '#737373', flex: 1 }}>
+          <Text style={{ fontSize: 14, color: '#737373', flex: 1, fontFamily: 'Inter', fontWeight: '500' }}>
             Wait {waitingMinutes} min for bus
           </Text>
         </View>
@@ -170,7 +170,7 @@ export function InternalRouteCard({
         {/* Step 3: Bus ride */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <BusIcon />
-          <Text style={{ fontSize: 14, color: '#274F9C', flex: 1, fontWeight: '500' }}>
+          <Text style={{ fontSize: 14, color: '#274F9C', flex: 1, fontWeight: '500', fontFamily: 'Inter' }}>
             {route.routeCode} bus • {busMinutes} min to {route.arrivalStop.code}
           </Text>
         </View>
@@ -179,7 +179,7 @@ export function InternalRouteCard({
         {walkFromStopMinutes > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <WalkingIcon />
-            <Text style={{ fontSize: 14, color: '#737373', flex: 1 }}>
+            <Text style={{ fontSize: 14, color: '#737373', flex: 1, fontFamily: 'Inter', fontWeight: '500' }}>
               Walk {walkFromStopMinutes} min to destination
             </Text>
           </View>
@@ -196,7 +196,7 @@ export function InternalRouteCard({
             borderRadius: 6,
           }}
         >
-          <Text style={{ fontSize: 12, color: '#92400E' }}>
+          <Text style={{ fontSize: 12, color: '#92400E', fontFamily: 'Inter', fontWeight: '500' }}>
             ⚠️ You may not reach the bus stop in time for this bus
           </Text>
         </View>
@@ -225,7 +225,7 @@ export function InternalRoutesSection({
   if (isLoading) {
     return (
       <View style={{ padding: 16, backgroundColor: '#F9FAFB', borderRadius: 12 }}>
-        <Text style={{ fontSize: 14, color: '#737373', textAlign: 'center' }}>
+        <Text style={{ fontSize: 14, color: '#737373', textAlign: 'center', fontFamily: 'Inter', fontWeight: '500' }}>
           Finding internal bus routes...
         </Text>
       </View>
@@ -247,11 +247,11 @@ export function InternalRoutesSection({
           marginBottom: 12,
         }}
       >
-        <Text style={{ fontSize: 18, fontWeight: '600', color: '#09090B' }}>
+        <Text style={{ fontSize: 18, fontWeight: '600', color: '#09090B', fontFamily: 'Inter' }}>
           🚌 Internal Shuttle Routes
         </Text>
         {googleMapsTimeSeconds && (
-          <Text style={{ fontSize: 12, color: '#737373' }}>
+          <Text style={{ fontSize: 12, color: '#737373', fontFamily: 'Inter', fontWeight: '500' }}>
             Google: {formatDuration(googleMapsTimeSeconds)}
           </Text>
         )}
@@ -269,7 +269,7 @@ export function InternalRoutesSection({
             borderLeftColor: '#16A34A',
           }}
         >
-          <Text style={{ fontSize: 14, color: '#166534', fontWeight: '500' }}>
+          <Text style={{ fontSize: 14, color: '#166534', fontWeight: '500', fontFamily: 'Inter' }}>
             ✅ Taking the internal shuttle is faster than external transport!
           </Text>
         </View>
