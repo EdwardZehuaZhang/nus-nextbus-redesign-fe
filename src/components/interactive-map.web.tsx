@@ -5200,7 +5200,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <div
           style={{
             position: 'fixed',
-            top: '12px',
+            top: '24px',
             right: '20px',
             zIndex: 9999,
           }}

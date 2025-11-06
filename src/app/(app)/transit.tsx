@@ -297,6 +297,9 @@ const BusRouteCard = ({
 };
 
 const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
+  // Filter out N/A times to hide entire rows
+  const validTimes = times.filter((timeItem) => timeItem.time !== 'N/A');
+  
   return (
     <View
       className="border border-t-0 border-neutral-200"
@@ -306,10 +309,8 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
         overflow: 'hidden',
       }}
     >
-      {times.map((timeItem, index) => {
-        const isLast = index === times.length - 1;
-        // Hide capacity icon when time is "N/A" (bus doesn't exist)
-        const showCapacity = timeItem.time !== 'N/A';
+      {validTimes.map((timeItem, index) => {
+        const isLast = index === validTimes.length - 1;
         return (
           <View key={index}>
             <View className="flex-row items-center justify-between bg-white px-3 py-2">
@@ -317,7 +318,7 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
                 time={timeItem.time}
                 textColor={timeItem.textColor}
               />
-              {showCapacity && <CrowdingIndicator crowding={timeItem.crowding} />}
+              <CrowdingIndicator crowding={timeItem.crowding} />
             </View>
             {!isLast && (
               <View className="h-px bg-neutral-200" style={{ marginTop: -1 }} />
@@ -481,6 +482,7 @@ const TabBar = ({
                   : 'rounded-tr-md border-y border-r bg-white opacity-60'
               } ${index === 0 ? 'border-l' : ''}`}
               onPress={() => onTabChange(tab.id)}
+              style={!isActive ? { maxWidth: '100%' } : undefined}
             >
               <Text
                 className={`text-base ${
@@ -490,6 +492,7 @@ const TabBar = ({
                 }`}
                 numberOfLines={1}
                 ellipsizeMode="tail"
+                style={!isActive ? { maxWidth: '100%' } : undefined}
               >
                 {tab.label}
               </Text>
@@ -1693,7 +1696,7 @@ export default function TransitPage() {
       <View
         style={{
           position: 'absolute' as any,
-          top: 12,
+          top: 40,
           right: 20,
           zIndex: 99999,
         }}
