@@ -238,6 +238,83 @@ const loadGoogleMapsScript = (): Promise<void> => {
   });
 };
 
+/**
+ * Calculate bearing (angle) from one point to another
+ * @param from - Starting coordinate {lat, lng}
+ * @param to - Ending coordinate {lat, lng}
+ * @returns Bearing in degrees (0-360, where 0 is North, 90 is East, 180 is South, 270 is West)
+ */
+const calculateBearing = (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+): number => {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const dLng = toRadians(to.lng - from.lng);
+
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+
+  const bearing = toDegrees(Math.atan2(y, x));
+  
+  // Convert to 0-360 range
+  return (bearing + 360) % 360;
+};
+
+/**
+ * Find the nearest upcoming checkpoint for a bus along its route
+ * @param busPos - Current bus position {lat, lng}
+ * @param checkpoints - Array of route checkpoints
+ * @param direction - Bus direction (1 = forward, 2 = reverse)
+ * @returns Next checkpoint or null if not found
+ */
+const findNextCheckpoint = (
+  busPos: { lat: number; lng: number },
+  checkpoints: { latitude: number; longitude: number }[],
+  direction: 1 | 2
+): { lat: number; lng: number } | null => {
+  if (!checkpoints || checkpoints.length === 0) return null;
+
+  // For reverse direction, reverse the checkpoint array
+  const orderedCheckpoints =
+    direction === 2 ? [...checkpoints].reverse() : checkpoints;
+
+  // Find the closest checkpoint ahead of the bus
+  let minDistance = Infinity;
+  let closestIndex = -1;
+
+  orderedCheckpoints.forEach((checkpoint, index) => {
+    const distance = Math.sqrt(
+      Math.pow(checkpoint.latitude - busPos.lat, 2) +
+        Math.pow(checkpoint.longitude - busPos.lng, 2)
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestIndex = index;
+    }
+  });
+
+  // Return the next checkpoint after the closest one
+  if (closestIndex !== -1 && closestIndex < orderedCheckpoints.length - 1) {
+    const nextCheckpoint = orderedCheckpoints[closestIndex + 1];
+    return { lat: nextCheckpoint.latitude, lng: nextCheckpoint.longitude };
+  }
+
+  // If we're at the last checkpoint, return the last one
+  if (closestIndex === orderedCheckpoints.length - 1) {
+    const checkpoint = orderedCheckpoints[closestIndex];
+    return { lat: checkpoint.latitude, lng: checkpoint.longitude };
+  }
+
+  return null;
+};
+
 // Create marker with custom color
 const createMarker = ({
   position,
@@ -3887,9 +3964,11 @@ const useDestinationMarker = (
 const useBusMarkers = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   activeBuses: ActiveBus[],
-  routeColor: string = '#274F9C'
+  routeColor: string = '#274F9C',
+  activeRoute?: RouteCode | null
 ) => {
   const busMarkersRef = useRef<google.maps.Marker[]>([]);
+  const { data: checkpointsData } = useCheckpoints(activeRoute ?? 'A1');
 
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined' || !window.google) {
@@ -3902,6 +3981,11 @@ const useBusMarkers = (
     busMarkersRef.current.forEach((marker) => marker.setMap(null));
     busMarkersRef.current = [];
 
+    // Get route checkpoints for calculating direction
+    const checkpoints = activeRoute
+      ? checkpointsData?.CheckPointResult?.CheckPoint || []
+      : [];
+
     // Create new markers for each active bus
     activeBuses.forEach((bus) => {
       const { lat, lng, veh_plate, direction } = bus;
@@ -3909,8 +3993,23 @@ const useBusMarkers = (
       // Use horizontal flip for reverse direction instead of rotation
       const flipHorizontal = direction === 2;
 
-      // Create SVG icon for bus marker with route color
-      const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal);
+      // Calculate arrow rotation based on next checkpoint
+      let arrowRotation = 0; // Default to pointing right (East)
+      const nextCheckpoint = findNextCheckpoint(
+        { lat, lng },
+        checkpoints,
+        direction
+      );
+      
+      if (nextCheckpoint) {
+        // Calculate bearing from bus to next checkpoint
+        const bearing = calculateBearing({ lat, lng }, nextCheckpoint);
+        // Convert bearing to SVG rotation (bearing: 0°=North, 90°=East; SVG: 0°=East, 90°=South)
+        arrowRotation = bearing - 90;
+      }
+
+      // Create SVG icon for bus marker with route color and rotation
+      const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
       const iconUrl = svgToDataURL(iconSvg);
 
       // Create marker
@@ -3919,8 +4018,8 @@ const useBusMarkers = (
         map,
         icon: {
           url: iconUrl,
-          scaledSize: new google.maps.Size(32, 32),
-          anchor: new google.maps.Point(16, 16), // Center the icon
+          scaledSize: new google.maps.Size(28, 28),
+          anchor: new google.maps.Point(14, 14), // Center the icon
         },
         title: `Bus ${veh_plate}`,
         zIndex: 1000, // Ensure buses appear above routes
@@ -4119,6 +4218,9 @@ const useFilteredBusRoutes = (
       const existingBusMarkers = busMarkersRef.current.get(routeCode) || [];
       existingBusMarkers.forEach((marker) => marker.setMap(null));
 
+      // Get checkpoints for this route to calculate arrow direction
+      const checkpoints = (routeCheckpointsData as Record<string, any>)[routeCode] || [];
+
       const newBusMarkers: google.maps.Marker[] = [];
       buses.forEach((bus: any) => {
         const { lat, lng, veh_plate, direction, speed } = bus;
@@ -4138,7 +4240,21 @@ const useFilteredBusRoutes = (
         }
         
         const flipHorizontal = direction === 2;
-        const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal);
+        
+        // Calculate arrow rotation based on next checkpoint
+        let arrowRotation = 0;
+        const nextCheckpoint = findNextCheckpoint(
+          { lat, lng },
+          checkpoints,
+          direction
+        );
+        
+        if (nextCheckpoint) {
+          const bearing = calculateBearing({ lat, lng }, nextCheckpoint);
+          arrowRotation = bearing - 90;
+        }
+        
+        const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
         const iconUrl = svgToDataURL(iconSvg);
 
         const marker = new google.maps.Marker({
@@ -4146,8 +4262,8 @@ const useFilteredBusRoutes = (
           map,
           icon: {
             url: iconUrl,
-            scaledSize: new google.maps.Size(32, 32),
-            anchor: new google.maps.Point(16, 16),
+            scaledSize: new google.maps.Size(28, 28),
+            anchor: new google.maps.Point(14, 14),
           },
           title: `Bus ${veh_plate}`,
           zIndex: 1000,
@@ -5030,7 +5146,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useConnectorLines(mapRef, internalRoutePolylines ? undefined : origin, internalRoutePolylines ? undefined : destination, internalRoutePolylines ? undefined : routePolyline); // Draw dotted lines from user to route start and route end to destination
   
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
-  useBusMarkers(mapRef, activeBuses, routeColor);
+  useBusMarkers(mapRef, activeBuses, routeColor, effectiveActiveRoute);
   // Don't render full route checkpoints when showing internal route polylines (which shows only the segment)
   useRouteCheckpoints(mapRef, internalRoutePolylines ? null : effectiveActiveRoute, routeColor);
   // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)
