@@ -42,6 +42,8 @@ export default function RootLayout() {
           name="search"
           options={{ headerShown: false, presentation: 'modal' }}
         />
+        <Stack.Screen name="demo" options={{ headerShown: false }} />
+        <Stack.Screen name="investor" options={{ headerShown: false }} />
       </Stack>
     </Providers>
   );

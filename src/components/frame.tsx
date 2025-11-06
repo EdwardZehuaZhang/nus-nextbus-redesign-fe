@@ -9,115 +9,187 @@ interface FrameProps {
   onDragEnd?: () => void;
 }
 
-// Hook to manage drag handlers
-const useDragHandlers = (
-  onDrag?: (gestureState: { dy: number; vy: number }) => void,
-  onDragMove?: (dy: number) => void,
-  onDragEnd?: () => void
-) => {
+interface DragState {
+  startY: React.MutableRefObject<number>;
+  startTime: React.MutableRefObject<number>;
+  isDragging: React.MutableRefObject<boolean>;
+  setCursor: (cursor: 'grab' | 'grabbing') => void;
+}
+
+// Mouse handlers for desktop
+function useMouseHandlers(state: DragState, callbacks: FrameProps) {
+  const { startY, startTime, isDragging, setCursor } = state;
+  const { onDrag, onDragMove, onDragEnd } = callbacks;
+
+  const handleMouseMove = React.useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      e.preventDefault();
+      onDragMove?.(e.clientY - startY.current);
+    },
+    [isDragging, startY, onDragMove]
+  );
+
+  const handleMouseUp = React.useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const dy = e.clientY - startY.current;
+      // eslint-disable-next-line react-compiler/react-compiler
+      isDragging.current = false;
+      setCursor('grab');
+      onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+      onDragEnd?.();
+
+      // Remove global listeners
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    },
+    [
+      isDragging,
+      startY,
+      startTime,
+      setCursor,
+      onDrag,
+      onDragEnd,
+      handleMouseMove,
+    ]
+  );
+
+  const handleMouseDown = React.useCallback(
+    (e: any) => {
+      e.preventDefault();
+      startY.current = e.clientY;
+      startTime.current = Date.now();
+      isDragging.current = true;
+      setCursor('grabbing');
+
+      // Attach global listeners for move and up
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [startY, startTime, isDragging, setCursor, handleMouseMove, handleMouseUp]
+  );
+
+  return { handleMouseDown, handleMouseMove, handleMouseUp };
+}
+
+// Touch handlers for mobile
+function useTouchHandlers(state: DragState, callbacks: FrameProps) {
+  const { startY, startTime, isDragging, setCursor } = state;
+  const { onDrag, onDragMove, onDragEnd } = callbacks;
+
+  const handleTouchStart = React.useCallback(
+    (e: any) => {
+      const touch = e.touches?.[0] || e;
+      // eslint-disable-next-line react-compiler/react-compiler
+      startY.current = touch.clientY || touch.pageY;
+      startTime.current = Date.now();
+      isDragging.current = true;
+      setCursor('grabbing');
+    },
+    [startY, startTime, isDragging, setCursor]
+  );
+
+  const handleTouchMove = React.useCallback(
+    (e: any) => {
+      if (!isDragging.current) return;
+      const touch = e.touches?.[0] || e;
+      onDragMove?.((touch.clientY || touch.pageY) - startY.current);
+    },
+    [isDragging, startY, onDragMove]
+  );
+
+  const handleTouchEnd = React.useCallback(
+    (e: any) => {
+      if (!isDragging.current) return;
+      const touch = e.changedTouches?.[0] || e;
+      const dy = (touch.clientY || touch.pageY) - startY.current;
+      isDragging.current = false;
+      setCursor('grab');
+      onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+      onDragEnd?.();
+    },
+    [isDragging, startY, startTime, setCursor, onDrag, onDragEnd]
+  );
+
+  return { handleTouchStart, handleTouchMove, handleTouchEnd };
+}
+
+// Main hook to manage drag handlers
+function useDragHandlers(callbacks: FrameProps) {
   const startY = React.useRef(0);
   const startTime = React.useRef(0);
   const isDragging = React.useRef(false);
   const [cursor, setCursor] = React.useState<'grab' | 'grabbing'>('grab');
 
-  const handleTouchStart = (e: any) => {
-    const touch = e.touches ? e.touches[0] : e;
-    startY.current = touch.clientY || touch.pageY;
-    startTime.current = Date.now();
-    isDragging.current = true;
-    setCursor('grabbing');
-    console.log('Touch started at:', startY.current);
+  const state = { startY, startTime, isDragging, setCursor };
+  const mouseHandlers = useMouseHandlers(state, callbacks);
+  const touchHandlers = useTouchHandlers(state, callbacks);
+
+  return { cursor, ...mouseHandlers, ...touchHandlers };
+}
+
+// Web frame component
+const WebFrame = ({
+  cursor,
+  handlers,
+}: {
+  cursor: 'grab' | 'grabbing';
+  handlers: ReturnType<typeof useDragHandlers>;
+}) => {
+  const hitAreaStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '-30px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '100vw',
+    height: '60px',
+    cursor,
+    userSelect: 'none',
+    zIndex: 10,
+    touchAction: 'none',
   };
 
-  const handleTouchMove = (e: any) => {
-    if (!isDragging.current) return;
-
-    const touch = e.touches ? e.touches[0] : e;
-    const currentY = touch.clientY || touch.pageY;
-    const dy = currentY - startY.current;
-
-    if (onDragMove) {
-      onDragMove(dy);
-    }
-  };
-
-  const handleTouchEnd = (e: any) => {
-    if (!isDragging.current) return;
-
-    const touch = e.changedTouches ? e.changedTouches[0] : e;
-    const endY = touch.clientY || touch.pageY;
-    const dy = endY - startY.current;
-    const dt = Date.now() - startTime.current;
-    const vy = dy / dt; // velocity in pixels per millisecond
-
-    console.log('Touch ended - dy:', dy, 'velocity:', vy);
-
-    isDragging.current = false;
-    setCursor('grab');
-
-    if (onDrag) {
-      onDrag({ dy, vy });
-    }
-
-    if (onDragEnd) {
-      onDragEnd();
-    }
-  };
-
-  return { cursor, handleTouchStart, handleTouchMove, handleTouchEnd };
+  return (
+    <div
+      style={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}
+    >
+      {/* Invisible expanded hit area */}
+      <div
+        style={hitAreaStyle}
+        onMouseDown={handlers.handleMouseDown}
+        onTouchStart={handlers.handleTouchStart}
+        onTouchMove={handlers.handleTouchMove}
+        onTouchEnd={handlers.handleTouchEnd}
+      />
+      {/* Visible bar */}
+      <View
+        className="h-1 w-[52px] rounded-[48px]"
+        style={{ backgroundColor: '#b6b6b6' }}
+      />
+    </div>
+  );
 };
 
 export const Frame = ({ onDrag, onDragMove, onDragEnd }: FrameProps) => {
-  const { cursor, handleTouchStart, handleTouchMove, handleTouchEnd } =
-    useDragHandlers(onDrag, onDragMove, onDragEnd);
+  const handlers = useDragHandlers({ onDrag, onDragMove, onDragEnd });
 
   // Use native div for web to ensure mouse events work
   if (Platform.OS === 'web') {
-    return (
-      <div
-        style={{
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        {/* Invisible expanded hit area */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '-30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '100vw',
-            height: '60px',
-            cursor: cursor,
-            userSelect: 'none',
-            zIndex: 10,
-          }}
-          onMouseDown={handleTouchStart}
-          onMouseMove={handleTouchMove}
-          onMouseUp={handleTouchEnd}
-          onMouseLeave={handleTouchEnd}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        />
-        {/* Visible bar */}
-        <View
-          className="h-1 w-[52px] rounded-[48px]"
-          style={{ backgroundColor: '#b6b6b6' }}
-        />
-      </div>
-    );
+    return <WebFrame cursor={handlers.cursor} handlers={handlers} />;
   }
 
   return (
     <RNView
       style={styles.container}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      onTouchStart={handlers.handleTouchStart}
+      onTouchMove={handlers.handleTouchMove}
+      onTouchEnd={handlers.handleTouchEnd}
     >
       <View
         className="h-1 w-[52px] rounded-[48px]"

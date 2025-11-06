@@ -302,30 +302,75 @@ const useDragHandlers = () => {
     setContainerHeight(newHeight);
   };
 
-  const handleDragEnd = () => {
-    // Snap to nearest state
+  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+    // This is called on drag end with velocity
     const currentHeight = tempHeight ?? containerHeight;
+    const { dy, vy } = gestureState;
 
+    // Consider velocity for more natural snapping
+    // Negative dy means dragging up, positive means dragging down
+    // Negative vy means fast upward movement, positive means fast downward
+    
     let targetHeight = DEFAULT_HEIGHT;
 
-    if (currentHeight < 15) {
-      // Snap to collapsed (minimum)
-      targetHeight = MIN_HEIGHT;
-    } else if (currentHeight > 60) {
-      // Snap to expanded (max based on content)
-      targetHeight = MAX_HEIGHT;
+    console.log('[NAV DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy);
+
+    // Smart snapping based on current position and velocity
+    // Consider both where we are and where we're going
+    // Three states: MIN (5%) -> DEFAULT (39%) -> MAX (90%)
+    
+    if (Math.abs(vy) > 0.5) {
+      // Fast swipe detected
+      if (vy < 0) {
+        // Fast upward swipe
+        if (currentHeight < DEFAULT_HEIGHT - 5) {
+          // From collapsed/below DEFAULT - snap to DEFAULT
+          targetHeight = DEFAULT_HEIGHT;
+          console.log('[NAV DRAG] ⬆️ Fast swipe UP from collapsed - Snapping to DEFAULT');
+        } else if (currentHeight <= DEFAULT_HEIGHT + 5) {
+          // From around DEFAULT - snap to MAX
+          targetHeight = MAX_HEIGHT;
+          console.log('[NAV DRAG] ⬆️ Fast swipe UP from DEFAULT - Snapping to EXPANDED (MAX_HEIGHT)');
+        } else {
+          // Already above DEFAULT - snap to MAX
+          targetHeight = MAX_HEIGHT;
+          console.log('[NAV DRAG] ⬆️ Fast swipe UP from upper position - Snapping to EXPANDED (MAX_HEIGHT)');
+        }
+      } else {
+        // Fast downward swipe
+        if (currentHeight > DEFAULT_HEIGHT + 10) {
+          // From well above DEFAULT - snap to DEFAULT
+          targetHeight = DEFAULT_HEIGHT;
+          console.log('[NAV DRAG] ⬇️ Fast swipe DOWN from upper position - Snapping to DEFAULT');
+        } else {
+          // From DEFAULT or below - snap to MIN
+          targetHeight = MIN_HEIGHT;
+          console.log('[NAV DRAG] ⬇️ Fast swipe DOWN from DEFAULT/lower - Snapping to COLLAPSED (MIN_HEIGHT)');
+        }
+      }
     } else {
-      // Snap to default
-      targetHeight = DEFAULT_HEIGHT;
+      // Slow drag - snap based on position
+      if (currentHeight < 22) {
+        targetHeight = MIN_HEIGHT;
+        console.log('[NAV DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
+      } else if (currentHeight > 60) {
+        targetHeight = MAX_HEIGHT;
+        console.log('[NAV DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
+      } else {
+        targetHeight = DEFAULT_HEIGHT;
+        console.log('[NAV DRAG] 🔄 Snapping to DEFAULT height');
+      }
     }
 
     setContainerHeight(targetHeight);
     setTempHeight(null);
+    console.log('[NAV DRAG] ✅ Final height set to:', targetHeight);
   };
 
-  const handleDrag = (_gestureState: { dy: number; vy: number }) => {
-    // This is called on drag end
-    handleDragEnd();
+  const handleDragEnd = () => {
+    // Do nothing - all snapping logic is handled in handleDrag
+    // This is called after handleDrag by the Frame component
+    // We don't want to override the snap decision made in handleDrag
   };
 
   return {
@@ -552,6 +597,7 @@ export default function NavigationPage() {
     containerHeight,
     handleDrag,
     handleDragMove,
+    handleDragEnd,
     dragStartY,
     dragStartTime,
     isDragging,
@@ -1178,7 +1224,7 @@ export default function NavigationPage() {
         <View
           style={{
             marginHorizontal: 10,
-            marginTop: 12,
+            marginTop: 40,
             borderRadius: 12,
             backgroundColor: '#FFFFFF',
             padding: 12,
@@ -1434,7 +1480,11 @@ export default function NavigationPage() {
             }
           }}
         >
-          <Frame />
+          <Frame 
+            onDrag={handleDrag}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          />
           <ScrollView
             scrollEnabled={containerHeight > 60}
             showsVerticalScrollIndicator={containerHeight > 60}
