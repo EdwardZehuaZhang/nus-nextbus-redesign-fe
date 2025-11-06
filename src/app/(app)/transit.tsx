@@ -360,7 +360,13 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
           value={searchText}
           onChangeText={setSearchText}
           onFocus={handleFocus}
-          style={{ outlineWidth: 0 }}
+          style={{
+            outlineWidth: 0,
+            // @ts-ignore - Web-specific properties to remove Safari focus outline
+            outlineStyle: 'none',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+          } as any}
         />
       </View>
     </Pressable>
@@ -431,17 +437,17 @@ const PopularSearchCard = ({
 }) => {
   return (
     <Pressable
-      className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
-      style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
       onPress={onPress}
+      style={showAllPopular ? { flex: 1 } : { flex: 1, minWidth: 150 }}
     >
-      <View className="relative size-full">
+      <View className="relative h-[116px] overflow-hidden rounded-md">
         <Image
           source={{ uri: item.image }}
-          className="size-full"
-          style={{ resizeMode: 'cover' }}
+          contentFit="cover"
+          className="absolute inset-0 size-full"
+          style={{ borderRadius: 6 }}
+          placeholder={undefined}
         />
-        <View className="absolute inset-0 bg-black/40" />
         <View className="absolute inset-x-0 bottom-0 p-3">
           <Text className="text-lg font-bold leading-tight text-white">
             {item.title}
@@ -1125,20 +1131,19 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       : popularSearches.slice(0, 3);
 
     if (showAllPopular) {
+      // Create rows with 2 items each
+      const rows: PopularSearchItem[][] = [];
+      for (let i = 0; i < displayItems.length; i += 2) {
+        rows.push(displayItems.slice(i, i + 2));
+      }
+
       return (
         <View className="w-full" style={{ gap: 8 }}>
-          <View className="w-full flex-row" style={{ gap: 8 }}>
-            <View className="flex-1" style={{ gap: 8 }}>
-              {displayItems
-                .filter((_, index) => index % 2 === 0)
-                .map((item) => renderPopularItem(item))}
+          {rows.map((row, rowIndex) => (
+            <View key={rowIndex} className="flex-row" style={{ gap: 8 }}>
+              {row.map((item) => renderPopularItem(item))}
             </View>
-            <View className="flex-1" style={{ gap: 8 }}>
-              {displayItems
-                .filter((_, index) => index % 2 === 1)
-                .map((item) => renderPopularItem(item))}
-            </View>
-          </View>
+          ))}
         </View>
       );
     }
@@ -1147,7 +1152,8 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 8 }}
+        contentContainerStyle={{ gap: 8, paddingRight: 20 }}
+        style={{ marginLeft: -20, marginRight: -20, paddingLeft: 20 }}
       >
         {displayItems.map((item) => renderPopularItem(item))}
       </ScrollView>
@@ -1167,7 +1173,13 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             value={searchText}
             onChangeText={setSearchText}
             autoFocus={true}
-            style={{ outlineWidth: 0 }}
+            style={{
+              outlineWidth: 0,
+              // @ts-ignore - Web-specific properties to remove Safari focus outline
+              outlineStyle: 'none',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+            } as any}
           />
         </View>
         <Pressable onPress={onCancel}>
@@ -1258,30 +1270,26 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
                   <Text className="text-sm font-medium text-neutral-500">
                     Recents
                   </Text>
-                  {recentSearches.length > 3 && (
-                    <Pressable onPress={() => setShowAllRecent(!showAllRecent)}>
-                      <Text
-                        className="text-sm font-medium"
-                        style={{ color: '#274F9C' }}
-                      >
-                        {showAllRecent ? 'View Less' : 'View More'}
-                      </Text>
-                    </Pressable>
-                  )}
+                  <Pressable onPress={() => setShowAllRecent(!showAllRecent)}>
+                    <Text
+                      className="text-sm font-medium"
+                      style={{ color: '#274F9C' }}
+                    >
+                      {showAllRecent ? 'View Less' : 'View More'}
+                    </Text>
+                  </Pressable>
                 </View>
-                <View>
-                  {(showAllRecent
-                    ? recentSearches
-                    : recentSearches.slice(0, 3)
-                  ).map((item, index, array) => (
-                    <RecentSearchCard
-                      key={item.id}
-                      item={item}
-                      isLast={index === array.length - 1}
-                      onPress={() => handleRecentPress(item)}
-                    />
-                  ))}
-                </View>
+                {(showAllRecent
+                  ? recentSearches
+                  : recentSearches.slice(0, 3)
+                ).map((item, index, array) => (
+                  <RecentSearchCard
+                    key={item.id}
+                    item={item}
+                    isLast={index === array.length - 1}
+                    onPress={() => handleRecentPress(item)}
+                  />
+                ))}
               </View>
             )}
 

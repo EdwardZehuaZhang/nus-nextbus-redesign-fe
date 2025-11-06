@@ -293,21 +293,41 @@ export default function SearchPage() {
       });
     };
 
+    const itemWidth = showAllPopular ? '100%' : 154;
+    const itemHeight = 116;
+
     return (
-      <Pressable
-        key={item.id}
-        className="overflow-hidden rounded-md border border-neutral-200 shadow-sm"
-        style={{ width: showAllPopular ? '100%' : 154, height: 116 }}
-        onPress={handleNavigationPress}
-      >
-        <View className="relative size-full">
+      <Pressable key={item.id} onPress={handleNavigationPress}>
+        <View
+          style={{
+            width: itemWidth,
+            height: itemHeight,
+            borderRadius: 6,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
           <Image
             source={{ uri: item.image }}
-            className="size-full"
-            style={{ resizeMode: 'cover' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              resizeMode: 'cover',
+            }}
+            placeholder={undefined}
           />
-          <View className="absolute inset-0 bg-black/40" />
-          <View className="absolute inset-x-0 bottom-0 p-3">
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              padding: 12,
+            }}
+          >
             <Text className="text-lg font-bold leading-tight text-white">
               {item.title}
             </Text>
@@ -389,7 +409,13 @@ export default function SearchPage() {
                 value={searchText}
                 onChangeText={setSearchText}
                 autoFocus={true}
-                style={{ outlineWidth: 0 }}
+                style={{
+                  outlineWidth: 0,
+                  // @ts-ignore - Web-specific properties to remove Safari focus outline
+                  outlineStyle: 'none',
+                  outline: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                } as any}
               />
             </View>
             <Pressable onPress={handleCancel}>
