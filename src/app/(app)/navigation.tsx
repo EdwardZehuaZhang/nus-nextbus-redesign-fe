@@ -278,7 +278,7 @@ const useDragHandlers = () => {
   const isDragging = React.useRef(false);
 
   const MIN_HEIGHT = 5; // Minimum height - just frame visible
-  const MAX_HEIGHT = 90; // Maximum height - based on content
+  const MAX_HEIGHT = 75; // Maximum height - reduced to better fit content
   const DEFAULT_HEIGHT = 39; // Default state
 
   const handleDragMove = (dy: number) => {
@@ -317,7 +317,7 @@ const useDragHandlers = () => {
 
     // Smart snapping based on current position and velocity
     // Consider both where we are and where we're going
-    // Three states: MIN (5%) -> DEFAULT (39%) -> MAX (90%)
+    // Three states: MIN (5%) -> DEFAULT (39%) -> MAX (75%)
     
     if (Math.abs(vy) > 0.5) {
       // Fast swipe detected
@@ -353,7 +353,7 @@ const useDragHandlers = () => {
       if (currentHeight < 22) {
         targetHeight = MIN_HEIGHT;
         console.log('[NAV DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
-      } else if (currentHeight > 60) {
+      } else if (currentHeight > 50) {
         targetHeight = MAX_HEIGHT;
         console.log('[NAV DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
       } else {
@@ -1448,12 +1448,12 @@ export default function NavigationPage() {
               inputRange: [0, 1],
               outputRange: [5, 10],
             }) as any,
-            height: searchPanelAnimation.interpolate({
+            maxHeight: searchPanelAnimation.interpolate({
               inputRange: [0, 1],
               outputRange: [
-                panelState === 'expanded' ? '85%' : `${containerHeight}%`, 
-                '85%'
-              ], // If already expanded, stay at 85%, otherwise expand from containerHeight to 85%
+                panelState === 'expanded' ? '75%' : `${containerHeight}%`, 
+                '75%'
+              ], // If already expanded, stay at 75%, otherwise expand from containerHeight to 75%
             }) as any,
           }}
           onTouchStart={(e: any) => {
@@ -1490,8 +1490,8 @@ export default function NavigationPage() {
             onDragEnd={handleDragEnd}
           />
           <ScrollView
-            scrollEnabled={containerHeight > 60}
-            showsVerticalScrollIndicator={containerHeight > 60}
+            scrollEnabled={containerHeight > 50}
+            showsVerticalScrollIndicator={containerHeight > 50}
             style={{ marginTop: 12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
           >

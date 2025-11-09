@@ -1389,7 +1389,7 @@ const useDragHandlers = () => {
   const isDragging = React.useRef(false);
 
   const MIN_HEIGHT = 10; // Minimum height - just search bar visible
-  const MAX_HEIGHT = 85; // Maximum height - like search mode
+  const MAX_HEIGHT = 70; // Maximum height - reduced to better fit content
   const DEFAULT_HEIGHT = 45; // Default state
 
   const handleDragMove = (dy: number) => {
@@ -1429,7 +1429,7 @@ const useDragHandlers = () => {
 
     // Smart snapping based on current position and velocity
     // Consider both where we are and where we're going
-    // Three states: MIN (10%) -> DEFAULT (45%) -> MAX (85%)
+    // Three states: MIN (10%) -> DEFAULT (45%) -> MAX (70%)
     
     if (Math.abs(vy) > 0.5) {
       // Fast swipe detected
@@ -1471,7 +1471,7 @@ const useDragHandlers = () => {
         targetHeight = MIN_HEIGHT;
         collapsed = true;
         console.log('[DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
-      } else if (currentHeight > 65) {
+      } else if (currentHeight > 55) {
         targetHeight = MAX_HEIGHT;
         collapsed = false;
         console.log('[DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
@@ -1573,13 +1573,13 @@ const useDragHandlers = () => {
 
   const animatedStyle = isSearchMode
     ? {
-        height: heightAnimation.interpolate({
+        maxHeight: heightAnimation.interpolate({
           inputRange: [DEFAULT_HEIGHT, MAX_HEIGHT],
           outputRange: [`${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
         }),
       }
     : {
-        height: `${containerHeight}%` as any,
+        maxHeight: `${containerHeight}%` as any,
         transform: [
           {
             translateY: translateY.interpolate({
