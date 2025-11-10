@@ -118,8 +118,8 @@ interface InteractiveMapProps {
 // coordinate to try first so the map appears higher on the screen (accounts
 // for the bottom panel overlay).
 const DEFAULT_REGION = {
-  latitude: 1.3965033959396037,
-  longitude: 103.77708613739266,
+  latitude: 1.295123780071173,
+  longitude: 103.77776037392553,
   latitudeDelta: 0.01,
   longitudeDelta: 0.01,
 };
@@ -562,20 +562,34 @@ const useGoogleMapsInit = (
 
   useEffect(() => {
     if (!isLoaded || !mapContainerRef.current || !window.google) {
+      console.log('[MAP INIT] ⏸️ Not ready - isLoaded:', isLoaded, 'hasContainer:', !!mapContainerRef.current, 'hasGoogle:', !!window.google);
       return;
     }
 
     if (!mapRef.current) {
+      console.log('[MAP INIT] 🗺️ Creating map instance with initialRegion:', {
+        lat: initialRegion.latitude,
+        lng: initialRegion.longitude,
+        hasRoutePolyline
+      });
       try {
         mapRef.current = createMapInstance(
           mapContainerRef.current,
           initialRegion
         );
+        console.log('[MAP INIT] ✅ Map instance created successfully at:', {
+          lat: initialRegion.latitude,
+          lng: initialRegion.longitude
+        });
         addCoordinateListener(mapRef.current);
         // Move the chosen target slightly upward on the viewport so it isn't
         // obscured by the bottom panel. Offset value can be tuned if needed.
         // Skip vertical offset if we have a route polyline (it will fitBounds instead)
         if (!hasRoutePolyline) {
+          console.log('[MAP INIT] 📍 Applying vertical offset to:', {
+            lat: initialRegion.latitude,
+            lng: initialRegion.longitude
+          });
           try {
             applyVerticalOffset(
               mapRef.current,
@@ -583,16 +597,23 @@ const useGoogleMapsInit = (
               200 // increase offset so the focal point appears higher on the viewport
             );
           } catch (e) {
-            // ignore
+            console.error('[MAP INIT] ❌ Error applying vertical offset:', e);
           }
+        } else {
+          console.log('[MAP INIT] ⏭️ Skipping vertical offset (has route polyline)');
         }
         if (mapContainerRef.current) {
           preventContextMenu(mapContainerRef.current);
         }
         setIsMapCreated(true);
       } catch (error) {
-        console.error('Error creating map:', error);
+        console.error('[MAP INIT] ❌ Error creating map:', error);
       }
+    } else {
+      console.log('[MAP INIT] ℹ️ Map already exists, initialRegion changed to:', {
+        lat: initialRegion.latitude,
+        lng: initialRegion.longitude
+      });
     }
   }, [isLoaded, initialRegion, mapContainerRef, hasRoutePolyline]);
 
@@ -600,11 +621,18 @@ const useGoogleMapsInit = (
   // Skip this if we have a route polyline (the polyline hook will handle bounds)
   useEffect(() => {
     if (mapRef.current && isMapCreated && !hasRoutePolyline) {
+      console.log('[MAP PAN] 📍 Panning to new center:', {
+        lat: initialRegion.latitude,
+        lng: initialRegion.longitude,
+        zoom: 15
+      });
       mapRef.current.panTo({
         lat: initialRegion.latitude,
         lng: initialRegion.longitude,
       });
       mapRef.current.setZoom(15); // Zoom level for city-scale view
+    } else {
+      console.log('[MAP PAN] ⏭️ Skipping pan - mapCreated:', isMapCreated, 'hasRoutePolyline:', hasRoutePolyline);
     }
   }, [
     initialRegion.latitude,

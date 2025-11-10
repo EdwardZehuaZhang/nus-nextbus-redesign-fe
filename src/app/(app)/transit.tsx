@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import React from 'react';
 import { Animated, TextInput } from 'react-native';
 
@@ -1677,6 +1677,7 @@ const useDragHandlers = () => {
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(
@@ -1866,21 +1867,23 @@ export default function TransitPage() {
       </Animated.View>
 
       {/* Map controls - rendered at top level to ensure proper z-index stacking */}
-      <View
-        style={{
-          position: 'absolute' as any,
-          top: 40,
-          right: 20,
-          zIndex: 99999,
-        }}
-        pointerEvents="box-none"
-      >
-        <MapTypeSelector
-          onMapTypeChange={handleMapTypeChange}
-          onFilterChange={handleFilterChange}
-          filters={mapFilters}
-        />
-      </View>
+      {pathname === '/transit' && (
+        <View
+          style={{
+            position: 'absolute' as any,
+            top: 40,
+            right: 20,
+            zIndex: 99999,
+          }}
+          pointerEvents="box-none"
+        >
+          <MapTypeSelector
+            onMapTypeChange={handleMapTypeChange}
+            onFilterChange={handleFilterChange}
+            filters={mapFilters}
+          />
+        </View>
+      )}
     </View>
   );
 }

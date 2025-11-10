@@ -1206,12 +1206,18 @@ export default function NavigationPage() {
           initialRegion={
             userLocation
               ? {
-                  latitude: userLocation.latitude - 0.044,
+                  latitude: userLocation.latitude,
                   longitude: userLocation.longitude,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }
-              : undefined
+              : {
+                  // Default to NUS center when no user location
+                  latitude: 1.295123780071173,
+                  longitude: 103.77776037392553,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }
           }
           showLandmarks={false}
           showMapControls={false}
@@ -1734,7 +1740,7 @@ export default function NavigationPage() {
               <Text
                 style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}
               >
-                28 Mins
+                {bestInternalRoute ? `${Math.ceil(bestInternalRoute.totalTime / 60)} Mins` : '28 Mins'}
               </Text>
 
               <View
@@ -1906,7 +1912,10 @@ export default function NavigationPage() {
                     const lineName = bestInternalRoute.routeCode;
                     const boardingStop = bestInternalRoute.departureStop.caption;
                     const alightingStop = bestInternalRoute.arrivalStop.caption;
-                    const waitMinutes = Math.ceil(bestInternalRoute.waitingTime / 60);
+                    // Calculate actual wait time at bus stop (bus arrival time - walk time)
+                    const actualWaitTime = Math.max(0, bestInternalRoute.waitingTime - bestInternalRoute.walkToStopTime);
+                    const waitMinutes = Math.ceil(actualWaitTime / 60);
+                    const busArrivalMinutes = Math.ceil(bestInternalRoute.waitingTime / 60);
                     const rideMinutes = Math.ceil(bestInternalRoute.busTravelTime / 60);
 
                     return (
