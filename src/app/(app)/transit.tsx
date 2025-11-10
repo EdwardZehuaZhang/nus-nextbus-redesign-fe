@@ -805,12 +805,21 @@ const NearestStopsSection = ({
   // Get user's current location
   const { coords: userLocation, error: locationError, loading: locationLoading } = useLocation();
 
+  // Fallback to SDE3 coordinates if geolocation fails
+  const SDE3_FALLBACK_COORDS: LocationCoords = {
+    latitude: 1.2976164142477022,
+    longitude: 103.77048361789565,
+  };
+
+  // Use actual location if available, otherwise fall back to SDE3
+  const effectiveLocation = userLocation || (locationError ? SDE3_FALLBACK_COORDS : null);
+
   // Fetch all bus stops from the API
   const { data: busStopsData } = useBusStops();
 
   // Calculate nearest stops based on user location
   const nearestStops = React.useMemo(() => {
-    if (!userLocation || !busStopsData?.BusStopsResult?.busstops) {
+    if (!effectiveLocation || !busStopsData?.BusStopsResult?.busstops) {
       // Return empty array if no location - we'll show error message instead
       return [];
     }
@@ -818,8 +827,8 @@ const NearestStopsSection = ({
     const stops = busStopsData.BusStopsResult.busstops
       .map((stop) => {
         const distance = calculateDistance({
-          lat1: userLocation.latitude,
-          lon1: userLocation.longitude,
+          lat1: effectiveLocation.latitude,
+          lon1: effectiveLocation.longitude,
           lat2: stop.latitude,
           lon2: stop.longitude,
         });
@@ -834,7 +843,7 @@ const NearestStopsSection = ({
       .slice(0, 2); // Get the 2 nearest stops
 
     return stops;
-  }, [userLocation, busStopsData]);
+  }, [effectiveLocation, busStopsData]);
 
   // Update activeTab when nearest stops change (only if current tab is not in nearest stops)
   React.useEffect(() => {
