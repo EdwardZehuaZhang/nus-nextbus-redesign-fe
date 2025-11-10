@@ -4815,6 +4815,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const previousActiveRouteRef = useRef<RouteCode | null>(null);
   const isSyncingFromActiveRouteRef = useRef(false); // Track if we're syncing from activeRoute to prevent loops
+  const savedFilterStateRef = useRef<Record<string, boolean> | null>(null); // Save filter state before route selection
 
   // Map filter state - use external state if provided, otherwise use internal state with localStorage persistence
   const [internalMapFilters, setInternalMapFilters] = useState<
@@ -4850,21 +4851,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Use external filters if provided, otherwise use internal state
   const mapFilters = externalMapFilters || internalMapFilters;
-  const setMapFilters = (filters: Record<string, boolean>) => {
-    if (onMapFiltersChange) {
-      onMapFiltersChange(filters);
-    } else {
-      setInternalMapFilters(filters);
-      try {
-        localStorage.setItem(
-          'nus-nextbus-map-filters',
-          JSON.stringify(filters)
-        );
-      } catch (error) {
-        console.error('Error saving map filters:', error);
+  const setMapFilters = React.useCallback(
+    (filters: Record<string, boolean>) => {
+      if (onMapFiltersChange) {
+        onMapFiltersChange(filters);
+      } else {
+        setInternalMapFilters(filters);
+        try {
+          localStorage.setItem(
+            'nus-nextbus-map-filters',
+            JSON.stringify(filters)
+          );
+        } catch (error) {
+          console.error('Error saving map filters:', error);
+        }
       }
-    }
-  };
+    },
+    [onMapFiltersChange]
+  );
 
   // Determine if landmarks should be shown based on filters
   const shouldShowLandmarks = mapFilters.important && showLandmarks;
@@ -4891,6 +4895,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     if (activeRoute && activeRoute !== previousActiveRoute) {
       // When a route is selected from "nearest stops" (new selection)
+      // Save the current filter state before making changes
+      if (!savedFilterStateRef.current) {
+        savedFilterStateRef.current = {
+          important: mapFilters.important || false,
+          academic: mapFilters.academic || false,
+          residences: mapFilters.residences || false,
+          'bus-stops': mapFilters['bus-stops'] || false,
+        };
+      }
+      
       // Update the filter panel to match
       isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
 
@@ -4906,6 +4920,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       // Select the active route in the filter
       updatedFilters[routeFilterKey] = true;
+      
+      // Also uncheck landmarks, academic, and residences when a route is selected from nearest stops
+      updatedFilters['important'] = false;
+      updatedFilters['academic'] = false;
+      updatedFilters['residences'] = false;
 
       setMapFilters(updatedFilters);
 
@@ -4917,7 +4936,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }, 100);
     } else if (!activeRoute && previousActiveRoute) {
       // When activeRoute becomes null (deselected from "nearest stops")
-      // Revert to "Bus Stops" as default
+      // Restore the saved filter state
       isSyncingFromActiveRouteRef.current = true; // Set flag to prevent loop
 
       const updatedFilters = { ...mapFilters };
@@ -4929,8 +4948,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }
       });
 
-      // Select "Bus Stops"
-      updatedFilters['bus-stops'] = true;
+      // Restore the previously saved state, or default to Bus Stops and Landmarks
+      if (savedFilterStateRef.current) {
+        updatedFilters['bus-stops'] = savedFilterStateRef.current['bus-stops'];
+        updatedFilters['important'] = savedFilterStateRef.current['important'];
+        updatedFilters['academic'] = savedFilterStateRef.current['academic'];
+        updatedFilters['residences'] = savedFilterStateRef.current['residences'];
+        
+        // Clear the saved state
+        savedFilterStateRef.current = null;
+      } else {
+        // Fallback to defaults if no saved state
+        updatedFilters['bus-stops'] = true;
+        updatedFilters['important'] = true;
+      }
 
       setMapFilters(updatedFilters);
 
@@ -4941,7 +4972,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         isSyncingFromActiveRouteRef.current = false;
       }, 100);
     }
-  }, [activeRoute]); // Only depend on activeRoute
+  }, [activeRoute, mapFilters, setMapFilters]); // Added mapFilters and setMapFilters to dependencies
 
   // When filter route is selected, notify parent to clear activeRoute
   React.useEffect(() => {

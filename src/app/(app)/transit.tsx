@@ -273,7 +273,6 @@ const BusRouteCard = ({
       }}
     >
       <View
-        className="flex-1"
         style={{
           borderWidth: isSelected ? 3 : 0,
           borderColor: isSelected ? route.color : 'transparent',
@@ -534,8 +533,16 @@ const FavoriteButton = ({
   onUpdate: () => void;
 }) => {
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editText, setEditText] = React.useState(`${item.from} - ${item.to}`);
+  const [editText, setEditText] = React.useState(
+    item.to ? `${item.from} - ${item.to}` : item.from
+  );
   const inputRef = React.useRef<TextInput>(null);
+  const hasSelectedText = React.useRef(false);
+
+  // Update editText when item changes
+  React.useEffect(() => {
+    setEditText(item.to ? `${item.from} - ${item.to}` : item.from);
+  }, [item.from, item.to]);
 
   const renderIcons = () => {
     if (item.icon === 'home-work') {
@@ -568,6 +575,10 @@ const FavoriteButton = ({
   };
 
   const handlePress = () => {
+    // Don't navigate if we're editing
+    if (isEditing) {
+      return;
+    }
     // Navigate to navigation page with the route and user location
     router.push({
       pathname: '/(app)/navigation',
@@ -585,13 +596,15 @@ const FavoriteButton = ({
     setIsEditing(true);
   };
 
-  // Select all text when entering edit mode
+  // Select all text when entering edit mode (only once)
   React.useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if (isEditing && inputRef.current && !hasSelectedText.current) {
+      hasSelectedText.current = true;
       // Small delay to ensure the input is focused first
       setTimeout(() => {
+        const currentText = editText;
         inputRef.current?.setNativeProps?.({
-          selection: { start: 0, end: editText.length },
+          selection: { start: 0, end: currentText.length },
         });
         // For web, use the DOM API
         if (typeof window !== 'undefined') {
@@ -602,63 +615,85 @@ const FavoriteButton = ({
         }
       }, 100);
     }
-  }, [isEditing, editText.length]);
+    // Reset the flag when exiting edit mode
+    if (!isEditing) {
+      hasSelectedText.current = false;
+    }
+  }, [isEditing]);
 
   const handleSaveEdit = () => {
-    // Parse the edited text to extract from and to
-    const parts = editText.split('-').map((s) => s.trim());
-    if (parts.length >= 2) {
-      const from = parts[0];
-      const to = parts.slice(1).join(' - '); // In case there are multiple dashes
-      updateFavoriteLabel(item.id, from, to);
+    if (!editText.trim()) {
+      // If empty, just cancel edit
       setIsEditing(false);
-      onUpdate(); // Refresh the favorites list
-    } else {
-      setIsEditing(false);
+      setEditText(item.to ? `${item.from} - ${item.to}` : item.from);
+      return;
     }
+
+    // Save the entire text as the label - split by dash if present, otherwise use as single label
+    const trimmedText = editText.trim();
+    const dashIndex = trimmedText.indexOf('-');
+    
+    if (dashIndex > 0) {
+      // Has a dash separator - split into from and to
+      const from = trimmedText.substring(0, dashIndex).trim();
+      const to = trimmedText.substring(dashIndex + 1).trim();
+      updateFavoriteLabel(item.id, from, to || item.to);
+    } else {
+      // No dash - use entire text as "from" and empty string as "to"
+      updateFavoriteLabel(item.id, trimmedText, '');
+    }
+    
+    setIsEditing(false);
+    onUpdate(); // Refresh the favorites list
   };
 
   return (
     <Pressable
       className="min-w-[64px] max-w-[140px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
       onPress={handlePress}
+      disabled={isEditing}
     >
       {renderIcons()}
       {isEditing ? (
-        <TextInput
-          ref={inputRef}
-          value={editText}
-          onChangeText={setEditText}
-          onBlur={handleSaveEdit}
-          onSubmitEditing={handleSaveEdit}
-          autoFocus
-          selectTextOnFocus
-          multiline
-          numberOfLines={2}
-          style={{
-            color: '#274F9C',
-            fontSize: 14,
-            fontWeight: '500',
-            textAlign: 'center',
-            lineHeight: 18,
-            minHeight: 36,
-            paddingVertical: 2,
-            fontFamily: 'Inter',
-            outline: 'none',
-          }}
-          className="w-full text-center"
-        />
-      ) : (
-        <Pressable onPress={handleTextPress}>
-          <Text
-            className="text-center text-sm font-medium leading-tight"
-            style={{ color: '#274F9C' }}
+        <View className="w-full" style={{ height: 36 }}>
+          <TextInput
+            ref={inputRef}
+            value={editText}
+            onChangeText={setEditText}
+            onBlur={handleSaveEdit}
+            onSubmitEditing={handleSaveEdit}
+            autoFocus
+            multiline
             numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {item.from} - {item.to}
-          </Text>
-        </Pressable>
+            style={{
+              color: '#274F9C',
+              fontSize: 14,
+              fontWeight: '500',
+              textAlign: 'center',
+              lineHeight: 18,
+              height: 36,
+              width: '100%',
+              paddingVertical: 0,
+              paddingHorizontal: 0,
+              fontFamily: 'Inter',
+              outline: 'none',
+            }}
+            className="w-full text-center"
+          />
+        </View>
+      ) : (
+        <View style={{ height: 36, width: '100%' }}>
+          <Pressable onPress={handleTextPress}>
+            <Text
+              className="text-center text-sm font-medium"
+              style={{ color: '#274F9C', lineHeight: 18 }}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {item.to ? `${item.from} - ${item.to}` : item.from}
+            </Text>
+          </Pressable>
+        </View>
       )}
     </Pressable>
   );
