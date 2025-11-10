@@ -4828,6 +4828,7 @@ const PlaceDetailsCompact: React.FC<{
 }> = ({ placeId, onClose, onDirections, colorMode = 'light', onLoadingChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const placeDetailsRef = useRef<HTMLElement | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [containerHeight, setContainerHeight] = useState<number>(80);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -4917,16 +4918,17 @@ const PlaceDetailsCompact: React.FC<{
           placeDetailsRef.current = placeDetails;
           console.log('[PlaceDetailsCompact] Successfully created place details UI');
           
-          // Observe container height changes to update button position
-          const resizeObserver = new ResizeObserver((entries) => {
+          // Observe the actual place details element height, not the container
+          resizeObserverRef.current = new ResizeObserver((entries) => {
             for (const entry of entries) {
               const height = entry.contentRect.height;
-              console.log('[PlaceDetailsCompact] Container height changed to:', height);
+              console.log('[PlaceDetailsCompact] Place details element height changed to:', height);
               setContainerHeight(height);
             }
           });
           
-          resizeObserver.observe(containerRef.current);
+          // Observe the actual gmp-place-details-compact element
+          resizeObserverRef.current.observe(placeDetails);
           
           // Set loading to false once the element is appended
           setIsLoading(false);
@@ -4979,15 +4981,19 @@ const PlaceDetailsCompact: React.FC<{
 
     return () => {
       console.log('[PlaceDetailsCompact] Cleaning up');
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
     };
   }, [placeId, colorMode]);
   
-  // Calculate button position based on container height
-  // Position it near the bottom of the container with some padding
-  const buttonTopPosition = Math.max(76, containerHeight - 50);
+  // Calculate button position based on actual place details height
+  // Ensure the button stays within the panel (56px is close button + directions button height)
+  // We want the button to be at the bottom but not overflow
+  const buttonTopPosition = Math.min(containerHeight - 36, Math.max(56, containerHeight - 50));
 
   return (
     <div style={{ position: 'relative' }}>
