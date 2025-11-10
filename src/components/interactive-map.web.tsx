@@ -112,6 +112,7 @@ interface InteractiveMapProps {
   onMapTypeChangeReady?: (
     handler: (mapType: google.maps.MapTypeId | 'dark' | 'light') => void
   ) => void; // Callback to receive map type change handler
+  enablePlaceDetails?: boolean; // Control place details compact element visibility (default true)
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -4749,16 +4750,19 @@ const useUserLocationMarker = (
 const usePlaceDetailsClick = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapCreated: boolean,
-  onPlaceSelected: (placeId: string | null) => void
+  onPlaceSelected: (placeId: string | null) => void,
+  enabled: boolean = true
 ) => {
   useEffect(() => {
     if (
+      !enabled ||
       !mapRef.current ||
       !isMapCreated ||
       typeof window === 'undefined' ||
       !window.google
     ) {
-      console.log('[PlaceDetailsClick] Not ready:', {
+      console.log('[PlaceDetailsClick] Not ready or disabled:', {
+        enabled,
         hasMap: !!mapRef.current,
         isMapCreated,
         hasWindow: typeof window !== 'undefined',
@@ -4863,7 +4867,7 @@ const usePlaceDetailsClick = (
         google.maps.event.removeListener(clickListener);
       }
     };
-  }, [mapRef, isMapCreated, onPlaceSelected]);
+  }, [mapRef, isMapCreated, onPlaceSelected, enabled]);
 };
 
 // PlaceDetailsCompact Component using Google Places UI Kit
@@ -5193,6 +5197,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   mapFilters: externalMapFilters,
   onMapFiltersChange,
   onMapTypeChangeReady,
+  enablePlaceDetails = true, // Default to true for backward compatibility
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -5610,7 +5615,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)
-  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceIdWithLogging); // Handle place clicks
+  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceIdWithLogging, enablePlaceDetails); // Handle place clicks
   usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
   useTiltControl(mapRef, isMapCreated); // Control 45-degree tilt in satellite/hybrid view based on zoom level
 
@@ -5813,7 +5818,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       )}
 
       {/* Place Details Compact Element */}
-      {selectedPlaceId && isMapCreated && (
+      {enablePlaceDetails && selectedPlaceId && isMapCreated && (
         <div
           style={{
             position: 'absolute',

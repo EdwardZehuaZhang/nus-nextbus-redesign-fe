@@ -1237,6 +1237,7 @@ export default function NavigationPage() {
           activeRoute={recommendInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
           showBusStops={recommendInternal} // Show bus stops when displaying internal route
           visibleBusStops={visibleBusStops} // Only show stops on the internal route
+          enablePlaceDetails={false} // Disable place details on navigation page
           mapFilters={{
             important: true,
             'bus-stops': false,
