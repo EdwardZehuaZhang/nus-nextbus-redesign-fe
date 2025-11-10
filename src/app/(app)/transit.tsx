@@ -274,12 +274,29 @@ const BusRouteCard = ({
     >
       <View
         style={{
-          borderWidth: isSelected ? 3 : 0,
-          borderColor: isSelected ? route.color : 'transparent',
+          position: 'relative',
           borderRadius: 6,
           overflow: 'hidden',
         }}
       >
+        {/* Selection indicator overlay - doesn't affect layout */}
+        {isSelected && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderWidth: 3,
+              borderColor: route.color,
+              borderRadius: 6,
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          />
+        )}
+        
         {/* Route Header */}
         <View
           className="h-8 items-center justify-center shadow-sm"
@@ -309,6 +326,7 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
       style={{
         borderBottomWidth: 1,
         borderLeftWidth: 1,
+        borderRightWidth: 1,
         borderColor: '#e5e5e5',
         borderBottomLeftRadius: 6,
         borderBottomRightRadius: 6,

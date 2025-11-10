@@ -43,7 +43,31 @@ declare global {
         React.HTMLAttributes<HTMLElement>,
         HTMLElement
       >;
+      'gmp-place-content-config': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
       'gmp-place-standard-content': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-display-name': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-formatted-address': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-rating': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-opening-hours': React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      >;
+      'gmp-place-photo-gallery': React.DetailedHTMLProps<
         React.HTMLAttributes<HTMLElement>,
         HTMLElement
       >;
@@ -4379,7 +4403,8 @@ const useFilteredBusRoutes = (
 const useLandmarkMarkers = (
   mapRef: React.RefObject<google.maps.Map | null>,
   isMapCreated: boolean,
-  activeRoute?: RouteCode | null
+  activeRoute?: RouteCode | null,
+  onPlaceSelected?: (placeId: string | null) => void
 ) => {
   const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
 
@@ -4477,8 +4502,42 @@ const useLandmarkMarkers = (
         `,
       });
 
-      marker.addListener('click', () => {
-        infoWindow.open(map, marker);
+      marker.addListener('click', async () => {
+        console.log('[LandmarkMarker] Clicked on:', landmark.name, 'Place ID:', landmark.placeId);
+        
+        // Use text search to find the place ID if we have coordinates
+        if (onPlaceSelected) {
+          try {
+            // Import the places library
+            const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+            
+            // Use findPlaceFromQuery to get the correct place ID
+            const service = new google.maps.places.PlacesService(map);
+            
+            const request = {
+              query: landmark.name + ', ' + landmark.address,
+              fields: ['place_id', 'name'],
+              locationBias: landmark.coordinates,
+            };
+            
+            service.findPlaceFromQuery(request, (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+                const placeId = results[0].place_id;
+                console.log('[LandmarkMarker] Found Place ID:', placeId, 'for', landmark.name);
+                onPlaceSelected(placeId);
+              } else {
+                console.error('[LandmarkMarker] Failed to find place:', status);
+                // Fallback to info window
+                infoWindow.open(map, marker);
+              }
+            });
+          } catch (error) {
+            console.error('[LandmarkMarker] Error finding place:', error);
+            infoWindow.open(map, marker);
+          }
+        } else {
+          infoWindow.open(map, marker);
+        }
       });
 
       landmarkMarkersRef.current.push(marker);
@@ -4651,27 +4710,107 @@ const usePlaceDetailsClick = (
       typeof window === 'undefined' ||
       !window.google
     ) {
+      console.log('[PlaceDetailsClick] Not ready:', {
+        hasMap: !!mapRef.current,
+        isMapCreated,
+        hasWindow: typeof window !== 'undefined',
+        hasGoogle: typeof window !== 'undefined' && !!window.google,
+      });
       return;
     }
 
     const map = mapRef.current;
+    console.log('[PlaceDetailsClick] Setting up click listener');
 
     // Add click listener to the map
     const clickListener = map.addListener(
       'click',
-      (event: google.maps.MapMouseEvent & { placeId?: string }) => {
+      async (event: google.maps.MapMouseEvent & { placeId?: string }) => {
+        console.log('[PlaceDetailsClick] Map clicked:', {
+          hasPlaceId: !!event.placeId,
+          placeId: event.placeId,
+          hasLatLng: !!event.latLng,
+          latLng: event.latLng?.toJSON(),
+        });
+
         if (event.placeId) {
           // User clicked on a POI (Point of Interest)
+          console.log('[PlaceDetailsClick] POI clicked, place ID:', event.placeId);
           event.stop(); // Prevent default info window
           onPlaceSelected(event.placeId);
+        } else if (event.latLng) {
+          // User clicked on a location without a POI - search for nearby places
+          console.log('[PlaceDetailsClick] Empty location clicked, searching nearby places');
+          try {
+            // Import the places library if not already loaded
+            console.log('[PlaceDetailsClick] Importing places library...');
+            const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+            console.log('[PlaceDetailsClick] Places library imported, Place class:', Place);
+
+            // Use searchNearby to find places at the clicked location
+            console.log('[PlaceDetailsClick] Calling searchNearby with:', {
+              center: event.latLng.toJSON(),
+              radius: 50,
+            });
+            
+            const { places } = await Place.searchNearby({
+              locationRestriction: {
+                center: event.latLng,
+                radius: 50, // Search within 50 meters of the clicked point
+              },
+              maxResultCount: 1, // Only get the closest place
+              fields: ['id', 'displayName', 'location'], // Required fields
+            });
+
+            console.log('[PlaceDetailsClick] searchNearby results:', {
+              placesCount: places?.length || 0,
+              firstPlaceId: places?.[0]?.id,
+            });
+
+            if (places && places.length > 0 && places[0].id) {
+              // Get the first (closest) place
+              console.log('[PlaceDetailsClick] Found nearby place, ID:', places[0].id);
+              onPlaceSelected(places[0].id);
+            } else {
+              // If no place found nearby, try geocoding the location
+              console.log('[PlaceDetailsClick] No nearby places, trying geocoding');
+              const geocoder = new google.maps.Geocoder();
+              geocoder.geocode({ location: event.latLng }, (geocodeResults, geocodeStatus) => {
+                console.log('[PlaceDetailsClick] Geocode results:', {
+                  status: geocodeStatus,
+                  resultsCount: geocodeResults?.length || 0,
+                  firstPlaceId: geocodeResults?.[0]?.place_id,
+                });
+
+                if (geocodeStatus === 'OK' && geocodeResults && geocodeResults.length > 0) {
+                  const result = geocodeResults[0];
+                  if (result.place_id) {
+                    console.log('[PlaceDetailsClick] Found place via geocoding, ID:', result.place_id);
+                    onPlaceSelected(result.place_id);
+                  }
+                } else {
+                  // No place found - close place details
+                  console.log('[PlaceDetailsClick] No place found, closing details');
+                  onPlaceSelected(null);
+                }
+              });
+            }
+          } catch (error) {
+            console.error('[PlaceDetailsClick] Error handling map click:', error);
+            onPlaceSelected(null);
+          }
         } else {
-          // User clicked on empty map area - close place details
+          // No location data - close place details
+          console.log('[PlaceDetailsClick] No location data, closing details');
           onPlaceSelected(null);
         }
       }
     );
 
+    console.log('[PlaceDetailsClick] Click listener added successfully');
+
     return () => {
+      console.log('[PlaceDetailsClick] Removing click listener');
       if (clickListener) {
         google.maps.event.removeListener(clickListener);
       }
@@ -4683,24 +4822,44 @@ const usePlaceDetailsClick = (
 const PlaceDetailsCompact: React.FC<{
   placeId: string;
   onClose: () => void;
-}> = ({ placeId, onClose }) => {
+  onDirections?: (placeId: string) => void;
+  colorMode?: 'light' | 'dark';
+  onLoadingChange?: (loading: boolean) => void;
+}> = ({ placeId, onClose, onDirections, colorMode = 'light', onLoadingChange }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const placeDetailsRef = useRef<HTMLElement | null>(null);
+  const [containerHeight, setContainerHeight] = useState<number>(80);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  console.log('[PlaceDetailsCompact] Rendering with placeId:', placeId, 'colorMode:', colorMode);
 
   useEffect(() => {
+    console.log('[PlaceDetailsCompact] useEffect triggered, placeId:', placeId);
+    
+    // Reset loading state when placeId changes
+    setIsLoading(true);
+    onLoadingChange?.(true);
+    
     if (
       !containerRef.current ||
       typeof window === 'undefined' ||
       !window.google
     ) {
+      console.log('[PlaceDetailsCompact] Not ready:', {
+        hasContainer: !!containerRef.current,
+        hasWindow: typeof window !== 'undefined',
+        hasGoogle: typeof window !== 'undefined' && !!window.google,
+      });
       return;
     }
 
     // Dynamically create the place details element
     const loadPlacesLibrary = async () => {
       try {
+        console.log('[PlaceDetailsCompact] Loading places library...');
         // Import the places library
         await google.maps.importLibrary('places');
+        console.log('[PlaceDetailsCompact] Places library loaded');
 
         // Create the custom elements
         const placeDetails = document.createElement(
@@ -4710,9 +4869,32 @@ const PlaceDetailsCompact: React.FC<{
           'gmp-place-details-place-request'
         ) as HTMLElement;
         const contentConfig = document.createElement(
-          'gmp-place-standard-content'
+          'gmp-place-content-config'
         ) as HTMLElement;
 
+        // Add all content elements from the example
+        const media = document.createElement('gmp-place-media');
+        media.setAttribute('lightbox-preferred', '');
+        
+        const rating = document.createElement('gmp-place-rating');
+        const type = document.createElement('gmp-place-type');
+        const price = document.createElement('gmp-place-price');
+        const accessibleEntrance = document.createElement('gmp-place-accessible-entrance-icon');
+        const openNowStatus = document.createElement('gmp-place-open-now-status');
+        
+        const attribution = document.createElement('gmp-place-attribution');
+        attribution.setAttribute('light-scheme-color', 'gray');
+        attribution.setAttribute('dark-scheme-color', 'white');
+        
+        contentConfig.appendChild(media);
+        contentConfig.appendChild(rating);
+        contentConfig.appendChild(type);
+        contentConfig.appendChild(price);
+        contentConfig.appendChild(accessibleEntrance);
+        contentConfig.appendChild(openNowStatus);
+        contentConfig.appendChild(attribution);
+
+        console.log('[PlaceDetailsCompact] Setting place ID:', placeId);
         // Set the place ID
         placeRequest.setAttribute('place', placeId);
 
@@ -4723,42 +4905,156 @@ const PlaceDetailsCompact: React.FC<{
         // Set attributes
         placeDetails.setAttribute('orientation', 'horizontal');
         placeDetails.setAttribute('truncation-preferred', '');
+        
+        // Force light mode using CSS (per documentation)
+        placeDetails.style.colorScheme = 'light';
 
         // Clear and append to container
         if (containerRef.current) {
+          console.log('[PlaceDetailsCompact] Appending to container');
           containerRef.current.innerHTML = '';
           containerRef.current.appendChild(placeDetails);
           placeDetailsRef.current = placeDetails;
+          console.log('[PlaceDetailsCompact] Successfully created place details UI');
+          
+          // Observe container height changes to update button position
+          const resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+              const height = entry.contentRect.height;
+              console.log('[PlaceDetailsCompact] Container height changed to:', height);
+              setContainerHeight(height);
+            }
+          });
+          
+          resizeObserver.observe(containerRef.current);
+          
+          // Set loading to false once the element is appended
+          setIsLoading(false);
+          onLoadingChange?.(false);
+          
+          // Wait for the component to render, then hide the attribution and link button
+          setTimeout(() => {
+            const hideElements = () => {
+              // Find and hide the Google Maps attribution text and info button
+              const attributionContainers = placeDetails.querySelectorAll('.container');
+              attributionContainers.forEach((container) => {
+                const attributionText = container.querySelector('.attribution-text');
+                const infoButton = container.querySelector('.info-button');
+                if (attributionText || infoButton) {
+                  (container as HTMLElement).style.display = 'none';
+                }
+              });
+              
+              // Also try to hide by querying directly
+              const attributionTexts = placeDetails.querySelectorAll('.attribution-text');
+              const infoButtons = placeDetails.querySelectorAll('.info-button');
+              attributionTexts.forEach((el) => {
+                (el as HTMLElement).style.display = 'none';
+                // Hide parent container too
+                if (el.parentElement) {
+                  (el.parentElement as HTMLElement).style.display = 'none';
+                }
+              });
+              infoButtons.forEach((el) => {
+                (el as HTMLElement).style.display = 'none';
+                // Hide parent container too
+                if (el.parentElement) {
+                  (el.parentElement as HTMLElement).style.display = 'none';
+                }
+              });
+            };
+            
+            // Try multiple times in case the content loads asynchronously
+            hideElements();
+            setTimeout(hideElements, 100);
+            setTimeout(hideElements, 500);
+          }, 100);
         }
       } catch (error) {
-        console.error('Error loading place details:', error);
+        console.error('[PlaceDetailsCompact] Error loading place details:', error);
       }
     };
 
     loadPlacesLibrary();
 
     return () => {
+      console.log('[PlaceDetailsCompact] Cleaning up');
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
     };
-  }, [placeId]);
+  }, [placeId, colorMode]);
+  
+  // Calculate button position based on container height
+  // Position it near the bottom of the container with some padding
+  const buttonTopPosition = Math.max(76, containerHeight - 50);
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Close button */}
+      {/* Loading spinner overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '120px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            zIndex: 999998,
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #4285f4',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
+      
+      {/* Place details container */}
+      <div
+        ref={containerRef}
+        style={{
+          minHeight: '80px',
+          width: '100%',
+          colorScheme: 'light',
+          // Force white background using CSS custom property from documentation
+          '--gmp-mat-color-surface': '#ffffff',
+          '--gmp-mat-color-on-surface': '#000000',
+          '--gmp-mat-color-on-surface-variant': '#666666',
+        } as React.CSSProperties}
+      />
+      
+      {/* Close button - positioned above the panel */}
       <button
         onClick={onClose}
         style={{
           position: 'absolute',
-          top: '8px',
-          right: '8px',
-          zIndex: 1,
+          top: '10px',
+          right: '10px',
+          zIndex: 999999,
           background: 'rgba(255, 255, 255, 0.95)',
           border: 'none',
           borderRadius: '50%',
-          width: '28px',
-          height: '28px',
+          width: '36px',
+          height: '36px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -4776,15 +5072,48 @@ const PlaceDetailsCompact: React.FC<{
       >
         ×
       </button>
-
-      {/* Place details container */}
-      <div
-        ref={containerRef}
-        style={{
-          minHeight: '80px',
-          width: '100%',
-        }}
-      />
+      
+      {/* Directions button - positioned dynamically based on container height */}
+      {onDirections && (
+        <button
+          onClick={() => onDirections(placeId)}
+          style={{
+            position: 'absolute',
+            top: `${buttonTopPosition}px`,
+            right: '10px',
+            zIndex: 999999,
+            background: 'rgba(66, 133, 244, 0.95)',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: 'white',
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+            gap: '6px',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(66, 133, 244, 1)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(66, 133, 244, 0.95)';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.2)';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <path
+              d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
+              fill="#FFFFFF"
+            />
+          </svg>
+          Directions
+        </button>
+      )}
     </div>
   );
 };
@@ -4813,6 +5142,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [isPlaceLoading, setIsPlaceLoading] = useState<boolean>(false);
+  const [currentMapType, setCurrentMapType] = useState<'light' | 'dark' | google.maps.MapTypeId>('light'); // Track map type for styling
+  
+  // Get user location for directions
+  const { coords: userLocation } = useLocation();
+  
+  // Add logging wrapper for setSelectedPlaceId
+  const setSelectedPlaceIdWithLogging = React.useCallback((placeId: string | null) => {
+    console.log('[InteractiveMap] setSelectedPlaceId called with:', placeId);
+    setSelectedPlaceId(placeId);
+    if (placeId) {
+      setIsPlaceLoading(true); // Start loading when a place is selected
+    } else {
+      setIsPlaceLoading(false); // Stop loading when cleared
+    }
+  }, []);
+  
+  // Log when selectedPlaceId changes
+  useEffect(() => {
+    console.log('[InteractiveMap] selectedPlaceId changed to:', selectedPlaceId);
+  }, [selectedPlaceId]);
+  
   const previousActiveRouteRef = useRef<RouteCode | null>(null);
   const isSyncingFromActiveRouteRef = useRef(false); // Track if we're syncing from activeRoute to prevent loops
   const savedFilterStateRef = useRef<Record<string, boolean> | null>(null); // Save filter state before route selection
@@ -5192,7 +5543,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useLandmarkMarkers(
     mapRef,
     isMapCreated && shouldShowLandmarks,
-    effectiveActiveRoute
+    effectiveActiveRoute,
+    setSelectedPlaceIdWithLogging // Pass the callback to show Place UI Kit
   ); // Control landmarks with filter
   useBusStopMarkers(
     mapRef,
@@ -5204,12 +5556,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)
-  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceId); // Handle place clicks
+  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceIdWithLogging); // Handle place clicks
   usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
   useTiltControl(mapRef, isMapCreated); // Control 45-degree tilt in satellite/hybrid view based on zoom level
 
   const handleMapTypeChange = React.useCallback(
     (mapType: google.maps.MapTypeId | 'dark' | 'light') => {
+      setCurrentMapType(mapType); // Track current map type
       if (mapRef.current) {
         if (mapType === 'dark') {
           // Apply dark mode styles
@@ -5363,26 +5716,125 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       )}
 
+      {/* Loading Placeholder */}
+      {selectedPlaceId && isPlaceLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '84px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: currentMapType === 'dark' ? '#1e1e1e' : 'white',
+            borderRadius: '12px',
+            boxShadow: currentMapType === 'dark' 
+              ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
+            padding: '40px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: '120px',
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #274F9C',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }}
+          />
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* Place Details Compact Element */}
       {selectedPlaceId && isMapCreated && (
         <div
           style={{
             position: 'absolute',
-            bottom: '20px',
+            top: '84px', // Position below map controls with increased spacing
             left: '50%',
             transform: 'translateX(-50%)',
-            zIndex: 10000,
+            zIndex: 999999,
             width: '90%',
             maxWidth: '400px',
-            backgroundColor: 'white',
+            backgroundColor: currentMapType === 'dark' ? '#1e1e1e' : 'white',
             borderRadius: '12px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            boxShadow: currentMapType === 'dark' 
+              ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
             overflow: 'hidden',
+            pointerEvents: 'auto',
+            opacity: isPlaceLoading ? 0 : 1,
+            transition: 'opacity 0.3s ease-in-out',
           }}
+          onClick={() => console.log('[InteractiveMap] Place details container clicked')}
         >
           <PlaceDetailsCompact
             placeId={selectedPlaceId}
-            onClose={() => setSelectedPlaceId(null)}
+            colorMode="light"
+            onClose={() => {
+              console.log('[InteractiveMap] Close button clicked');
+              setSelectedPlaceIdWithLogging(null);
+            }}
+            onLoadingChange={(loading) => {
+              console.log('[InteractiveMap] Loading state changed:', loading);
+              setIsPlaceLoading(loading);
+            }}
+            onDirections={async (placeId) => {
+              console.log('[InteractiveMap] Directions button clicked for place:', placeId);
+              
+              try {
+                // Fetch place details using Google Places API
+                const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+                const place = new Place({
+                  id: placeId,
+                  requestedLanguage: 'en',
+                });
+                
+                // Fetch the required fields
+                await place.fetchFields({
+                  fields: ['displayName', 'formattedAddress', 'location'],
+                });
+                
+                const location = place.location;
+                const displayName = place.displayName;
+                const address = place.formattedAddress;
+                
+                console.log('[InteractiveMap] Place details fetched:', { displayName, address, location });
+                
+                // Get user location
+                const userLat = userLocation?.latitude?.toString() || '';
+                const userLng = userLocation?.longitude?.toString() || '';
+                
+                // Navigate to navigation page with proper parameters
+                if (typeof window !== 'undefined') {
+                  const params = new URLSearchParams({
+                    destination: displayName || 'Selected Location',
+                    destinationAddress: address || '',
+                    destinationLat: location?.lat().toString() || '',
+                    destinationLng: location?.lng().toString() || '',
+                    userLat: userLat,
+                    userLng: userLng,
+                  });
+                  
+                  window.location.href = `/(app)/navigation?${params.toString()}`;
+                }
+              } catch (error) {
+                console.error('[InteractiveMap] Error fetching place details:', error);
+              }
+            }}
           />
         </div>
       )}

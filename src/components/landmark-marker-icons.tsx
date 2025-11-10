@@ -39,6 +39,7 @@ export interface Landmark {
   address: string;
   coordinates: { lat: number; lng: number };
   type: 'hospital' | 'mrt' | 'library' | 'bus-terminal';
+  placeId?: string; // Google Maps Place ID
 }
 
 export const NUS_LANDMARKS: Landmark[] = [
@@ -47,24 +48,28 @@ export const NUS_LANDMARKS: Landmark[] = [
     address: '20 Lower Kent Ridge Rd, Singapore 119080',
     coordinates: { lat: 1.2984648, lng: 103.7760358 },
     type: 'hospital',
+    placeId: 'ChIJSRKyHlga2jER8FRSVqw1Px0',
   },
   {
     name: 'Kent Ridge MRT Station (CC24)',
     address: '301 South Buona Vista Rd, Singapore 118177',
     coordinates: { lat: 1.2934291, lng: 103.7846561 },
     type: 'mrt',
+    placeId: 'ChIJ_9hQHswb2jERDyOL3',
   },
   {
     name: 'NUS Central Library',
     address: '12 Kent Ridge Cres, Singapore 119275',
     coordinates: { lat: 1.2966106, lng: 103.7722558 },
     type: 'library',
+    placeId: 'ChIJ77M1mP4a2jERRfwA553Qz3E',
   },
   {
     name: 'Kent Ridge Bus Terminal',
     address: '37B Clementi Rd, Singapore 129762',
     coordinates: { lat: 1.2946866, lng: 103.7700484 },
     type: 'bus-terminal',
+    placeId: 'ChIJbQOuVPka2jERT0AKxPVa',
   },
 ];
 

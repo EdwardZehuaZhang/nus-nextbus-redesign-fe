@@ -52,14 +52,57 @@ export const usePickupPoints = (routeCode: RouteCode) => {
 /**
  * Hook to fetch shuttle service at a bus stop
  * Refetches frequently for real-time updates
+ * Uses dynamic polling: faster when buses are arriving soon, slower otherwise
  */
 export const useShuttleService = (busStopName: string, enabled = true) => {
   return useQuery({
     queryKey: ['shuttleService', busStopName],
     queryFn: () => getShuttleService(busStopName),
     enabled: enabled && !!busStopName,
-    staleTime: 10 * 1000, // 10 seconds
-    refetchInterval: 30 * 1000, // Refetch every 30 seconds for real-time updates
+    staleTime: 5 * 1000, // 5 seconds
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      
+      // If no data yet, use default interval
+      if (!data?.ShuttleServiceResult?.shuttles) {
+        return 30 * 1000; // 30 seconds default
+      }
+      
+      // Find the minimum arrival time across all shuttles
+      let minArrivalTime = Infinity;
+      
+      for (const shuttle of data.ShuttleServiceResult.shuttles) {
+        const arrivalTime = typeof shuttle.arrivalTime === 'string' 
+          ? parseInt(shuttle.arrivalTime, 10) 
+          : shuttle.arrivalTime;
+        
+        const nextArrivalTime = typeof shuttle.nextArrivalTime === 'string'
+          ? parseInt(shuttle.nextArrivalTime, 10)
+          : shuttle.nextArrivalTime;
+        
+        // Check arrivalTime
+        if (!isNaN(arrivalTime) && arrivalTime >= 0 && arrivalTime < minArrivalTime) {
+          minArrivalTime = arrivalTime;
+        }
+        
+        // Check nextArrivalTime
+        if (!isNaN(nextArrivalTime) && nextArrivalTime >= 0 && nextArrivalTime < minArrivalTime) {
+          minArrivalTime = nextArrivalTime;
+        }
+      }
+      
+      // Dynamic polling based on closest bus:
+      // - If bus arriving in ≤2 minutes: refresh every 5 seconds (to catch "Arr" state)
+      // - If bus arriving in 2-5 minutes: refresh every 15 seconds
+      // - Otherwise: refresh every 30 seconds
+      if (minArrivalTime <= 2) {
+        return 5 * 1000; // 5 seconds for imminent arrivals
+      } else if (minArrivalTime <= 5) {
+        return 15 * 1000; // 15 seconds for soon arrivals
+      } else {
+        return 30 * 1000; // 30 seconds for distant arrivals
+      }
+    },
   });
 };
 
