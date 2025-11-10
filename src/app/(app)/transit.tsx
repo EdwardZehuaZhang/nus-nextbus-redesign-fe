@@ -61,6 +61,7 @@ import {
 type BusRoute = {
   route: string;
   color: string;
+  isPublicBus?: boolean;
   times: {
     time: string;
     crowding: 'low' | 'medium' | 'high';
@@ -264,9 +265,12 @@ const BusRouteCard = ({
   isSelected?: boolean;
   onPress?: () => void;
 }) => {
+  const isDisabled = route.isPublicBus;
+  
   return (
     <Pressable
-      onPress={onPress}
+      onPress={isDisabled ? undefined : onPress}
+      disabled={isDisabled}
       style={{
         flex: 1,
         transform: isSelected ? [{ scale: 1.05 }] : [{ scale: 1 }],
@@ -888,6 +892,7 @@ const NearestStopsSection = ({
         return {
           route: routeName,
           color: routeColor,
+          isPublicBus: isPublicBus,
           times: [
             {
               time: formatArrivalTime(shuttle.arrivalTime),
@@ -1671,8 +1676,8 @@ export default function TransitPage() {
         important: true,
         academic: false,
         residences: false,
-        'bus-stops': false,
-        'bus-route-d2': true,
+        'bus-stops': true,
+        'bus-route-d2': false,
       };
 
       if (typeof window !== 'undefined') {
