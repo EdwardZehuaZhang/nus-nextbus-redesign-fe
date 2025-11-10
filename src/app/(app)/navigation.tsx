@@ -557,7 +557,7 @@ export default function NavigationPage() {
   console.log('[COMPONENT] 🔄 NavigationPage rendered');
   
   const router = useRouter();
-  const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng } = useLocalSearchParams();
+  const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng, destinationLat, destinationLng, destinationAddress } = useLocalSearchParams();
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -862,6 +862,16 @@ export default function NavigationPage() {
 
   // Helper to map destination names to coordinates (simplified for now)
   const getDestinationCoordinates = (dest: string): { lat: number; lng: number } | null => {
+    // First, check if we have coordinates from URL params (Google Places)
+    if (typeof destinationLat === 'string' && typeof destinationLng === 'string') {
+      const lat = parseFloat(destinationLat);
+      const lng = parseFloat(destinationLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        console.log('📍 Using destination coordinates from URL params:', { lat, lng });
+        return { lat, lng };
+      }
+    }
+    
     const destinations: Record<string, { lat: number; lng: number }> = {
       // Residential Colleges
       'COM1': { lat: 1.29453, lng: 103.77397 },
@@ -2086,33 +2096,6 @@ export default function NavigationPage() {
                       </View>
                     );
                   })()}
-
-                  {/* Live bus tracking info */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingTop: 12,
-                      paddingLeft: 36,
-                    }}
-                  >
-                    <Svg width={14} height={14} viewBox="0 0 20 20" fill="none">
-                      <Circle cx="10" cy="10" r="8" fill="#00B050" opacity={0.2} />
-                      <Circle cx="10" cy="10" r="4" fill="#00B050" />
-                    </Svg>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '400',
-                        color: '#737373',
-                        fontFamily: 'Inter',
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      Live bus position shown on map
-                    </Text>
-                  </View>
 
                   {/* Connecting line before walking */}
                   {bestInternalRoute.walkFromStopTime > 0 && (
