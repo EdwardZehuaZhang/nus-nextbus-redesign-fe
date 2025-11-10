@@ -21,7 +21,7 @@ const BusIconWrapper = ({ color }: { color?: string }) => (
       marginLeft: -5.5,
       marginRight: -5.5,
       backgroundColor: '#F5F5F5',
-      borderRadius: 97,
+      borderRadius: '97px',
       borderWidth: 1,
       borderColor: '#E5E5E5',
     }}

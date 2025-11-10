@@ -222,7 +222,7 @@ export const SwitchIcon = ({ checked = false }: IconProps) => {
           width: THUMB_WIDTH,
           position: 'absolute',
           backgroundColor: 'white',
-          borderRadius: 13,
+          borderRadius: '13px',
           right: 0,
         }}
         animate={{

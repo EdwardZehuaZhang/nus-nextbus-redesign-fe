@@ -279,7 +279,7 @@ const BusRouteCard = ({
       <View
         style={{
           position: 'relative',
-          borderRadius: 6,
+          borderRadius: '6px',
           overflow: 'hidden',
         }}
       >
@@ -294,7 +294,7 @@ const BusRouteCard = ({
               bottom: 0,
               borderWidth: 3,
               borderColor: route.color,
-              borderRadius: 6,
+              borderRadius: '6px',
               pointerEvents: 'none',
               zIndex: 10,
             }}
@@ -476,7 +476,7 @@ const PopularSearchCard = ({
           source={{ uri: item.image }}
           contentFit="cover"
           className="absolute inset-0 size-full"
-          style={{ borderRadius: 6 }}
+          style={{ borderRadius: '6px' }}
           placeholder={undefined}
         />
         <View className="absolute inset-x-0 bottom-0 p-3">
@@ -1874,8 +1874,8 @@ export default function TransitPage() {
             top: 40,
             right: 20,
             zIndex: 99999,
+            pointerEvents: 'box-none',
           }}
-          pointerEvents="box-none"
         >
           <MapTypeSelector
             onMapTypeChange={handleMapTypeChange}

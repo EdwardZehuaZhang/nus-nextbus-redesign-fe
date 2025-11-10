@@ -226,7 +226,7 @@ const loadGoogleMapsScript = (): Promise<void> => {
     }
 
     // Check if already loaded
-    if (window.google?.maps) {
+    if (window.google?.maps?.Map) {
       resolve();
       return;
     }
@@ -236,12 +236,19 @@ const loadGoogleMapsScript = (): Promise<void> => {
 
     if (existingScript) {
       // Script is loading, wait for it
-      existingScript.addEventListener('load', () => {
-        resolve();
-      });
-      existingScript.addEventListener('error', () =>
-        reject(new Error('Failed to load Google Maps'))
-      );
+      const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.Map) {
+          clearInterval(checkLoaded);
+          resolve();
+        }
+      }, 100);
+      
+      setTimeout(() => {
+        clearInterval(checkLoaded);
+        if (!window.google?.maps?.Map) {
+          reject(new Error('Google Maps failed to load in time'));
+        }
+      }, 10000);
       return;
     }
 
@@ -252,7 +259,20 @@ const loadGoogleMapsScript = (): Promise<void> => {
     script.defer = true;
 
     script.addEventListener('load', () => {
-      resolve();
+      // Wait for google.maps.Map to be available
+      const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.Map) {
+          clearInterval(checkLoaded);
+          resolve();
+        }
+      }, 100);
+      
+      setTimeout(() => {
+        clearInterval(checkLoaded);
+        if (!window.google?.maps?.Map) {
+          reject(new Error('Google Maps Map constructor not available'));
+        }
+      }, 10000);
     });
     script.addEventListener('error', () => {
       reject(new Error('Failed to load Google Maps'));

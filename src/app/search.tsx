@@ -302,7 +302,7 @@ export default function SearchPage() {
           style={{
             width: itemWidth,
             height: itemHeight,
-            borderRadius: 6,
+            borderRadius: '6px',
             overflow: 'hidden',
             position: 'relative',
           }}

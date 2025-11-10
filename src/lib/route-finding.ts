@@ -47,7 +47,7 @@ export interface InternalBusRoute {
   walkToStopTime: number; // seconds
   walkToStopDistance: number; // meters
   walkToStopRoute?: GoogleRoute; // actual walking directions from Google Maps
-  waitingTime: number; // seconds
+  waitingTime: number; // seconds - arrival time of the selected bus we're taking
   busArrivalTime: string; // when bus arrives at departure stop
   busTravelTime: number; // estimated travel time on bus
   walkFromStopTime: number; // walking time from arrival stop to final destination
@@ -55,6 +55,8 @@ export interface InternalBusRoute {
   walkFromStopRoute?: GoogleRoute; // actual walking directions to final destination
   totalTime: number; // total journey time in seconds
   canCatchBus: boolean; // whether user can make it in time
+  selectedBusVehiclePlate?: string; // vehicle plate of the bus we're taking
+  allBusArrivals?: { arrivalTime: number; vehiclePlate: string }[]; // all available bus timings
 }
 
 export interface RouteComparison {
@@ -235,12 +237,12 @@ async function routeConnectsStops(
 }
 
 /**
- * Get next bus arrival time at a stop
+ * Get all bus arrival times at a stop (up to 3 buses)
  */
-async function getNextBusArrival(
+async function getBusArrivals(
   stopName: string,
   routeCode: RouteCode
-): Promise<{ arrivalTime: number; vehiclePlate: string } | null> {
+): Promise<{ arrivalTime: number; vehiclePlate: string }[]> {
   try {
     const shuttleService = await getShuttleService(stopName);
     const shuttles = shuttleService.ShuttleServiceResult.shuttles;
@@ -249,24 +251,34 @@ async function getNextBusArrival(
       (shuttle) => shuttle.name === routeCode
     );
 
-    if (!routeShuttle || !routeShuttle.arrivalTime) {
-      return null;
+    if (!routeShuttle) {
+      return [];
     }
 
+    const arrivals: { arrivalTime: number; vehiclePlate: string }[] = [];
+
+    // First bus
     const arrivalMinutes = parseInt(routeShuttle.arrivalTime, 10);
-    
-    // If arrival time is negative or empty, no bus available
-    if (isNaN(arrivalMinutes) || arrivalMinutes < 0) {
-      return null;
+    if (!isNaN(arrivalMinutes) && arrivalMinutes >= 0) {
+      arrivals.push({
+        arrivalTime: arrivalMinutes * 60, // Convert to seconds
+        vehiclePlate: routeShuttle.arrivalTime_veh_plate || '',
+      });
     }
 
-    return {
-      arrivalTime: arrivalMinutes * 60, // Convert to seconds
-      vehiclePlate: routeShuttle.arrivalTime_veh_plate || '',
-    };
+    // Second bus
+    const nextArrivalMinutes = parseInt(routeShuttle.nextArrivalTime, 10);
+    if (!isNaN(nextArrivalMinutes) && nextArrivalMinutes >= 0) {
+      arrivals.push({
+        arrivalTime: nextArrivalMinutes * 60, // Convert to seconds
+        vehiclePlate: routeShuttle.nextArrivalTime_veh_plate || '',
+      });
+    }
+
+    return arrivals;
   } catch (error) {
     console.error(`Error getting shuttle service for ${stopName}:`, error);
-    return null;
+    return [];
   }
 }
 
@@ -390,16 +402,36 @@ export async function findInternalBusRoutes(
             // Continue with Haversine estimate if Google Maps fails
           }
 
-          // Get next bus arrival
-          const nextBus = await getNextBusArrival(departureStop.name, routeCode);
+          // Get all bus arrivals (up to 2 buses)
+          const busArrivals = await getBusArrivals(departureStop.name, routeCode);
 
-          if (!nextBus) continue;
+          if (busArrivals.length === 0) continue;
 
-          const waitingTime = nextBus.arrivalTime;
+          // Find the first bus the user can actually catch
+          // User needs walk time + buffer (2 min) to catch a bus
+          const minTimeNeeded = actualWalkToStopTime + BUS_CATCH_BUFFER;
           
-          // Check if user can catch the bus (using actual walking time)
-          const canCatchBus = actualWalkToStopTime + BUS_CATCH_BUFFER <= waitingTime;
+          let selectedBus = busArrivals[0]; // Default to first bus
+          let canCatchBus = minTimeNeeded <= busArrivals[0].arrivalTime;
+          
+          // If can't catch first bus, or if there's a better option, check next buses
+          if (!canCatchBus && busArrivals.length > 1) {
+            // Try to find a catchable bus
+            for (let i = 1; i < busArrivals.length; i++) {
+              if (minTimeNeeded <= busArrivals[i].arrivalTime) {
+                selectedBus = busArrivals[i];
+                canCatchBus = true;
+                break;
+              }
+            }
+            // If still can't catch any bus, use the last available bus (at least show realistic timing)
+            if (!canCatchBus) {
+              selectedBus = busArrivals[busArrivals.length - 1];
+            }
+          }
 
+          const waitingTime = selectedBus.arrivalTime;
+          
           // FIXED: Total time should be max(walk, wait) + bus + walk, not walk + wait + bus
           // If you walk 15 mins and bus arrives in 26 mins, you wait 11 mins (26-15), not 26 mins
           // Total = max(15, 26) + bus + walkFromStop = 26 + bus + walkFromStop
@@ -414,13 +446,15 @@ export async function findInternalBusRoutes(
             walkToStopDistance,
             walkToStopRoute, // Include Google Maps walking directions
             waitingTime,
-            busArrivalTime: new Date(Date.now() + nextBus.arrivalTime * 1000).toISOString(),
+            busArrivalTime: new Date(Date.now() + selectedBus.arrivalTime * 1000).toISOString(),
             busTravelTime: estimatedTravelTime,
             walkFromStopTime: actualWalkFromStopTime, // Use actual Google Maps time
             walkFromStopDistance,
             walkFromStopRoute, // Include Google Maps walking directions
             totalTime,
             canCatchBus,
+            selectedBusVehiclePlate: selectedBus.vehiclePlate, // Track which bus we're taking
+            allBusArrivals: busArrivals, // Include all bus timings for display
           };
           
           // console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {

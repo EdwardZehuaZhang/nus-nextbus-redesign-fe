@@ -364,7 +364,7 @@ const useDragHandlers = () => {
 
     setContainerHeight(targetHeight);
     setTempHeight(null);
-    console.log('[NAV DRAG] ✅ Final height set to:', targetHeight);
+    console.log('[NAV DRAG] �?Final height set to:', targetHeight);
   };
 
   const handleDragEnd = () => {
@@ -532,7 +532,7 @@ const IntermediateStops = ({
               style={{
                 width: 6,
                 height: 6,
-                borderRadius: 3,
+                borderRadius: '3px',
                 backgroundColor: isFirst || isLast ? '#211F26' : '#A3A3A3',
               }}
             />
@@ -741,13 +741,13 @@ export default function NavigationPage() {
     
     if (panelState === 'expanded') {
       // Already expanded, don't re-animate
-      console.log('[PANEL STATE] ✅ Already in EXPANDED state - skipping animation');
+      console.log('[PANEL STATE] �?Already in EXPANDED state - skipping animation');
       return;
     }
     
     if (panelState === 'animating') {
       // Start animation to expand
-      console.log('[PANEL STATE] 🎬 Starting animation to EXPAND (0 → 1)');
+      console.log('[PANEL STATE] 🎬 Starting animation to EXPAND (0 �?1)');
       Animated.spring(searchPanelAnimation, {
         toValue: 1,
         useNativeDriver: false,
@@ -756,12 +756,12 @@ export default function NavigationPage() {
         velocity: 2,
       }).start(() => {
         // Mark as fully expanded after animation completes
-        console.log('[PANEL STATE] ✨ Animation complete - setting state to EXPANDED');
+        console.log('[PANEL STATE] �?Animation complete - setting state to EXPANDED');
         setPanelState('expanded');
       });
     } else if (panelState === 'closed') {
       // Animate back to closed
-      console.log('[PANEL STATE] 📉 Animating back to CLOSED (1 → 0)');
+      console.log('[PANEL STATE] 📉 Animating back to CLOSED (1 �?0)');
       Animated.spring(searchPanelAnimation, {
         toValue: 0,
         useNativeDriver: false,
@@ -769,7 +769,7 @@ export default function NavigationPage() {
         friction: 10,
         velocity: 2,
       }).start(() => {
-        console.log('[PANEL STATE] ✅ Panel fully closed');
+        console.log('[PANEL STATE] �?Panel fully closed');
       });
     }
   }, [panelState, searchPanelAnimation]);
@@ -989,7 +989,7 @@ export default function NavigationPage() {
       }
 
       try {
-        console.log('🗺️ Generating polylines for internal route:', {
+        console.log('🗺�?Generating polylines for internal route:', {
           routeCode: bestInternalRoute.routeCode,
           departure: bestInternalRoute.departureStop.name,
           arrival: bestInternalRoute.arrivalStop.name
@@ -1004,13 +1004,13 @@ export default function NavigationPage() {
         );
 
         setInternalRoutePolylines(polylines);
-        console.log('✅ Internal route polylines generated:', {
+        console.log('�?Internal route polylines generated:', {
           walkToStopPoints: polylines.walkToStop.length,
           busSegmentPoints: polylines.busSegment.length,
           walkFromStopPoints: polylines.walkFromStop.length
         });
       } catch (error) {
-        console.error('❌ Error generating internal route polylines:', error);
+        console.error('�?Error generating internal route polylines:', error);
         setInternalRoutePolylines(null);
       }
     };
@@ -1245,7 +1245,7 @@ export default function NavigationPage() {
           style={{
             marginHorizontal: 10,
             marginTop: 40,
-            borderRadius: 12,
+            borderRadius: '12px',
             backgroundColor: '#FFFFFF',
             padding: 12,
             paddingHorizontal: 20,
@@ -1536,7 +1536,7 @@ export default function NavigationPage() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 8,
-                      borderRadius: 8,
+                      borderRadius: '8px',
                       borderWidth: 1,
                       borderColor: '#E5E5E5',
                       backgroundColor: '#FFFFFF',
@@ -1621,7 +1621,7 @@ export default function NavigationPage() {
                                   height: 36,
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  borderRadius: 18,
+                                  borderRadius: '18px',
                                   backgroundColor: '#F5F5F5',
                                   padding: 8,
                                 }}
@@ -1694,7 +1694,7 @@ export default function NavigationPage() {
                               height: 36,
                               alignItems: 'center',
                               justifyContent: 'center',
-                              borderRadius: 18,
+                              borderRadius: '18px',
                               backgroundColor: '#F5F5F5',
                               padding: 8,
                             }}
@@ -1751,7 +1751,7 @@ export default function NavigationPage() {
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderRadius: 6,
+                    borderRadius: '6px',
                     borderWidth: 1,
                     borderColor: '#E5E5E5',
                     backgroundColor: '#FFFFFF',
@@ -1788,9 +1788,9 @@ export default function NavigationPage() {
                 </View>
               )}
               {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && (
-                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
+                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: '8px', marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
-                    ❌ Error: {routeError}
+                    �?Error: {routeError}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
                     Destination: {currentDestination}
@@ -1915,6 +1915,7 @@ export default function NavigationPage() {
                     // Calculate actual wait time at bus stop (bus arrival time - walk time)
                     const actualWaitTime = Math.max(0, bestInternalRoute.waitingTime - bestInternalRoute.walkToStopTime);
                     const waitMinutes = Math.ceil(actualWaitTime / 60);
+                    // Use the bus arrival time (not wait time) - this is when the bus we're taking arrives
                     const busArrivalMinutes = Math.ceil(bestInternalRoute.waitingTime / 60);
                     const rideMinutes = Math.ceil(bestInternalRoute.busTravelTime / 60);
 
@@ -1955,7 +1956,7 @@ export default function NavigationPage() {
                                   flexDirection: 'row',
                                   alignItems: 'center',
                                   height: 37,
-                                  borderRadius: 5,
+                                  borderRadius: '5px',
                                   marginTop: 8,
                                 }}
                               >
@@ -2017,7 +2018,7 @@ export default function NavigationPage() {
                                         fontFamily: 'Inter',
                                       }}
                                     >
-                                      {waitMinutes} Min
+                                      {busArrivalMinutes} Min
                                     </Text>
                                     <CapacityIcons opacity={1} />
                                   </View>
@@ -2074,7 +2075,7 @@ export default function NavigationPage() {
                                         style={{
                                           width: 6,
                                           height: 6,
-                                          borderRadius: 3,
+                                          borderRadius: '3px',
                                           backgroundColor: '#A3A3A3',
                                         }}
                                       />
@@ -2415,7 +2416,7 @@ export default function NavigationPage() {
                                       flexDirection: 'row',
                                       alignItems: 'center',
                                       height: 37,
-                                      borderRadius: 5,
+                                      borderRadius: '5px',
                                     }}
                                   >
                                     {/* Bus Number Badge */}
@@ -2732,7 +2733,7 @@ export default function NavigationPage() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   gap: 4,
-                  borderRadius: 8,
+                  borderRadius: '8px',
                   backgroundColor: '#274F9C',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                   elevation: 1,
@@ -2765,7 +2766,7 @@ export default function NavigationPage() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   gap: 4,
-                  borderRadius: 8,
+                  borderRadius: '8px',
                   borderWidth: 1,
                   borderColor: favorited ? '#6B7280' : '#E5E5E5',
                   backgroundColor: favorited ? '#6B7280' : '#FFFFFF',

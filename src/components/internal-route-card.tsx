@@ -88,7 +88,7 @@ export function InternalRouteCard({
       onPress={onSelect}
       style={{
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: '12px',
         padding: 16,
         marginBottom: 12,
         borderWidth: isRecommended ? 2 : 1,
@@ -107,13 +107,13 @@ export function InternalRouteCard({
             backgroundColor: '#274F9C',
             paddingHorizontal: 8,
             paddingVertical: 4,
-            borderRadius: 6,
+            borderRadius: '6px',
             alignSelf: 'flex-start',
             marginBottom: 12,
           }}
         >
           <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600', fontFamily: 'Inter' }}>
-            âš¡ Fastest with Internal Bus
+            âš?Fastest with Internal Bus
           </Text>
         </View>
       )}
@@ -133,7 +133,7 @@ export function InternalRouteCard({
               backgroundColor: '#274F9C',
               paddingHorizontal: 12,
               paddingVertical: 6,
-              borderRadius: 8,
+              borderRadius: '8px',
             }}
           >
             <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700', fontFamily: 'Inter' }}>
@@ -171,7 +171,7 @@ export function InternalRouteCard({
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <BusIcon />
           <Text style={{ fontSize: 14, color: '#274F9C', flex: 1, fontWeight: '500', fontFamily: 'Inter' }}>
-            {route.routeCode} bus â€¢ {busMinutes} min to {route.arrivalStop.code}
+            {route.routeCode} bus â€?{busMinutes} min to {route.arrivalStop.code}
           </Text>
         </View>
 
@@ -193,7 +193,7 @@ export function InternalRouteCard({
             marginTop: 12,
             backgroundColor: '#FEF3C7',
             padding: 8,
-            borderRadius: 6,
+            borderRadius: '6px',
           }}
         >
           <Text style={{ fontSize: 12, color: '#92400E', fontFamily: 'Inter', fontWeight: '500' }}>
@@ -263,14 +263,14 @@ export function InternalRoutesSection({
           style={{
             backgroundColor: '#DCFCE7',
             padding: 12,
-            borderRadius: 8,
+            borderRadius: '8px',
             marginBottom: 12,
             borderLeftWidth: 4,
             borderLeftColor: '#16A34A',
           }}
         >
           <Text style={{ fontSize: 14, color: '#166534', fontWeight: '500', fontFamily: 'Inter' }}>
-            âœ… Taking the internal shuttle is faster than external transport!
+            âœ?Taking the internal shuttle is faster than external transport!
           </Text>
         </View>
       )}
