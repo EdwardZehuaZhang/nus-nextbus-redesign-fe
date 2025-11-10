@@ -1447,7 +1447,7 @@ const useDragHandlers = () => {
   const isDragging = React.useRef(false);
 
   const MIN_HEIGHT = 10; // Minimum height - just search bar visible
-  const MAX_HEIGHT = 70; // Maximum height - reduced to better fit content
+  const MAX_HEIGHT = 92; // Maximum height - allow nearly full screen expansion for small devices
   const DEFAULT_HEIGHT = 45; // Default state
 
   const handleDragMove = (dy: number) => {
