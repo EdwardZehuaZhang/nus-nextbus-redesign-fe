@@ -728,6 +728,19 @@ export default function NavigationPage() {
     enabled: !!effectiveOrigin && !!destinationCoords,
   });
 
+  // Log route comparison results
+  useEffect(() => {
+    if (bestInternalRoute && googleMapsTime) {
+      console.log('🔍 [ROUTE COMPARISON]', {
+        internalRouteTime: `${Math.ceil(bestInternalRoute.totalTime / 60)} min (${bestInternalRoute.totalTime}s)`,
+        googleMapsTime: `${Math.ceil(googleMapsTime / 60)} min (${googleMapsTime}s)`,
+        recommendInternal,
+        winner: recommendInternal ? '🚌 Internal Bus Route' : '🗺️ Google Maps Route',
+        timeDifference: `${Math.abs(bestInternalRoute.totalTime - googleMapsTime)}s`
+      });
+    }
+  }, [bestInternalRoute, googleMapsTime, recommendInternal]);
+
   // Update userLocation state when effectiveOrigin changes (for map display)
   useEffect(() => {
     if (effectiveOrigin) {
@@ -1802,7 +1815,7 @@ export default function NavigationPage() {
               )}
 
               {/* Show Internal Route if it's faster, otherwise show Google Maps route */}
-              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && bestInternalRoute ? (
+              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && recommendInternal && bestInternalRoute ? (
                 // DISPLAY INTERNAL BUS ROUTE - Using same format as Google Maps
                 <>
                   {/* Step 1: Origin location - SAME FORMAT AS GOOGLE MAPS */}

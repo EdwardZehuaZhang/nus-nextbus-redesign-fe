@@ -289,9 +289,9 @@ export async function findInternalBusRoutes(
   origin: LatLng,
   destination: LatLng
 ): Promise<InternalBusRoute[]> {
-  // console.log('🚌 [INTERNAL ROUTE FINDER] Starting route search...');
-  // console.log('📍 Origin:', origin);
-  // console.log('📍 Destination:', destination);
+  console.log('🚌 [INTERNAL ROUTE FINDER] Starting route search...');
+  console.log('📍 Origin:', origin);
+  console.log('📍 Destination:', destination);
   
   const routes: InternalBusRoute[] = [];
 
@@ -457,16 +457,16 @@ export async function findInternalBusRoutes(
             allBusArrivals: busArrivals, // Include all bus timings for display
           };
           
-          // console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {
-          //   totalTime: `${Math.ceil(totalTime / 60)} min`,
-          //   walkToStop: `${Math.ceil(actualWalkToStopTime / 60)} min`,
-          //   wait: `${Math.ceil(waitingTime / 60)} min`,
-          //   actualWait: `${Math.ceil(Math.max(0, waitingTime - actualWalkToStopTime) / 60)} min`,
-          //   busRide: `${Math.ceil(estimatedTravelTime / 60)} min`,
-          //   walkFromStop: `${Math.ceil(actualWalkFromStopTime / 60)} min`,
-          //   canCatch: canCatchBus,
-          //   hasWalkingRoute: !!walkToStopRoute
-          // });
+          console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {
+            totalTime: `${Math.ceil(totalTime / 60)} min (${totalTime}s)`,
+            walkToStop: `${Math.ceil(actualWalkToStopTime / 60)} min (${actualWalkToStopTime}s)`,
+            wait: `${Math.ceil(waitingTime / 60)} min (${waitingTime}s)`,
+            actualWait: `${Math.ceil(Math.max(0, waitingTime - actualWalkToStopTime) / 60)} min`,
+            busRide: `${Math.ceil(estimatedTravelTime / 60)} min (${estimatedTravelTime}s)`,
+            walkFromStop: `${Math.ceil(actualWalkFromStopTime / 60)} min (${actualWalkFromStopTime}s)`,
+            canCatch: canCatchBus,
+            hasWalkingRoute: !!walkToStopRoute
+          });
           
           routes.push(route);
         }
@@ -476,10 +476,17 @@ export async function findInternalBusRoutes(
     // Sort routes by total time
     routes.sort((a, b) => a.totalTime - b.totalTime);
     
-    // console.log(`🎯 Found ${routes.length} total internal routes`);
-    // if (routes.length > 0) {
-    //   console.log('🏆 Best route:', routes[0].routeCode, `(${Math.ceil(routes[0].totalTime / 60)} min)`);
-    // }
+    console.log(`🎯 Found ${routes.length} total internal routes`);
+    if (routes.length > 0) {
+      console.log('🏆 Top 3 routes by time:');
+      routes.slice(0, 3).forEach((route, idx) => {
+        console.log(`  ${idx + 1}. ${route.routeCode} (${route.departureStop.code} → ${route.arrivalStop.code}): ${Math.ceil(route.totalTime / 60)} min total`);
+        console.log(`     - Walk to stop: ${Math.ceil(route.walkToStopTime / 60)} min`);
+        console.log(`     - Bus wait: ${Math.ceil(route.waitingTime / 60)} min (actual wait after walking: ${Math.ceil(Math.max(0, route.waitingTime - route.walkToStopTime) / 60)} min)`);
+        console.log(`     - Bus ride: ${Math.ceil(route.busTravelTime / 60)} min`);
+        console.log(`     - Walk from stop: ${Math.ceil(route.walkFromStopTime / 60)} min`);
+      });
+    }
 
     return routes;
   } catch (error) {
