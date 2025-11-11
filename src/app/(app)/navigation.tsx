@@ -148,6 +148,43 @@ const calculateFontSize = (
   return currentFontSize < 14 ? 14 : currentFontSize;
 };
 
+// Helper function to generate arrival time slots (15-minute intervals)
+const generateArrivalTimeSlots = (): Date[] => {
+  const now = new Date();
+  const slots: Date[] = [];
+  
+  // Round up to next 15-minute interval
+  const minutes = now.getMinutes();
+  const roundedMinutes = Math.ceil(minutes / 15) * 15;
+  const startTime = new Date(now);
+  startTime.setMinutes(roundedMinutes);
+  startTime.setSeconds(0);
+  startTime.setMilliseconds(0);
+  
+  // If rounded time is in the past (shouldn't happen with ceil), add 15 mins
+  if (startTime <= now) {
+    startTime.setMinutes(startTime.getMinutes() + 15);
+  }
+  
+  // Generate slots for the next 3 hours (12 slots of 15 minutes)
+  for (let i = 0; i < 12; i++) {
+    const slot = new Date(startTime);
+    slot.setMinutes(startTime.getMinutes() + (i * 15));
+    slots.push(slot);
+  }
+  
+  return slots;
+};
+
+// Helper function to format time for display
+const formatArrivalTime = (date: Date): string => {
+  return date.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true 
+  });
+};
+
 // Dynamic font size component for bus timing
 const DynamicBusTime = ({
   time,
@@ -569,6 +606,10 @@ export default function NavigationPage() {
   const [selectedInternalRoute, setSelectedInternalRoute] = useState<InternalBusRoute | null>(null);
   const [showIntermediateStops, setShowIntermediateStops] = useState(false); // State for expanding bus stops
   
+  // Arrival time selector state
+  const [showArrivalTimeDropdown, setShowArrivalTimeDropdown] = useState(false);
+  const [selectedArrivalTime, setSelectedArrivalTime] = useState<Date | null>(null);
+  
   // Internal route polylines for map display
   const [internalRoutePolylines, setInternalRoutePolylines] = useState<{
     walkToStop: google.maps.LatLngLiteral[];
@@ -726,6 +767,12 @@ export default function NavigationPage() {
       ? durationToMinutes(routes[0].legs[0].duration) * 60 
       : undefined,
     enabled: !!effectiveOrigin && !!destinationCoords,
+    // TODO: Add arrivalTime parameter to filter routes based on arrival time
+    // When selectedArrivalTime is set, we need to:
+    // 1. Calculate the latest departure time (arrivalTime - totalTime)
+    // 2. Filter out buses that arrive too late
+    // 3. Show only routes that get you there before the selected time
+    arrivalTime: selectedArrivalTime,
   });
 
   // Log route comparison results
@@ -740,6 +787,20 @@ export default function NavigationPage() {
       });
     }
   }, [bestInternalRoute, googleMapsTime, recommendInternal]);
+
+  // Close arrival time dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (showArrivalTimeDropdown) {
+        setShowArrivalTimeDropdown(false);
+      }
+    };
+
+    if (showArrivalTimeDropdown && typeof document !== 'undefined') {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showArrivalTimeDropdown]);
 
   // Update userLocation state when effectiveOrigin changes (for map display)
   useEffect(() => {
@@ -1760,7 +1821,11 @@ export default function NavigationPage() {
               <View
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
               >
-                <View
+                <Pressable
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    setShowArrivalTimeDropdown(!showArrivalTimeDropdown);
+                  }}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
@@ -1778,10 +1843,90 @@ export default function NavigationPage() {
                   }}
                 >
                   <Text style={{ fontSize: 14, color: '#09090B' }}>
-                    Arrive 9:15PM
+                    {selectedArrivalTime 
+                      ? `Arrive ${formatArrivalTime(selectedArrivalTime)}`
+                      : 'Leave now'
+                    }
                   </Text>
                   <ChevronDown />
-                </View>
+                </Pressable>
+                
+                {/* Arrival Time Dropdown */}
+                {showArrivalTimeDropdown && (
+                  <Pressable
+                    onPress={(e) => e?.stopPropagation?.()}
+                    style={{
+                      position: 'absolute',
+                      top: 40,
+                      left: 0,
+                      zIndex: 1000,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '8px',
+                      borderWidth: 1,
+                      borderColor: '#E5E5E5',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                      elevation: 5,
+                      width: 180,
+                      maxHeight: 300,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <ScrollView
+                      style={{ maxHeight: 300 }}
+                      showsVerticalScrollIndicator={true}
+                    >
+                      {/* "Leave now" option */}
+                      <Pressable
+                        onPress={() => {
+                          setSelectedArrivalTime(null);
+                          setShowArrivalTimeDropdown(false);
+                        }}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#E5E5E5',
+                          backgroundColor: selectedArrivalTime === null ? '#F4F4F5' : '#FFFFFF',
+                        }}
+                      >
+                        <Text style={{ 
+                          fontSize: 14, 
+                          color: '#09090B',
+                          fontWeight: selectedArrivalTime === null ? '600' : '400'
+                        }}>
+                          Leave now
+                        </Text>
+                      </Pressable>
+                      
+                      {/* Time slot options */}
+                      {generateArrivalTimeSlots().map((timeSlot, index) => (
+                        <Pressable
+                          key={index}
+                          onPress={() => {
+                            setSelectedArrivalTime(timeSlot);
+                            setShowArrivalTimeDropdown(false);
+                          }}
+                          style={{
+                            paddingHorizontal: 16,
+                            paddingVertical: 12,
+                            borderBottomWidth: index < 11 ? 1 : 0,
+                            borderBottomColor: '#E5E5E5',
+                            backgroundColor: selectedArrivalTime?.getTime() === timeSlot.getTime() ? '#F4F4F5' : '#FFFFFF',
+                          }}
+                        >
+                          <Text style={{ 
+                            fontSize: 14, 
+                            color: '#09090B',
+                            fontWeight: selectedArrivalTime?.getTime() === timeSlot.getTime() ? '600' : '400'
+                          }}>
+                            Arrive {formatArrivalTime(timeSlot)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </Pressable>
+                )}
+                
                 <Pressable
                   onPress={() => router.push('/(app)/transit')}
                   style={{

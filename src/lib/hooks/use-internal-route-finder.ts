@@ -11,6 +11,7 @@ export interface UseInternalRouteFinderParams {
   destination: LatLng | null;
   googleMapsTimeSeconds?: number;
   enabled?: boolean;
+  arrivalTime?: Date | null; // Desired arrival time at destination
 }
 
 export interface UseInternalRouteFinderResult {
@@ -31,6 +32,7 @@ export function useInternalRouteFinder({
   destination,
   googleMapsTimeSeconds,
   enabled = true,
+  arrivalTime = null,
 }: UseInternalRouteFinderParams): UseInternalRouteFinderResult {
   const [routes, setRoutes] = useState<InternalBusRoute[]>([]);
   const [bestRoute, setBestRoute] = useState<InternalBusRoute | null>(null);
@@ -60,20 +62,45 @@ export function useInternalRouteFinder({
         googleMapsTimeSeconds
       );
 
+      // Filter routes based on arrival time if specified
+      let filteredRoutes = result.internalRoutes;
+      let filteredBestRoute = result.bestInternalRoute;
+      
+      if (arrivalTime) {
+        const arrivalTimeMs = arrivalTime.getTime();
+        const nowMs = Date.now();
+        const maxTravelTimeSeconds = (arrivalTimeMs - nowMs) / 1000;
+        
+        console.log('⏰ [useInternalRouteFinder] Filtering by arrival time:', {
+          arrivalTime: arrivalTime.toLocaleTimeString(),
+          maxTravelTime: `${Math.ceil(maxTravelTimeSeconds / 60)} min`,
+        });
+        
+        // Filter routes that arrive before the desired time
+        filteredRoutes = result.internalRoutes.filter(route => {
+          const arrivesByTime = route.totalTime <= maxTravelTimeSeconds;
+          return arrivesByTime;
+        });
+        
+        filteredBestRoute = filteredRoutes.length > 0 ? filteredRoutes[0] : null;
+        
+        console.log(`✅ [useInternalRouteFinder] Filtered to ${filteredRoutes.length} routes that arrive by ${arrivalTime.toLocaleTimeString()}`);
+      }
+
       console.log('✅ [useInternalRouteFinder] Route search complete:', {
-        routesFound: result.internalRoutes.length,
-        hasBestRoute: !!result.bestInternalRoute,
+        routesFound: filteredRoutes.length,
+        hasBestRoute: !!filteredBestRoute,
         recommendInternal: result.recommendInternal,
-        bestRouteDetails: result.bestInternalRoute ? {
-          code: result.bestInternalRoute.routeCode,
-          totalTime: `${Math.ceil(result.bestInternalRoute.totalTime / 60)} min`,
-          hasWalkingRoute: !!result.bestInternalRoute.walkToStopRoute
+        bestRouteDetails: filteredBestRoute ? {
+          code: filteredBestRoute.routeCode,
+          totalTime: `${Math.ceil(filteredBestRoute.totalTime / 60)} min`,
+          hasWalkingRoute: !!filteredBestRoute.walkToStopRoute
         } : null
       });
 
-      setRoutes(result.internalRoutes);
-      setBestRoute(result.bestInternalRoute);
-      setRecommendInternal(result.recommendInternal);
+      setRoutes(filteredRoutes);
+      setBestRoute(filteredBestRoute);
+      setRecommendInternal(filteredBestRoute !== null && result.recommendInternal);
       setGoogleMapsTime(result.googleMapsTime);
     } catch (err) {
       console.error('❌ [useInternalRouteFinder] Error:', err);
@@ -95,6 +122,7 @@ export function useInternalRouteFinder({
     destination?.longitude,
     googleMapsTimeSeconds,
     enabled,
+    arrivalTime?.getTime(),
   ]);
 
   return {

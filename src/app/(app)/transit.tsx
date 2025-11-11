@@ -1,6 +1,6 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
-import { Animated, TextInput } from 'react-native';
+import { Animated, TextInput, Keyboard, Platform } from 'react-native';
 
 import {
   calculateDistance,
@@ -1065,37 +1065,34 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
           try {
             const service = new window.google.maps.places.AutocompleteService();
 
-            // Define NUS campus bounds (approximate)
-            const nusBounds = new window.google.maps.LatLngBounds(
-              new window.google.maps.LatLng(1.29, 103.77), // Southwest corner
-              new window.google.maps.LatLng(1.305, 103.785) // Northeast corner
-            );
+            // Prepare request options - restrict to Singapore only
+            const requestOptions: any = {
+              input: searchText,
+              componentRestrictions: { country: 'sg' }, // Limit to Singapore
+            };
+
+            // Bias results to user's location within Singapore
+            if (userLocation) {
+              requestOptions.location = new window.google.maps.LatLng(
+                userLocation.latitude,
+                userLocation.longitude
+              );
+              requestOptions.radius = 50000; // 50km radius - biases results to this area
+            } else {
+              // Fallback to Singapore center
+              requestOptions.location = new window.google.maps.LatLng(1.3521, 103.8198);
+              requestOptions.radius = 50000;
+            }
 
             service.getPlacePredictions(
-              {
-                input: searchText,
-                locationRestriction: nusBounds, // Restrict to NUS campus bounds only
-              },
+              requestOptions,
               (predictions, status) => {
                 if (
                   status === window.google.maps.places.PlacesServiceStatus.OK &&
                   predictions
                 ) {
-                  // Filter results to only include those within NUS campus
-                  const filteredPredictions = predictions.filter((p) => {
-                    // Check if description contains NUS-related keywords
-                    const desc = p.description.toLowerCase();
-                    return (
-                      desc.includes('nus') ||
-                      desc.includes('national university of singapore') ||
-                      desc.includes('kent ridge') ||
-                      desc.includes('utown') ||
-                      desc.includes('university town')
-                    );
-                  });
-
                   // Convert Google Maps API format to our format
-                  const converted = filteredPredictions.map((p) => ({
+                  const converted = predictions.map((p) => ({
                     description: p.description,
                     matched_substrings: p.matched_substrings || [],
                     place_id: p.place_id,
@@ -1447,6 +1444,7 @@ const useDragHandlers = () => {
   const [isSearchMode, setIsSearchMode] = React.useState(false);
   const [containerHeight, setContainerHeight] = React.useState(45); // Start at 45%
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
   const translateY = React.useRef(new Animated.Value(0)).current;
   const heightAnimation = React.useRef(new Animated.Value(45)).current; // Add animated value for height
   const backdropOpacity = React.useRef(new Animated.Value(0)).current; // Add animated value for backdrop opacity
@@ -1458,6 +1456,28 @@ const useDragHandlers = () => {
   const MIN_HEIGHT = 10; // Minimum height - just search bar visible
   const MAX_HEIGHT = 92; // Maximum height - allow nearly full screen expansion for small devices
   const DEFAULT_HEIGHT = 45; // Default state
+
+  // Listen for keyboard events
+  React.useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
 
   const handleDragMove = (dy: number) => {
     // Don't allow drag when in search mode
@@ -1644,9 +1664,11 @@ const useDragHandlers = () => {
           inputRange: [DEFAULT_HEIGHT, MAX_HEIGHT],
           outputRange: [`${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
         }),
+        bottom: keyboardHeight,
       }
     : {
         maxHeight: `${containerHeight}%` as any,
+        bottom: keyboardHeight,
         transform: [
           {
             translateY: translateY.interpolate({
