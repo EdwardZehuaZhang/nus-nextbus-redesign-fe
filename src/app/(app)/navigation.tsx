@@ -12,8 +12,11 @@ import {
   formatTime,
 } from '@/api';
 import type { RouteCode } from '@/api/bus';
+
+import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { useNearestBusStop, useStopsBetween } from '@/api/lta/hooks';
 import { BusIndicator } from '@/components/bus-indicator';
+import { SearchResults } from '@/components/shared-search';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
 import { ToggleSwitch } from '@/components/toggle-switch';
@@ -35,7 +38,6 @@ import type { InternalBusRoute } from '@/lib/route-finding';
 import { createInternalRoutePolylines } from '@/lib/route-polylines';
 import {
   type BusStation,
-  searchBusStations,
   getBusStationByName,
 } from '@/lib/bus-stations';
 import {
@@ -621,9 +623,9 @@ export default function NavigationPage() {
   // Search panel state - using a single state to track panel position
   const [panelState, setPanelState] = useState<'closed' | 'animating' | 'expanded'>('closed');
   const [searchText, setSearchText] = useState('');
-  const [searchResults, setSearchResults] = useState<BusStation[]>([]);
   const [recentSearches, setRecentSearches] = useState<any[]>([]);
-  const [searchMode, setSearchMode] = useState<'origin' | 'destination'>('origin'); // Track what we're selecting
+  const [searchMode, setSearchMode] = useState<'origin' | 'destination' | 'stop'>('origin'); // Track what we're selecting
+  const [activeStopId, setActiveStopId] = useState<string | null>(null); // Track which stop is being edited
   
   // Log panel state changes
   useEffect(() => {
@@ -857,15 +859,85 @@ export default function NavigationPage() {
     loadRecentSearches();
   }, []);
 
-  // Handle search input changes
-  useEffect(() => {
-    if (searchText.trim().length > 0) {
-      const results = searchBusStations(searchText);
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
+  // Handle Google Place selection
+  const handleGooglePlacePress = async (place: PlaceAutocompleteResult) => {
+    console.log('[NAV GOOGLE PLACE] 🖱️ Clicked:', place.structured_formatting.main_text);
+    console.log('[NAV GOOGLE PLACE] 📍 Place ID:', place.place_id);
+    
+    try {
+      console.log('[NAV GOOGLE PLACE] 🔍 Fetching place details using Google Maps SDK...');
+      
+      // Use Google Maps JavaScript API instead of direct HTTP request to avoid CORS
+      if (typeof window !== 'undefined' && window.google?.maps) {
+        const service = new window.google.maps.places.PlacesService(
+          document.createElement('div')
+        );
+        
+        const request = {
+          placeId: place.place_id,
+          fields: ['geometry', 'name', 'formatted_address', 'place_id'],
+        };
+        
+        service.getDetails(request, (placeDetails, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && placeDetails) {
+            console.log('[NAV GOOGLE PLACE] ✅ Got details via SDK:', placeDetails);
+            
+            const destinationLat = placeDetails.geometry?.location?.lat();
+            const destinationLng = placeDetails.geometry?.location?.lng();
+            
+            console.log('[NAV GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
+            
+            // Set the selected location based on search mode
+            if (searchMode === 'destination') {
+              console.log('[NAV GOOGLE PLACE] 🎯 Setting as destination');
+              // Update destination
+              router.push({
+                pathname: '/navigation' as any,
+                params: {
+                  destination: place.structured_formatting.main_text,
+                  destinationAddress: placeDetails.formatted_address,
+                  destinationLat: destinationLat?.toString(),
+                  destinationLng: destinationLng?.toString(),
+                  userLat: userLocation?.latitude?.toString(),
+                  userLng: userLocation?.longitude?.toString(),
+                  customOrigin,
+                  customOriginLat,
+                  customOriginLng,
+                },
+              });
+            } else {
+              console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
+              // Update origin
+              router.push({
+                pathname: '/navigation' as any,
+                params: {
+                  destination,
+                  destinationAddress,
+                  destinationLat,
+                  destinationLng,
+                  customOrigin: place.structured_formatting.main_text,
+                  customOriginLat: destinationLat?.toString(),
+                  customOriginLng: destinationLng?.toString(),
+                  userLat: userLocation?.latitude?.toString(),
+                  userLng: userLocation?.longitude?.toString(),
+                },
+              });
+            }
+            
+            // Close the search panel
+            setPanelState('closed');
+            setSearchText('');
+          } else {
+            console.error('[NAV GOOGLE PLACE] ❌ PlacesService error:', status);
+          }
+        });
+      } else {
+        console.error('[NAV GOOGLE PLACE] ❌ Google Maps SDK not available');
+      }
+    } catch (error) {
+      console.error('[NAV GOOGLE PLACE] ❌ Error getting place details:', error);
     }
-  }, [searchText]);
+  };
 
   // Helper function to get actual location names from route data
   const getActualLocationNames = (): { fromName: string; toName: string } => {
@@ -1054,6 +1126,8 @@ export default function NavigationPage() {
     fetchRoutes();
   }, [currentDestination, effectiveOrigin]);
 
+  // (moved) helpers and effect for stops are defined after locations state
+
   // Generate internal route polylines when bestInternalRoute changes
   useEffect(() => {
     const generatePolylines = async () => {
@@ -1098,6 +1172,7 @@ export default function NavigationPage() {
     text: string;
     type: 'origin' | 'stop' | 'destination';
     isEditable: boolean;
+    coords?: { lat: number; lng: number };
   };
 
   const [locations, setLocations] = useState<LocationItem[]>([
@@ -1129,6 +1204,7 @@ export default function NavigationPage() {
       text: '',
       type: 'stop',
       isEditable: true,
+      coords: undefined,
     };
     // Insert before the last item (destination)
     setLocations([
@@ -1136,6 +1212,12 @@ export default function NavigationPage() {
       newStop,
       locations[locations.length - 1],
     ]);
+    
+    // Open search panel for the new stop
+    setSearchMode('stop');
+    setActiveStopId(newStop.id);
+    setPanelState('animating');
+    setSearchText('');
   };
 
   const handleRemoveLocation = (id: string) => {
@@ -1174,6 +1256,109 @@ export default function NavigationPage() {
     setLocations(newLocations);
   };
 
+  // Helper: get coordinates for a location name (bus stop)
+  const getCoordsForName = React.useCallback((name: string): { lat: number; lng: number } | null => {
+    if (!name) return null;
+    const stop = getBusStationByName(name);
+    if (stop?.coordinates) {
+      return { lat: stop.coordinates.latitude, lng: stop.coordinates.longitude };
+    }
+    return null;
+  }, []);
+
+  // Helper: parse Google duration string like "123s" to number (seconds)
+  const parseDurationSeconds = (duration?: string): number => {
+    if (!duration) return 0;
+    const m = duration.match(/^(\d+)s$/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+
+  // Key for intermediate stops to trigger recomputation
+  const stopsKey = React.useMemo(() => {
+    return JSON.stringify(
+      locations
+        .filter((l) => l.type === 'stop' && l.text && l.text.trim().length > 0)
+        .map((l) => `${l.text.trim()}|${l.coords?.lat ?? ''}|${l.coords?.lng ?? ''}`)
+    );
+  }, [locations]);
+
+  // Recompute Google routing when intermediate stops are present
+  useEffect(() => {
+    const recomputeWithStops = async () => {
+      const rawStopKeys = JSON.parse(stopsKey) as string[];
+      if (!rawStopKeys || rawStopKeys.length === 0) return;
+
+      const destCoords = getDestinationCoordinates(currentDestination);
+      if (!effectiveOrigin || !destCoords) return;
+      // Build stops from location entries directly (prefer stored coords; fallback to name lookup)
+      const stops = locations
+        .filter((l) => l.type === 'stop' && l.text.trim().length > 0)
+        .map((l) => ({
+          name: l.text.trim(),
+          coords: l.coords ?? getCoordsForName(l.text.trim()) ?? null,
+        }))
+        .filter((s) => !!s.coords) as Array<{ name: string; coords: { lat: number; lng: number } }>;
+
+      if (stops.length === 0) return;
+
+      setIsLoadingRoutes(true);
+      setRouteError(null);
+
+      try {
+        const combinedSteps: RouteStep[] = [];
+        let totalDurationSeconds = 0;
+        let totalDistanceMeters = 0;
+
+        const segmentTargets = [...stops.map((s) => s.coords), destCoords];
+        let currentPoint = { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude };
+
+        for (const target of segmentTargets) {
+          const originWp: Waypoint = { location: { latLng: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } } };
+          const destWp: Waypoint = { location: { latLng: { latitude: target.lat, longitude: target.lng } } };
+
+          const res = await getTransitRoute(originWp, destWp);
+          const firstRoute = res?.routes?.[0];
+          const firstLeg = firstRoute?.legs?.[0];
+          if (firstLeg?.steps) {
+            combinedSteps.push(...firstLeg.steps);
+            totalDurationSeconds += parseDurationSeconds(firstLeg.duration);
+            totalDistanceMeters += firstLeg.distanceMeters || 0;
+          }
+
+          currentPoint = { latitude: target.lat, longitude: target.lng };
+        }
+
+        const combinedRoute: Route = {
+          legs: [
+            {
+              distanceMeters: totalDistanceMeters,
+              duration: `${totalDurationSeconds}s`,
+              staticDuration: `${totalDurationSeconds}s`,
+              polyline: { encodedPolyline: '' },
+              startLocation: { latLng: { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude } },
+              endLocation: { latLng: { latitude: destCoords.lat, longitude: destCoords.lng } },
+              steps: combinedSteps,
+            },
+          ],
+          distanceMeters: totalDistanceMeters,
+          duration: `${totalDurationSeconds}s`,
+          staticDuration: `${totalDurationSeconds}s`,
+          polyline: { encodedPolyline: '' },
+        };
+
+        setRoutes([combinedRoute]);
+        setRouteError(null);
+      } catch (err) {
+        console.error('❌ Failed to compute route with stops:', err);
+        setRouteError('Failed to compute route with stops');
+      } finally {
+        setIsLoadingRoutes(false);
+      }
+    };
+
+    recomputeWithStops();
+  }, [stopsKey, effectiveOrigin?.latitude, effectiveOrigin?.longitude, currentDestination]);
+
   // Handle location selection from search
   const handleLocationSelect = (item: BusStation) => {
     // Add to recent searches
@@ -1192,7 +1377,7 @@ export default function NavigationPage() {
           userLng,
         },
       });
-    } else {
+    } else if (searchMode === 'destination') {
       // Update destination with selected location
       router.replace({
         pathname: '/navigation' as any,
@@ -1205,6 +1390,23 @@ export default function NavigationPage() {
           userLng,
         },
       });
+    } else if (searchMode === 'stop' && activeStopId) {
+      // Update the stop with selected location
+      setLocations(
+        locations.map((loc) =>
+          loc.id === activeStopId
+            ? {
+                ...loc,
+                text: item.name,
+                isEditable: false,
+                coords: item.coordinates
+                  ? { lat: item.coordinates.latitude, lng: item.coordinates.longitude }
+                  : undefined,
+              }
+            : loc
+        )
+      );
+      setActiveStopId(null);
     }
     
     // Close search panel
@@ -1251,8 +1453,18 @@ export default function NavigationPage() {
   }, [internalRoutePolylines, bestInternalRoute]);
 
   // Memoize visible bus stops for internal route display
+  const hasIntermediateStops = useMemo(() => {
+    try {
+      return (JSON.parse(stopsKey) as string[]).length > 0;
+    } catch {
+      return false;
+    }
+  }, [stopsKey]);
+
+  const showInternal = recommendInternal && !hasIntermediateStops;
+
   const visibleBusStops = useMemo(() => {
-    if (!recommendInternal || !bestInternalRoute) {
+    if (!showInternal || !bestInternalRoute) {
       return undefined; // Don't filter stops if not showing internal route
     }
     // Include departure stop (extract code), all intermediate stops, and arrival stop (extract code)
@@ -1262,7 +1474,7 @@ export default function NavigationPage() {
       ...bestInternalRoute.intermediateStops, // Already strings
       bestInternalRoute.arrivalStop.code, // Extract code from BusStop object
     ];
-  }, [recommendInternal, bestInternalRoute]);
+  }, [showInternal, bestInternalRoute]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
@@ -1272,9 +1484,9 @@ export default function NavigationPage() {
       <View className="flex-1" style={{ overflow: 'visible' }}>
         <InteractiveMap
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !recommendInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
-          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !recommendInternal ? routes[0]?.legs?.[0]?.steps : undefined}
-          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && recommendInternal ? memoizedInternalRoutePolylines : undefined}
+          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
+          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.legs?.[0]?.steps : undefined}
+          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
           origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
           destination={destinationCoords || undefined}
           initialRegion={
@@ -1295,8 +1507,8 @@ export default function NavigationPage() {
           }
           showLandmarks={false}
           showMapControls={false}
-          activeRoute={recommendInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
-          showBusStops={recommendInternal} // Show bus stops when displaying internal route
+          activeRoute={showInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
+          showBusStops={showInternal} // Show bus stops when displaying internal route
           visibleBusStops={visibleBusStops} // Only show stops on the internal route
           enablePlaceDetails={false} // Disable place details on navigation page
           mapFilters={{
@@ -1332,6 +1544,7 @@ export default function NavigationPage() {
           {locations.map((location, index) => {
             const isOrigin = location.type === 'origin';
             const isDestination = location.type === 'destination';
+            const isStop = location.type === 'stop';
             const isLast = index === locations.length - 1;
 
             // Determine icon
@@ -1348,10 +1561,11 @@ export default function NavigationPage() {
               <React.Fragment key={location.id}>
                 <Pressable
                   onPress={() => {
-                    // Allow clicking on both origin and destination to change them
+                    // Allow clicking on origin, destination, and stops to change them
                     if (isOrigin) {
                       console.log('[CLICK] 🎯 Origin clicked - Current panelState:', panelState);
                       setSearchMode('origin');
+                      setSearchText('');
                       // Only trigger animation if not already expanded
                       if (panelState !== 'expanded') {
                         console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
@@ -1362,6 +1576,19 @@ export default function NavigationPage() {
                     } else if (isDestination) {
                       console.log('[CLICK] 🎯 Destination clicked - Current panelState:', panelState);
                       setSearchMode('destination');
+                      setSearchText('');
+                      // Only trigger animation if not already expanded
+                      if (panelState !== 'expanded') {
+                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
+                        setPanelState('animating');
+                      } else {
+                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
+                      }
+                    } else if (isStop) {
+                      console.log('[CLICK] 🎯 Stop clicked - Current panelState:', panelState);
+                      setSearchMode('stop');
+                      setActiveStopId(location.id);
+                      setSearchText('');
                       // Only trigger animation if not already expanded
                       if (panelState !== 'expanded') {
                         console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
@@ -1371,7 +1598,6 @@ export default function NavigationPage() {
                       }
                     }
                   }}
-                  disabled={!isOrigin && !isDestination}
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
@@ -1387,33 +1613,15 @@ export default function NavigationPage() {
                     }}
                   >
                     {LocationIcon}
-                    {location.isEditable ? (
-                      <TextInput
-                        value={location.text}
-                        onChangeText={(text: string) =>
-                          handleUpdateLocation(location.id, text)
-                        }
-                        placeholder="Enter location"
-                        placeholderTextColor="#737373"
-                        style={{
-                          fontSize: 16,
-                          fontWeight: '500',
-                          color: '#211F26',
-                          flex: 1,
-                          padding: 0,
-                        }}
-                      />
-                    ) : (
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          fontWeight: '500',
-                          color: '#211F26',
-                        }}
-                      >
-                        {location.text}
-                      </Text>
-                    )}
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '500',
+                        color: location.text ? '#211F26' : '#737373',
+                      }}
+                    >
+                      {location.text || 'Search for location...'}
+                    </Text>
                   </View>
 
                   {/* Show controls when there are 3+ locations */}
@@ -1626,7 +1834,9 @@ export default function NavigationPage() {
                       placeholder={
                         searchMode === 'origin'
                           ? 'Search for starting location...'
-                          : 'Search for destination...'
+                          : searchMode === 'destination'
+                          ? 'Search for destination...'
+                          : 'Search for stop location...'
                       }
                       placeholderTextColor="#737373"
                       value={searchText}
@@ -1643,6 +1853,14 @@ export default function NavigationPage() {
                   </View>
                   <Pressable
                     onPress={() => {
+                      // If canceling a stop search and the stop is empty, remove it
+                      if (searchMode === 'stop' && activeStopId) {
+                        const stop = locations.find(loc => loc.id === activeStopId);
+                        if (stop && !stop.text) {
+                          setLocations(locations.filter(loc => loc.id !== activeStopId));
+                        }
+                        setActiveStopId(null);
+                      }
                       setPanelState('closed');
                       setSearchText('');
                     }}
@@ -1661,80 +1879,14 @@ export default function NavigationPage() {
 
                 {/* Search Results or Recent Searches */}
                 {searchText.trim().length > 0 ? (
-                  // Search Results
-                  <View>
-                    {searchResults.length > 0 ? (
-                      <View>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: '500',
-                            color: '#737373',
-                            marginBottom: 12,
-                          }}
-                        >
-                          Search Results ({searchResults.length})
-                        </Text>
-                        {searchResults.map((item, index) => {
-                          const IconComponent = item.icon;
-                          return (
-                            <Pressable
-                              key={item.id}
-                              onPress={() => handleLocationSelect(item)}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 12,
-                                paddingVertical: 12,
-                                borderBottomWidth: index < searchResults.length - 1 ? 1 : 0,
-                                borderBottomColor: '#E5E5E5',
-                              }}
-                            >
-                              <View
-                                style={{
-                                  width: 36,
-                                  height: 36,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  borderRadius: '18px',
-                                  backgroundColor: '#F5F5F5',
-                                  padding: 8,
-                                }}
-                              >
-                                <IconComponent style={{ width: 20, height: 20 }} />
-                              </View>
-                              <Text
-                                style={{
-                                  flex: 1,
-                                  fontSize: 16,
-                                  fontWeight: '500',
-                                  color: '#211F26',
-                                }}
-                              >
-                                {item.name}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    ) : (
-                      <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-                        <Text style={{ fontSize: 16, color: '#737373' }}>
-                          No results found for "{searchText}"
-                        </Text>
-                        <Text
-                          style={{
-                            marginTop: 8,
-                            fontSize: 14,
-                            color: '#A3A3A3',
-                            textAlign: 'center',
-                          }}
-                        >
-                          Try searching with different keywords
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  // Use shared SearchResults component
+                  <SearchResults
+                    searchText={searchText}
+                    userLocation={userLocation}
+                    onBusStationPress={handleLocationSelect}
+                    onGooglePlacePress={handleGooglePlacePress}
+                    useStyleProp={true}
+                  />
                 ) : (
                   // Recent Searches
                   <View>
@@ -1941,7 +2093,7 @@ export default function NavigationPage() {
             {/* Journey Steps */}
             <View style={{ marginBottom: 16 }}>
               {/* Loading/Error States */}
-              {(isLoadingRoutes || isLoadingInternalRoutes) && (
+              {(isLoadingRoutes || (showInternal && isLoadingInternalRoutes)) && (
                 <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center' }}>
                   <ActivityIndicator size="large" color="#274F9C" />
                 </View>
@@ -1961,7 +2113,7 @@ export default function NavigationPage() {
               )}
 
               {/* Show Internal Route if it's faster, otherwise show Google Maps route */}
-              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && recommendInternal && bestInternalRoute ? (
+              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && showInternal && bestInternalRoute ? (
                 // DISPLAY INTERNAL BUS ROUTE - Using same format as Google Maps
                 <>
                   {/* Step 1: Origin location - SAME FORMAT AS GOOGLE MAPS */}
@@ -2350,7 +2502,7 @@ export default function NavigationPage() {
                     </Text>
                   </View>
                 </>
-              ) : !isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && routes[0].legs ? (
+              ) : !isLoadingRoutes && !routeError && routes.length > 0 && routes[0].legs && (hasIntermediateStops || !isLoadingInternalRoutes) ? (
                 // DISPLAY GOOGLE MAPS ROUTE (original code)
                 <>
                   {/* Step 1: Origin location */}
@@ -2818,11 +2970,11 @@ export default function NavigationPage() {
             </View>
 
             {/* Internal Shuttle Routes Section - Shows AS alternative if Google Maps is shown */}
-            {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && internalRoutes.length > 0 && !recommendInternal && (
+            {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && internalRoutes.length > 0 && !showInternal && !hasIntermediateStops && (
               <InternalRoutesSection
                 routes={internalRoutes}
                 bestRoute={bestInternalRoute}
-                recommendInternal={recommendInternal}
+                recommendInternal={showInternal}
                 googleMapsTimeSeconds={googleMapsTime}
                 isLoading={isLoadingInternalRoutes}
                 onSelectRoute={(route) => {

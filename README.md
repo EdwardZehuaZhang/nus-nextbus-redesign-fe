@@ -83,9 +83,8 @@ nus-nextbus-redesign-fe/
 │   │   └── common/       # Shared API utilities
 │   ├── app/              # Expo Router pages
 │   │   ├── (app)/        # Authenticated app screens
-│   │   │   ├── transit.tsx      # Main bus tracking page
-│   │   │   ├── navigation.tsx   # Route navigation page
-│   │   │   └── search.tsx       # Destination search
+│   │   │   ├── transit.tsx      # Main bus tracking page with integrated search
+│   │   │   └── navigation.tsx   # Route navigation page
 │   │   ├── login.tsx     # Login screen
 │   │   └── onboarding.tsx
 │   ├── components/       # Reusable UI components

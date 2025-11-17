@@ -2,6 +2,7 @@ import { router, usePathname } from 'expo-router';
 import React from 'react';
 import { Animated, TextInput, Keyboard, Platform } from 'react-native';
 
+
 import {
   calculateDistance,
   formatArrivalTime,
@@ -13,10 +14,7 @@ import {
   useServiceDescriptions,
   useShuttleService,
 } from '@/api';
-import {
-  getPlaceAutocomplete,
-  getPlaceDetails,
-} from '@/api/google-maps/places';
+
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
@@ -42,10 +40,11 @@ import {
   Train,
   Van,
 } from '@/components/ui/icons';
+
+import { SearchResults } from '@/components/shared-search';
 import {
   type BusStation,
   getBusStationById,
-  searchBusStations,
 } from '@/lib/bus-stations';
 import { type LocationCoords, useLocation } from '@/lib/hooks/use-location';
 import {
@@ -57,6 +56,7 @@ import {
   addRecentSearch,
   getRecentSearches,
 } from '@/lib/storage/recent-searches';
+
 
 type BusRoute = {
   route: string;
@@ -430,32 +430,6 @@ const RecentSearchCard = ({
   );
 };
 
-const SearchResultItem = ({
-  item,
-  isLast,
-  onPress,
-}: {
-  item: BusStation;
-  isLast: boolean;
-  onPress: () => void;
-}) => {
-  const IconComponent = item.icon;
-  return (
-    <View>
-      <Pressable className="flex-row items-center gap-2 py-3" onPress={onPress}>
-        <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
-          <IconComponent className="size-5" />
-        </View>
-        <View className="flex-1">
-          <Text className="text-base font-medium text-neutral-900">
-            {item.name}
-          </Text>
-        </View>
-      </Pressable>
-      {!isLast && <View className="my-1 h-px w-full bg-neutral-200" />}
-    </View>
-  );
-};
 
 const PopularSearchCard = ({
   item,
@@ -721,23 +695,18 @@ const FavoriteButton = ({
   );
 };
 
-const AddButton = () => {
-  const handlePress = () => {
-    // TODO: Open a modal to add a new favorite
-    router.push('/search');
-  };
-
+const AddButton = ({ onSearchPress }: { onSearchPress: () => void }) => {
   return (
     <Pressable
       className="size-12 items-center justify-center self-center"
-      onPress={handlePress}
+      onPress={onSearchPress}
     >
       <PlusIcon width={20} height={20} fill="#274F9C" />
     </Pressable>
   );
 };
 
-const FavoritesSection = () => {
+const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
   const [favorites, setFavorites] = React.useState<FavoriteRoute[]>([]);
   
   // Get user's current location to pass to navigation
@@ -783,7 +752,7 @@ const FavoritesSection = () => {
               onUpdate={loadFavorites}
             />
           ))}
-          <AddButton />
+          <AddButton onSearchPress={onSearchPress} />
         </ScrollView>
       )}
     </View>
@@ -1009,11 +978,6 @@ const NearestStopsSection = ({
 /* eslint-disable max-lines-per-function */
 const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
-  const [searchResults, setSearchResults] = React.useState<BusStation[]>([]);
-  const [googlePlaceResults, setGooglePlaceResults] = React.useState<
-    PlaceAutocompleteResult[]
-  >([]);
-  const [isSearchingGoogle, setIsSearchingGoogle] = React.useState(false);
   const [recentSearches, setRecentSearches] = React.useState<
     RecentSearchItem[]
   >([]);
@@ -1051,81 +1015,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     }
   };
 
-  // Handle search input changes
-  React.useEffect(() => {
-    const searchPlaces = async () => {
-      if (searchText.trim().length > 0) {
-        // Search local bus stations
-        const busStationResults = searchBusStations(searchText);
-        setSearchResults(busStationResults);
 
-        // Search Google Places using JavaScript API (for web only)
-        if (typeof window !== 'undefined' && window.google) {
-          setIsSearchingGoogle(true);
-          try {
-            const service = new window.google.maps.places.AutocompleteService();
-
-            // Prepare request options - restrict to Singapore only
-            const requestOptions: any = {
-              input: searchText,
-              componentRestrictions: { country: 'sg' }, // Limit to Singapore
-            };
-
-            // Bias results to user's location within Singapore
-            if (userLocation) {
-              requestOptions.location = new window.google.maps.LatLng(
-                userLocation.latitude,
-                userLocation.longitude
-              );
-              requestOptions.radius = 50000; // 50km radius - biases results to this area
-            } else {
-              // Fallback to Singapore center
-              requestOptions.location = new window.google.maps.LatLng(1.3521, 103.8198);
-              requestOptions.radius = 50000;
-            }
-
-            service.getPlacePredictions(
-              requestOptions,
-              (predictions, status) => {
-                if (
-                  status === window.google.maps.places.PlacesServiceStatus.OK &&
-                  predictions
-                ) {
-                  // Convert Google Maps API format to our format
-                  const converted = predictions.map((p) => ({
-                    description: p.description,
-                    matched_substrings: p.matched_substrings || [],
-                    place_id: p.place_id,
-                    reference: p.place_id, // Use place_id as reference
-                    structured_formatting: p.structured_formatting,
-                    terms: p.terms || [],
-                    types: p.types || [],
-                  }));
-                  setGooglePlaceResults(converted);
-                } else {
-                  setGooglePlaceResults([]);
-                }
-                setIsSearchingGoogle(false);
-              }
-            );
-          } catch (error) {
-            console.error('Google Places search error:', error);
-            setGooglePlaceResults([]);
-            setIsSearchingGoogle(false);
-          }
-        } else {
-          setGooglePlaceResults([]);
-        }
-      } else {
-        setSearchResults([]);
-        setGooglePlaceResults([]);
-      }
-    };
-
-    // Debounce the search
-    const timeoutId = setTimeout(searchPlaces, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchText, userLocation]);
 
   const handleResultPress = (item: BusStation) => {
     addRecentSearch(item);
@@ -1141,24 +1031,54 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
   };
 
   const handleGooglePlacePress = async (place: PlaceAutocompleteResult) => {
+    console.log('[GOOGLE PLACE] 🖱️ Clicked:', place.structured_formatting.main_text);
+    console.log('[GOOGLE PLACE] 📍 Place ID:', place.place_id);
+    
     try {
-      // Get detailed information including coordinates
-      const details = await getPlaceDetails(place.place_id);
+      console.log('[GOOGLE PLACE] 🔍 Fetching place details using Google Maps SDK...');
+      
+      // Use Google Maps JavaScript API instead of direct HTTP request to avoid CORS
+      if (typeof window !== 'undefined' && window.google?.maps) {
+        const service = new window.google.maps.places.PlacesService(
+          document.createElement('div')
+        );
+        
+        const request = {
+          placeId: place.place_id,
+          fields: ['geometry', 'name', 'formatted_address', 'place_id']
+        };
+        
+        service.getDetails(request, (placeDetails, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && placeDetails) {
+            console.log('[GOOGLE PLACE] ✅ Got details via SDK:', placeDetails);
+            
+            const destinationLat = placeDetails.geometry?.location?.lat();
+            const destinationLng = placeDetails.geometry?.location?.lng();
+            
+            console.log('[GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
+            console.log('[GOOGLE PLACE] 🚀 Navigating to navigation page...');
 
-      // Navigate to navigation page with place details and user location
-      router.push({
-        pathname: '/navigation' as any,
-        params: {
-          destination: place.structured_formatting.main_text,
-          destinationAddress: place.description,
-          destinationLat: details.result.geometry.location.lat.toString(),
-          destinationLng: details.result.geometry.location.lng.toString(),
-          userLat: userLocation?.latitude?.toString(),
-          userLng: userLocation?.longitude?.toString(),
-        },
-      });
+            // Navigate to navigation page with place details and user location
+            router.push({
+              pathname: '/navigation' as any,
+              params: {
+                destination: place.structured_formatting.main_text,
+                destinationAddress: placeDetails.formatted_address || place.description,
+                destinationLat: destinationLat?.toString(),
+                destinationLng: destinationLng?.toString(),
+                userLat: userLocation?.latitude?.toString(),
+                userLng: userLocation?.longitude?.toString(),
+              },
+            });
+          } else {
+            console.error('[GOOGLE PLACE] ❌ PlacesService error:', status);
+          }
+        });
+      } else {
+        console.error('[GOOGLE PLACE] ❌ Google Maps SDK not available');
+      }
     } catch (error) {
-      console.error('Error getting place details:', error);
+      console.error('[GOOGLE PLACE] ❌ Error getting place details:', error);
     }
   };
 
@@ -1265,76 +1185,13 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {searchText.trim().length > 0 ? (
-          <View style={{ gap: 16 }}>
-            {/* Bus Station Results */}
-            {searchResults.length > 0 && (
-              <View>
-                <Text className="mb-3 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
-                  Bus Stops ({searchResults.length})
-                </Text>
-                {searchResults.map((item, index, array) => (
-                  <SearchResultItem
-                    key={item.id}
-                    item={item}
-                    isLast={index === array.length - 1}
-                    onPress={() => handleResultPress(item)}
-                  />
-                ))}
-              </View>
-            )}
-
-            {/* Google Places Results */}
-            {googlePlaceResults.length > 0 && (
-              <View>
-                <Text className="mb-3 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
-                  Other Locations ({googlePlaceResults.length})
-                </Text>
-                {googlePlaceResults.map((place, index) => (
-                  <Pressable
-                    key={place.place_id}
-                    onPress={() => handleGooglePlacePress(place)}
-                    className={`flex-row items-center gap-3 py-3 ${
-                      index < googlePlaceResults.length - 1
-                        ? 'border-b border-neutral-200'
-                        : ''
-                    }`}
-                  >
-                    <View className="flex-1">
-                      <Text className="text-base font-medium text-neutral-900">
-                        {place.structured_formatting.main_text}
-                      </Text>
-                      <Text className="text-sm text-neutral-500">
-                        {place.structured_formatting.secondary_text?.replace(
-                          /, Singapore$/,
-                          ''
-                        )}
-                      </Text>
-                    </View>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            {/* No results message */}
-            {searchResults.length === 0 &&
-              googlePlaceResults.length === 0 &&
-              !isSearchingGoogle && (
-                <View className="items-center py-8">
-                  <Text className="text-base text-neutral-500">
-                    No results found for &quot;{searchText}&quot;
-                  </Text>
-                </View>
-              )}
-
-            {/* Loading state */}
-            {isSearchingGoogle && (
-              <View className="items-center py-4">
-                <Text className="text-sm text-neutral-500">
-                  Searching locations...
-                </Text>
-              </View>
-            )}
-          </View>
+          <SearchResults
+            searchText={searchText}
+            userLocation={userLocation}
+            onBusStationPress={handleResultPress}
+            onGooglePlacePress={handleGooglePlacePress}
+            containerClassName="gap-4"
+          />
         ) : (
           <View>
             {/* Recent Searches */}
@@ -1431,7 +1288,7 @@ const BottomSheetContent = ({
             onRouteClick={onRouteClick}
           />
 
-          <FavoritesSection />
+          <FavoritesSection onSearchPress={onSearchPress} />
         </>
       )}
     </>

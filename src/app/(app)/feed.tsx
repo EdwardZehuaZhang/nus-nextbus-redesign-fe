@@ -18,7 +18,7 @@ function SearchBar() {
   const router = useRouter();
 
   const handleSearchPress = () => {
-    router.push('/search');
+    router.push('/transit');
   };
 
   return (
