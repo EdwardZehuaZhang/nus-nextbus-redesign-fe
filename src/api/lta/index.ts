@@ -18,8 +18,8 @@ export const getAllBusStops = async (): Promise<LTABusStop[]> => {
   let hasMore = true;
 
   while (hasMore) {
-    const { data } = await ltaClient.get<LTABusStopsResponse>('/BusStops', {
-      params: { $skip: skip },
+    const { data } = await ltaClient.get<LTABusStopsResponse>('/busstops', {
+      params: { skip: skip },
     });
 
     allStops.push(...data.value);
@@ -37,7 +37,7 @@ export const getBusStopByCode = async (
   busStopCode: string
 ): Promise<LTABusStop | null> => {
   try {
-    const { data } = await ltaClient.get<LTABusStopsResponse>('/BusStops', {
+    const { data } = await ltaClient.get<LTABusStopsResponse>('/busstops', {
       params: {
         BusStopCode: busStopCode,
       },
@@ -59,9 +59,10 @@ export const getBusRoute = async (
   serviceNo: string,
   direction?: 1 | 2
 ): Promise<LTABusRoute[]> => {
-  const { data } = await ltaClient.get<LTABusRoutesResponse>('/BusRoutes', {
+  const { data } = await ltaClient.get<LTABusRoutesResponse>('/busroutes', {
     params: {
-      ServiceNo: serviceNo,
+      serviceNo: serviceNo,
+      ...(direction && { direction: direction }),
     },
   });
 
@@ -114,11 +115,11 @@ export const getBusArrival = async (
   serviceNo?: string
 ): Promise<LTABusArrivalResponse> => {
   const { data } = await ltaClient.get<LTABusArrivalResponse>(
-    '/BusArrivalv2',
+    '/busarrival',
     {
       params: {
-        BusStopCode: busStopCode,
-        ...(serviceNo && { ServiceNo: serviceNo }),
+        busStopCode: busStopCode,
+        ...(serviceNo && { serviceNo: serviceNo }),
       },
     }
   );

@@ -72,7 +72,7 @@ const withEnvSuffix = (name) => {
  */
 
 const client = z.object({
-  APP_ENV: z.enum(['development', 'staging', 'production']),
+  APP_ENV: z.enum(['development', 'staging', 'production', 'local']),
   NAME: z.string(),
   SCHEME: z.string(),
   BUNDLE_ID: z.string(),
@@ -81,10 +81,11 @@ const client = z.object({
 
   // ADD YOUR CLIENT ENV VARS HERE
   API_URL: z.string(),
+  BACKEND_API_URL: z.string().min(1), // Backend gateway for proxied API calls
   VAR_NUMBER: z.number(),
   VAR_BOOL: z.boolean(),
-  GOOGLE_MAPS_API_KEY: z.string().min(1),
-  LTA_API_KEY: z.string().min(1),
+  GOOGLE_MAPS_API_KEY: z.string().optional(), // Optional - only for map display
+  LTA_API_KEY: z.string().optional(), // Optional - backend handles API calls
 });
 
 const buildTime = z.object({
@@ -107,6 +108,7 @@ const _clientEnv = {
 
   // ADD YOUR ENV VARS HERE TOO
   API_URL: process.env.API_URL,
+  BACKEND_API_URL: process.env.BACKEND_API_URL,
   VAR_NUMBER: Number(process.env.VAR_NUMBER),
   VAR_BOOL: process.env.VAR_BOOL === 'true',
   GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,

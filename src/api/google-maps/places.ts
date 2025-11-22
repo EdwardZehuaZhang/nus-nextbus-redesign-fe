@@ -3,10 +3,8 @@ import axios from 'axios';
 
 import type { PlaceAutocompleteResponse, PlaceDetailsResponse } from './types';
 
-const AUTOCOMPLETE_API_URL =
-  'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-const PLACE_DETAILS_API_URL =
-  'https://maps.googleapis.com/maps/api/place/details/json';
+// Use backend gateway for all Google Maps API calls
+const BACKEND_API_URL = Env.BACKEND_API_URL;
 
 export const getPlaceAutocomplete = async (
   input: string,
@@ -14,15 +12,19 @@ export const getPlaceAutocomplete = async (
   location?: { lat: number; lng: number },
   radius?: number
 ): Promise<PlaceAutocompleteResponse> => {
+  // Minimal logging to validate integration path
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[places-autocomplete] →', `${BACKEND_API_URL}/api/google/places/autocomplete`, { input, sessionToken, location, radius });
+  } catch {}
   const { data } = await axios.get<PlaceAutocompleteResponse>(
-    AUTOCOMPLETE_API_URL,
+    `${BACKEND_API_URL}/api/google/places/autocomplete`,
     {
       params: {
         input,
         sessiontoken: sessionToken,
         location: location ? `${location.lat},${location.lng}` : undefined,
         radius,
-        key: Env.GOOGLE_MAPS_API_KEY,
       },
     }
   );
@@ -39,13 +41,17 @@ export const getPlaceAutocomplete = async (
 export const getPlaceDetails = async (
   placeId: string
 ): Promise<PlaceDetailsResponse> => {
+  // Minimal logging to validate integration path
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[places-details] →', `${BACKEND_API_URL}/api/google/places/details`, { placeId });
+  } catch {}
   const { data } = await axios.get<PlaceDetailsResponse>(
-    PLACE_DETAILS_API_URL,
+    `${BACKEND_API_URL}/api/google/places/details`,
     {
       params: {
         place_id: placeId,
         fields: 'geometry,name,formatted_address,place_id',
-        key: Env.GOOGLE_MAPS_API_KEY,
       },
     }
   );

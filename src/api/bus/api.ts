@@ -27,7 +27,7 @@ export const getPublicity = async (): Promise<PublicityResponse> => {
  * Get information about all bus stops on campus
  */
 export const getBusStops = async (): Promise<BusStopsResponse> => {
-  const response = await client.get<BusStopsResponse>('/BusStops');
+  const response = await client.get<BusStopsResponse>('/busstops');
   return response.data;
 };
 
@@ -38,7 +38,7 @@ export const getBusStops = async (): Promise<BusStopsResponse> => {
 export const getPickupPoints = async (
   routeCode: RouteCode
 ): Promise<PickupPointResponse> => {
-  const response = await client.get<PickupPointResponse>('/PickupPoint', {
+  const response = await client.get<PickupPointResponse>('/pickuppoint', {
     params: { route_code: routeCode },
   });
   return response.data;
@@ -52,7 +52,7 @@ export const getPickupPoints = async (
 export const getShuttleService = async (
   busStopName: string
 ): Promise<ShuttleServiceResponse> => {
-  const response = await client.get<ShuttleServiceResponse>('/ShuttleService', {
+  const response = await client.get<ShuttleServiceResponse>('/shuttleservice', {
     params: { busstopname: busStopName },
   });
   return response.data;
@@ -65,7 +65,7 @@ export const getShuttleService = async (
 export const getActiveBuses = async (
   routeCode: RouteCode
 ): Promise<ActiveBusResponse> => {
-  const response = await client.get<ActiveBusResponse>('/ActiveBus', {
+  const response = await client.get<ActiveBusResponse>('/activebus', {
     params: { route_code: routeCode },
   });
   return response.data;
@@ -78,7 +78,7 @@ export const getActiveBuses = async (
 export const getBusLocation = async (
   vehiclePlate: string
 ): Promise<BusLocationResponse> => {
-  const response = await client.get<BusLocationResponse>('/BusLocation', {
+  const response = await client.get<BusLocationResponse>('/buslocation', {
     params: { veh_plate: vehiclePlate },
   });
   return response.data;
@@ -92,7 +92,7 @@ export const getRouteMinMaxTime = async (
   routeCode: RouteCode
 ): Promise<RouteMinMaxTimeResponse> => {
   const response = await client.get<RouteMinMaxTimeResponse>(
-    '/RouteMinMaxTime',
+    '/routeminmaxtime',
     {
       params: { route_code: routeCode },
     }
@@ -106,7 +106,7 @@ export const getRouteMinMaxTime = async (
 export const getServiceDescriptions =
   async (): Promise<ServiceDescriptionResponse> => {
     const response = await client.get<ServiceDescriptionResponse>(
-      '/ServiceDescription'
+      '/servicedescription'
     );
     return response.data;
   };
@@ -115,7 +115,7 @@ export const getServiceDescriptions =
  * Get all system announcements
  */
 export const getAnnouncements = async (): Promise<AnnouncementsResponse> => {
-  const response = await client.get<AnnouncementsResponse>('/Announcements');
+  const response = await client.get<AnnouncementsResponse>('/announcements');
   return response.data;
 };
 
@@ -123,7 +123,7 @@ export const getAnnouncements = async (): Promise<AnnouncementsResponse> => {
  * Get all ticker tape messages
  */
 export const getTickerTapes = async (): Promise<TickerTapesResponse> => {
-  const response = await client.get<TickerTapesResponse>('/TickerTapes');
+  const response = await client.get<TickerTapesResponse>('/tickertapes');
   return response.data;
 };
 
@@ -134,7 +134,7 @@ export const getTickerTapes = async (): Promise<TickerTapesResponse> => {
 export const getCheckpoints = async (
   routeCode: RouteCode
 ): Promise<CheckPointResponse> => {
-  const response = await client.get<CheckPointResponse>('/CheckPoint', {
+  const response = await client.get<CheckPointResponse>('/checkpoint', {
     params: { route_code: routeCode },
   });
   return response.data;

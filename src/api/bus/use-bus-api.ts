@@ -116,7 +116,7 @@ export const useActiveBuses = (routeCode: RouteCode, enabled = true) => {
     queryFn: () => getActiveBuses(routeCode),
     enabled: enabled && !!routeCode,
     staleTime: 5 * 1000, // 5 seconds
-    refetchInterval: 10 * 1000, // Refetch every 10 seconds
+    refetchInterval: 20 * 1000, // Refetch every 20 seconds for live bus tracking
   });
 };
 

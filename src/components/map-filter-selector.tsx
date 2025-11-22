@@ -23,15 +23,14 @@ const defaultFilterItems = [
   { id: 'bus-stops', label: 'Bus Stops', checked: true, type: 'radio', group: 'bus-view' },
   { id: 'academic', label: 'Academic', checked: false, type: 'checkbox' },
   { id: 'residences', label: 'Residences', checked: false, type: 'checkbox' },
-  // Temporarily hidden bus routes - uncomment to restore
-  // { id: 'bus-route-a1', label: 'A1', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-a2', label: 'A2', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-d1', label: 'D1', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-d2', label: 'D2', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-btc', label: 'BTC', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-e', label: 'E', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-k', label: 'K', checked: false, type: 'radio', group: 'bus-view' },
-  // { id: 'bus-route-l', label: 'L', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-a1', label: 'A1', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-a2', label: 'A2', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-d1', label: 'D1', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-d2', label: 'D2', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-btc', label: 'BTC', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-e', label: 'E', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-k', label: 'K', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-l', label: 'L', checked: false, type: 'radio', group: 'bus-view' },
 ];
 
 interface MapFilterSelectorProps {

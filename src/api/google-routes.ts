@@ -168,47 +168,31 @@ export interface ComputeRoutesResponse {
 }
 
 /**
- * Compute routes using Google Maps Routes API
+ * Compute routes using Google Maps Routes API (via backend gateway)
  * @param request - The route request parameters
  * @returns Promise with route data
  */
 export async function computeRoutes(
   request: ComputeRoutesRequest
 ): Promise<ComputeRoutesResponse> {
-  const apiKey = Env.GOOGLE_MAPS_API_KEY;
+  const backendUrl = Env.BACKEND_API_URL;
 
-  if (!apiKey) {
-    throw new Error('Google Maps API key is not configured');
+  if (!backendUrl) {
+    throw new Error('Backend API URL is not configured');
   }
 
-  const url = 'https://routes.googleapis.com/directions/v2:computeRoutes';
-
-  // Field mask to specify which fields to return
-  const fieldMask = [
-    'routes.duration',
-    'routes.distanceMeters',
-    'routes.polyline.encodedPolyline',
-    'routes.legs.steps.distanceMeters',
-    'routes.legs.steps.staticDuration',
-    'routes.legs.steps.polyline',
-    'routes.legs.steps.startLocation',
-    'routes.legs.steps.endLocation',
-    'routes.legs.steps.navigationInstruction',
-    'routes.legs.steps.travelMode',
-    'routes.legs.steps.transitDetails',
-    'routes.legs.stepsOverview',
-    'routes.travelAdvisory.transitFare',
-    'routes.localizedValues',
-    'routes.description',
-  ].join(',');
+  const url = `${backendUrl}/api/routes/compute`;
 
   try {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[google-routes] →', url, request);
+    } catch {}
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask': fieldMask,
+        // Backend will add X-Goog-Api-Key and X-Goog-FieldMask
       },
       body: JSON.stringify(request),
     });
@@ -221,6 +205,10 @@ export async function computeRoutes(
     }
 
     const data: ComputeRoutesResponse = await response.json();
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[google-routes] ←', response.status, url);
+    } catch {}
     return data;
   } catch (error) {
     console.error('Error computing routes:', error);

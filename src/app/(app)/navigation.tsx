@@ -5,6 +5,7 @@ import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 
 import {
   getTransitRoute,
+  getWalkingRoute,
   type Route,
   type RouteStep,
   type Waypoint,
@@ -665,11 +666,22 @@ export default function NavigationPage() {
   const originName = typeof customOrigin === 'string' ? customOrigin : 'Your location';
   const hasCustomOrigin = typeof customOrigin === 'string' && customOrigin !== '';
   
-  // Parse URL user location parameters
-  const urlUserLocation = React.useMemo(() => {
-    // First, check if there's a named origin location (customOrigin parameter)
-    if (typeof customOrigin === 'string' && customOrigin !== '') {
-      // Look up the bus stop coordinates for this custom origin
+  // Parse custom origin coordinates if available (highest priority)
+  const customOriginCoords = React.useMemo(() => {
+    if (typeof customOriginLat === 'string' && typeof customOriginLng === 'string') {
+      const lat = parseFloat(customOriginLat);
+      const lng = parseFloat(customOriginLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        console.log('📍 [URL] Custom origin from explicit coordinates:', { lat, lng });
+        return { latitude: lat, longitude: lng };
+      }
+    }
+    return null;
+  }, [customOriginLat, customOriginLng]);
+  
+  // Try to look up customOrigin as a bus station name (only if no explicit coords provided)
+  const customOriginFromBusStation = React.useMemo(() => {
+    if (typeof customOrigin === 'string' && customOrigin !== '' && !customOriginCoords) {
       const busStation = getBusStationByName(customOrigin);
       if (busStation?.coordinates) {
         console.log('📍 [URL] Origin from customOrigin bus station:', customOrigin, {
@@ -681,11 +693,13 @@ export default function NavigationPage() {
           longitude: busStation.coordinates.longitude
         };
       }
-      // If not a bus station, might be a landmark - will handle later
       console.warn('⚠️ customOrigin not found in bus stations:', customOrigin);
     }
-    
-    // Otherwise use userLat/userLng coordinates
+    return null;
+  }, [customOrigin, customOriginCoords]);
+  
+  // Parse URL user location parameters (lowest priority for origin)
+  const urlUserLocation = React.useMemo(() => {
     if (typeof userLat === 'string' && typeof userLng === 'string') {
       const lat = parseFloat(userLat);
       const lng = parseFloat(userLng);
@@ -695,29 +709,22 @@ export default function NavigationPage() {
       }
     }
     return null;
-  }, [customOrigin, userLat, userLng]);
-  
-  // Parse custom origin coordinates if available
-  const customOriginCoords = React.useMemo(() => {
-    if (typeof customOriginLat === 'string' && typeof customOriginLng === 'string') {
-      const lat = parseFloat(customOriginLat);
-      const lng = parseFloat(customOriginLng);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        return { latitude: lat, longitude: lng };
-      }
-    }
-    return null;
-  }, [customOriginLat, customOriginLng]);
+  }, [userLat, userLng]);
 
   // Calculate the effective origin for routing - priority order:
-  // 1. Custom origin from URL (customOriginLat/Lng)
-  // 2. User location from URL (userLat/Lng)  
-  // 3. GPS userLocation state
-  // 4. Global user location from context
+  // 1. Custom origin explicit coordinates (customOriginLat/Lng)
+  // 2. Custom origin from bus station lookup by name
+  // 3. User location from URL (userLat/Lng)  
+  // 4. GPS userLocation state
+  // 5. Global user location from context
   const effectiveOrigin = React.useMemo(() => {
     if (customOriginCoords) {
-      console.log('🎯 Using custom origin:', customOriginCoords);
+      console.log('🎯 Using custom origin explicit coords:', customOriginCoords);
       return customOriginCoords;
+    }
+    if (customOriginFromBusStation) {
+      console.log('🎯 Using custom origin from bus station:', customOriginFromBusStation);
+      return customOriginFromBusStation;
     }
     if (urlUserLocation) {
       console.log('🎯 Using URL user location:', urlUserLocation);
@@ -736,7 +743,7 @@ export default function NavigationPage() {
     }
     console.warn('⚠️ No user location available!');
     return null;
-  }, [customOriginCoords, urlUserLocation, userLocation, globalUserLocation]);
+  }, [customOriginCoords, customOriginFromBusStation, urlUserLocation, userLocation, globalUserLocation]);
 
   // Debug logging for internal route finder
   useEffect(() => {
@@ -1008,16 +1015,26 @@ export default function NavigationPage() {
 
   // Helper to map destination names to coordinates (simplified for now)
   const getDestinationCoordinates = (dest: string): { lat: number; lng: number } | null => {
-    // First, check if we have coordinates from URL params (Google Places)
-    if (typeof destinationLat === 'string' && typeof destinationLng === 'string') {
-      const lat = parseFloat(destinationLat);
-      const lng = parseFloat(destinationLng);
-      if (!isNaN(lat) && !isNaN(lng)) {
-        console.log('📍 Using destination coordinates from URL params:', { lat, lng });
-        return { lat, lng };
-      }
+    console.log('🎯 [getDestinationCoordinates] Resolving destination:', dest);
+    console.log('   destinationLat/Lng from URL:', destinationLat, destinationLng);
+    
+    // PRIORITY 1: Check if destination name matches a known bus stop
+    // This ensures we use correct bus stop coordinates even if Google provides different coords
+    const busStation = getBusStationByName(dest);
+    if (busStation?.coordinates) {
+      console.log('📍 [DESTINATION] Found as bus stop in database:', {
+        name: dest,
+        lat: busStation.coordinates.latitude,
+        lng: busStation.coordinates.longitude,
+      });
+      console.log('   ✓ Using bus stop coordinates (ignoring URL coords if different)');
+      return {
+        lat: busStation.coordinates.latitude,
+        lng: busStation.coordinates.longitude,
+      };
     }
     
+    // PRIORITY 2: Check if destination matches hardcoded destinations
     const destinations: Record<string, { lat: number; lng: number }> = {
       // Residential Colleges
       'COM1': { lat: 1.29453, lng: 103.77397 },
@@ -1048,25 +1065,31 @@ export default function NavigationPage() {
     // Try exact match first (case-insensitive)
     const upperDest = dest.toUpperCase();
     if (destinations[upperDest]) {
+      console.log('📍 [DESTINATION] Found exact match in hardcoded destinations:', destinations[upperDest]);
       return destinations[upperDest];
     }
     
     // Try partial match in hardcoded destinations
     for (const [key, coords] of Object.entries(destinations)) {
       if (key.includes(upperDest) || upperDest.includes(key)) {
+        console.log('📍 [DESTINATION] Found partial match in hardcoded destinations:', key, coords);
         return coords;
       }
     }
     
-    // Try to find in bus stations database
-    const busStation = getBusStationByName(dest);
-    if (busStation?.coordinates) {
-      return {
-        lat: busStation.coordinates.latitude,
-        lng: busStation.coordinates.longitude,
-      };
+    // PRIORITY 3: Use explicit coordinates from URL (for Google Places)
+    // Only use these if destination is NOT a known bus stop or landmark
+    if (typeof destinationLat === 'string' && typeof destinationLng === 'string') {
+      const lat = parseFloat(destinationLat);
+      const lng = parseFloat(destinationLng);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        console.log('📍 [DESTINATION] Using explicit coordinates from URL params (Google Place):', { lat, lng });
+        console.log('   ℹ️  Destination name not found in bus stops or landmarks:', dest);
+        return { lat, lng };
+      }
     }
     
+    console.warn('⚠️ [DESTINATION] No coordinates found for:', dest);
     return null;
   };
 
@@ -1107,8 +1130,18 @@ export default function NavigationPage() {
           },
         };
         
-        // Call Google Routes API
-        const result = await getTransitRoute(origin, dest);
+        // Call Google Routes API (Transit first, then fallback to Walking)
+        let result = await getTransitRoute(origin, dest);
+
+        if (!result || !result.routes || result.routes.length === 0) {
+          // Fallback to walking if no transit routes are available (common for intra-campus)
+          try {
+            const walkResult = await getWalkingRoute(origin, dest);
+            if (walkResult && walkResult.routes && walkResult.routes.length > 0) {
+              result = walkResult;
+            }
+          } catch {}
+        }
 
         if (result && result.routes && result.routes.length > 0) {
           setRoutes(result.routes);
@@ -1117,7 +1150,22 @@ export default function NavigationPage() {
           setRouteError('No routes found');
         }
       } catch (error) {
-        setRouteError(error instanceof Error ? error.message : 'Failed to fetch routes');
+        // If transit call failed, attempt a walking fallback once
+        try {
+          const origin: Waypoint = { location: { latLng: effectiveOrigin } };
+          const dest: Waypoint = { location: { latLng: { latitude: destCoords.lat, longitude: destCoords.lng } } };
+          const walkResult = await getWalkingRoute(origin, dest);
+          if (walkResult && walkResult.routes && walkResult.routes.length > 0) {
+            setRoutes(walkResult.routes);
+            setRouteError(null);
+          } else {
+            setRouteError(error instanceof Error ? error.message : 'Failed to fetch routes');
+          }
+        } catch (fallbackErr) {
+          setRouteError(
+            fallbackErr instanceof Error ? fallbackErr.message : 'Failed to fetch routes'
+          );
+        }
       } finally {
         setIsLoadingRoutes(false);
       }
@@ -1282,6 +1330,15 @@ export default function NavigationPage() {
     );
   }, [locations]);
 
+  // Calculate if there are intermediate stops
+  const hasIntermediateStops = useMemo(() => {
+    try {
+      return (JSON.parse(stopsKey) as string[]).length > 0;
+    } catch {
+      return false;
+    }
+  }, [stopsKey]);
+
   // Recompute Google routing when intermediate stops are present
   useEffect(() => {
     const recomputeWithStops = async () => {
@@ -1316,13 +1373,26 @@ export default function NavigationPage() {
           const originWp: Waypoint = { location: { latLng: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } } };
           const destWp: Waypoint = { location: { latLng: { latitude: target.lat, longitude: target.lng } } };
 
-          const res = await getTransitRoute(originWp, destWp);
-          const firstRoute = res?.routes?.[0];
+          // Try transit first; if none, fallback to walking for this segment
+          let res = await getTransitRoute(originWp, destWp);
+          let firstRoute = res?.routes?.[0];
+          if (!firstRoute) {
+            try {
+              const walkRes = await getWalkingRoute(originWp, destWp);
+              if (walkRes?.routes?.[0]) {
+                res = walkRes;
+                firstRoute = walkRes.routes[0];
+              }
+            } catch {}
+          }
           const firstLeg = firstRoute?.legs?.[0];
           if (firstLeg?.steps) {
             combinedSteps.push(...firstLeg.steps);
-            totalDurationSeconds += parseDurationSeconds(firstLeg.duration);
-            totalDistanceMeters += firstLeg.distanceMeters || 0;
+            // Prefer leg duration/distance; fallback to route-level if leg is missing in field mask
+            const segDuration = parseDurationSeconds(firstLeg.duration) || parseDurationSeconds(firstRoute?.duration);
+            const segDistance = (firstLeg.distanceMeters ?? firstRoute?.distanceMeters ?? 0) as number;
+            totalDurationSeconds += segDuration;
+            totalDistanceMeters += segDistance;
           }
 
           currentPoint = { latitude: target.lat, longitude: target.lng };
@@ -1452,15 +1522,7 @@ export default function NavigationPage() {
     };
   }, [internalRoutePolylines, bestInternalRoute]);
 
-  // Memoize visible bus stops for internal route display
-  const hasIntermediateStops = useMemo(() => {
-    try {
-      return (JSON.parse(stopsKey) as string[]).length > 0;
-    } catch {
-      return false;
-    }
-  }, [stopsKey]);
-
+  // showInternal determines whether to display the internal route in the UI
   const showInternal = recommendInternal && !hasIntermediateStops;
 
   const visibleBusStops = useMemo(() => {
@@ -2098,7 +2160,7 @@ export default function NavigationPage() {
                   <ActivityIndicator size="large" color="#274F9C" />
                 </View>
               )}
-              {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && (
+              {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && !bestInternalRoute && (
                 <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: '8px', marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
                     �?Error: {routeError}
@@ -2113,7 +2175,7 @@ export default function NavigationPage() {
               )}
 
               {/* Show Internal Route if it's faster, otherwise show Google Maps route */}
-              {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && showInternal && bestInternalRoute ? (
+              {!isLoadingRoutes && !isLoadingInternalRoutes && showInternal && bestInternalRoute ? (
                 // DISPLAY INTERNAL BUS ROUTE - Using same format as Google Maps
                 <>
                   {/* Step 1: Origin location - SAME FORMAT AS GOOGLE MAPS */}

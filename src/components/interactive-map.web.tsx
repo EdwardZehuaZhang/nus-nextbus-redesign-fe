@@ -4366,6 +4366,9 @@ const useFilteredBusRoutes = (
       });
       busMarkersRef.current.set(routeCode, newBusMarkers);
 
+      // DISABLED: Route-specific stop markers (redundant with general bus stop markers)
+      // The general bus stop markers already show all stops with labels and proper zoom behavior
+      /*
       // Update stop markers
       const stops = stopDataByRoute.get(routeCode) || [];
       const existingStopMarkers = stopMarkersRef.current.get(routeCode) || [];
@@ -4375,24 +4378,24 @@ const useFilteredBusRoutes = (
       stops.forEach((stop: any) => {
         // Validate coordinates before creating marker
         if (
-          typeof stop.latitude !== 'number' ||
-          typeof stop.longitude !== 'number' ||
-          isNaN(stop.latitude) ||
-          isNaN(stop.longitude)
+          typeof stop.lat !== 'number' ||
+          typeof stop.lng !== 'number' ||
+          isNaN(stop.lat) ||
+          isNaN(stop.lng)
         ) {
-          console.warn(`Invalid coordinates for stop ${stop.name}:`, {
-            lat: stop.latitude,
-            lng: stop.longitude,
+          console.warn(`Invalid coordinates for stop ${stop.ShortName}:`, {
+            lat: stop.lat,
+            lng: stop.lng,
           });
           return;
         }
         
         const marker = new google.maps.Marker({
-          position: { lat: stop.latitude, lng: stop.longitude },
+          position: { lat: stop.lat, lng: stop.lng },
           map,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
+            scale: 4, // Smaller default size
             fillColor: routeColor,
             fillOpacity: 1,
             strokeColor: '#FFFFFF',
@@ -4400,6 +4403,7 @@ const useFilteredBusRoutes = (
           },
           title: stop.name,
           zIndex: 500,
+          visible: false, // Hidden by default at low zoom levels
         });
 
         const infoWindow = new google.maps.InfoWindow({
@@ -4422,10 +4426,35 @@ const useFilteredBusRoutes = (
         newStopMarkers.push(marker);
       });
       stopMarkersRef.current.set(routeCode, newStopMarkers);
+      */
     });
+
+    // DISABLED: Zoom listener for route-specific stop markers (no longer needed)
+    /*
+    // Add zoom listener to control stop marker visibility based on zoom level
+    const zoomListener = map.addListener('zoom_changed', () => {
+      const zoom = map.getZoom();
+      if (zoom !== undefined) {
+        stopMarkersRef.current.forEach((markers) => {
+          markers.forEach((marker) => {
+            // Show markers only at zoom level 17 or higher
+            marker.setVisible(zoom >= 17);
+          });
+        });
+      }
+    });
+    */
 
     // Cleanup on unmount
     return () => {
+      // DISABLED: Remove zoom listener (no longer used)
+      /*
+      // Remove zoom listener
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+      */
+
       polylinesRef.current.forEach((polyline) => {
         polyline.setMap(null);
       });
@@ -4436,10 +4465,13 @@ const useFilteredBusRoutes = (
       });
       busMarkersRef.current.clear();
 
+      // DISABLED: Cleanup for route-specific stop markers (no longer created)
+      /*
       stopMarkersRef.current.forEach((markers) => {
         markers.forEach((marker) => marker.setMap(null));
       });
       stopMarkersRef.current.clear();
+      */
     };
   }, [mapRef, filters, busDataByRoute, stopDataByRoute]);
 
