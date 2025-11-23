@@ -1,7 +1,6 @@
-import { Link, Redirect, SplashScreen, Stack } from 'expo-router';
+import { Redirect, SplashScreen, Stack } from 'expo-router';
 import React, { useCallback, useEffect } from 'react';
 
-import { Pressable, Text } from '@/components/ui';
 import { useAuth, useIsFirstTime } from '@/lib';
 
 export const unstable_settings = {
@@ -26,29 +25,16 @@ export default function TabLayout() {
   // if (isFirstTime) {
   //   return <Redirect href="/onboarding" />;
   // }
-  if (status === 'signOut') {
-    return <Redirect href="/login" />;
-  }
+  // Comment out login redirect since auth is handled differently
+  // if (status === 'signOut') {
+  //   return <Redirect href="/login" />;
+  // }
   return (
     <Stack>
       <Stack.Screen
         name="transit"
         options={{
           title: 'Transit',
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="feed"
-        options={{
-          title: 'Feed',
-          headerRight: () => <CreateNewPostLink />,
-        }}
-      />
-      <Stack.Screen
-        name="style"
-        options={{
-          title: 'Style',
           headerShown: false,
         }}
       />
@@ -76,13 +62,3 @@ export default function TabLayout() {
     </Stack>
   );
 }
-
-const CreateNewPostLink = () => {
-  return (
-    <Link href="/feed/add-post" asChild>
-      <Pressable>
-        <Text className="px-3 text-primary-300">Create</Text>
-      </Pressable>
-    </Link>
-  );
-};
