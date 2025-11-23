@@ -2029,7 +2029,13 @@ export default function NavigationPage() {
               <Text
                 style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}
               >
-                {bestInternalRoute ? `${Math.ceil(bestInternalRoute.totalTime / 60)} Mins` : '28 Mins'}
+                {isLoadingRoutes || isLoadingInternalRoutes 
+                  ? '— Mins' 
+                  : bestInternalRoute 
+                    ? `${Math.ceil(bestInternalRoute.totalTime / 60)} Mins` 
+                    : routes.length > 0 && routes[0].legs?.[0]?.duration 
+                      ? `${Math.ceil(durationToMinutes(routes[0].legs[0].duration))} Mins` 
+                      : '—'}
               </Text>
 
               <View
@@ -2155,12 +2161,144 @@ export default function NavigationPage() {
             {/* Journey Steps */}
             <View style={{ marginBottom: 16 }}>
               {/* Loading/Error States */}
-              {(isLoadingRoutes || (showInternal && isLoadingInternalRoutes)) && (
-                <View style={{ padding: 16, alignItems: 'center', justifyContent: 'center' }}>
-                  <ActivityIndicator size="large" color="#274F9C" />
-                </View>
-              )}
-              {routeError && !isLoadingRoutes && !isLoadingInternalRoutes && !bestInternalRoute && (
+              {(isLoadingRoutes || isLoadingInternalRoutes) ? (
+                <>
+                  {/* Loading message */}
+                  <View style={{ alignItems: 'center', marginVertical: 0, paddingTop: 12, paddingBottom: 36, gap: 8 }}>
+                    <ActivityIndicator size="large" color="#274F9C" />
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#211F26', textAlign: 'center' }}>
+                      Calculating optimal route...
+                    </Text>
+                    <Text style={{ fontSize: 14, color: '#737373', textAlign: 'center' }}>
+                      Finding the best way from {originName} to {currentDestination}
+                    </Text>
+                  </View>
+
+                  {/* Origin */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <NavigationArrow />
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
+                        {originName}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }}>
+                      {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    </Text>
+                  </View>
+
+                  {/* Connecting line */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 16,
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <DotDivider />
+                    <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                  </View>
+
+                  {/* Loading step */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <View style={{ width: 20, height: 20 }}>
+                        <ActivityIndicator size="small" color="#274F9C" />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#737373',
+                          fontStyle: 'italic',
+                        }}
+                      >
+                        Calculating route...
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }} />
+                  </View>
+
+                  {/* Connecting line */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 20,
+                      paddingLeft: 9,
+                      height: 16,
+                      justifyContent: 'center',
+                      marginVertical: 8,
+                    }}
+                  >
+                    <DotDivider />
+                    <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+                  </View>
+
+                  {/* Destination */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 12,
+                      }}
+                    >
+                      <MapPin />
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '500',
+                          color: '#211F26',
+                        }}
+                      >
+                        {currentDestination}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#09090B' }} />
+                  </View>
+                </>
+              ) : routeError && !bestInternalRoute ? (
                 <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: '8px', marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
                     �?Error: {routeError}
@@ -2172,7 +2310,7 @@ export default function NavigationPage() {
                     Check the browser console for more details
                   </Text>
                 </View>
-              )}
+              ) : null}
 
               {/* Show Internal Route if it's faster, otherwise show Google Maps route */}
               {!isLoadingRoutes && !isLoadingInternalRoutes && showInternal && bestInternalRoute ? (
@@ -2999,36 +3137,7 @@ export default function NavigationPage() {
                     </Text>
                   </View>
                 </>
-              ) : (
-                // Fallback for no data
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 12,
-                    }}
-                  >
-                    <NavigationArrow />
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '500',
-                        color: '#211F26',
-                      }}
-                    >
-                      {originName}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 14, color: '#09090B' }}>9:44AM</Text>
-                </View>
-              )}
+              ) : null}
             </View>
 
             {/* Internal Shuttle Routes Section - Shows AS alternative if Google Maps is shown */}
