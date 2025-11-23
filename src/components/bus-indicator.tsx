@@ -46,6 +46,7 @@ export const BusIndicator = ({ color = '#274F9C' }: BusIndicatorProps) => {
         alignItems: 'center',
         justifyContent: 'space-between',
         alignSelf: 'stretch',
+        overflow: 'visible',
       }}
     >
       <View style={{ marginTop: -2.5 }}>

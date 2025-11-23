@@ -1853,7 +1853,7 @@ export default function NavigationPage() {
           <ScrollView
             scrollEnabled={containerHeight > 50}
             showsVerticalScrollIndicator={containerHeight > 50}
-            style={{ marginTop: 12 }}
+            style={{ marginTop: 12, paddingHorizontal: 12, marginHorizontal: -12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
           >
             {(panelState === 'animating' || panelState === 'expanded') ? (
@@ -2436,14 +2436,15 @@ export default function NavigationPage() {
                           flexDirection: 'row',
                           alignItems: 'flex-start',
                           gap: 16,
+                          overflow: 'visible',
                         }}
                       >
                         <View
                           style={{
                             flexDirection: 'row',
-                            alignItems: 'flex-start',
                             gap: 16,
                             flex: 1,
+                            overflow: 'visible',
                           }}
                         >
                           <BusIndicator expanded={false} color={routeColor} />
