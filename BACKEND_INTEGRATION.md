@@ -53,19 +53,23 @@ All Google Maps API calls for search and routing now go through the backend:
 
 ### 1. Environment Configuration
 
-**Added Variable:**
-- `BACKEND_API_URL` - URL of the backend gateway
+**Primary Variable:**
+- `BACKEND_API_URL` - URL of the backend gateway (handles ALL external APIs)
+
+**Removed Variables:**
+- `API_URL` - No longer used; all calls go through backend
+- `EXPO_PUBLIC_LTA_API_KEY` - Security risk; backend handles LTA authentication
 
 **Updated Files:**
 - `.env.example`
 - `.env.development` - Set to `http://localhost:3000`
 - `.env.staging` - Set to `https://your-backend-gateway-staging.com`
-- `.env.production` - Set to `https://your-backend-gateway.com`
-- `env.js` - Added to client schema
+- `.env.production` - Set to `https://nus-nextbus-redesign-be.onrender.com`
+- `env.js` - Removed API_URL from client schema
 
 **API Key Status:**
-- `GOOGLE_MAPS_API_KEY` - Now optional (only for map display)
-- `LTA_API_KEY` - Now optional (backend handles API calls)
+- `GOOGLE_MAPS_API_KEY` - Only for map display (Maps SDK)
+- All API calls (NUS NextBus, Google Maps, LTA) - Handled by backend
 
 ### 2. API Client Updates
 

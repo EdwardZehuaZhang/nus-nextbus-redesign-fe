@@ -80,19 +80,21 @@ const client = z.object({
   VERSION: z.string(),
 
   // ADD YOUR CLIENT ENV VARS HERE
-  API_URL: z.string(),
-  BACKEND_API_URL: z.string().min(1), // Backend gateway for proxied API calls
+  BACKEND_API_URL: z.string().min(1), // Backend gateway handles ALL API calls (NUS NextBus, Google Maps, LTA)
   VAR_NUMBER: z.number(),
   VAR_BOOL: z.boolean(),
-  GOOGLE_MAPS_API_KEY: z.string().optional(), // Optional - only for map display
-  LTA_API_KEY: z.string().optional(), // Optional - backend handles API calls
+  // Google Maps API Key - ONLY for map display (Maps SDK)
+  // SECURITY: This key should be restricted in Google Cloud Console by platform
+  // Backend handles all Google Maps API calls (Routes, Places, Directions)
+  GOOGLE_MAPS_API_KEY: z.string().min(1), // Required for map rendering
 });
 
 const buildTime = z.object({
   EXPO_ACCOUNT_OWNER: z.string(),
   EAS_PROJECT_ID: z.string(),
   // ADD YOUR BUILD TIME ENV VARS HERE
-  SECRET_KEY: z.string(),
+  // SECURITY: SECRET_KEY should be provided via CI/CD secrets, not .env files
+  SECRET_KEY: z.string().optional(), // Made optional - use EAS secrets instead
 });
 
 /**
@@ -107,12 +109,12 @@ const _clientEnv = {
   VERSION: packageJSON.version,
 
   // ADD YOUR ENV VARS HERE TOO
-  API_URL: process.env.API_URL,
   BACKEND_API_URL: process.env.BACKEND_API_URL,
   VAR_NUMBER: Number(process.env.VAR_NUMBER),
   VAR_BOOL: process.env.VAR_BOOL === 'true',
+  // SECURITY: Google Maps API key for map rendering only (not for API calls)
+  // Backend handles all Google Maps API requests (Routes, Places, Directions)
   GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-  LTA_API_KEY: process.env.EXPO_PUBLIC_LTA_API_KEY,
 };
 
 /**

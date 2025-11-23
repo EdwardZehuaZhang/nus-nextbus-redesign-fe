@@ -64,3 +64,34 @@ export const getPlaceDetails = async (
 
   return data;
 };
+
+export const findPlaceFromQuery = async (
+  input: string,
+  inputtype: 'textquery' | 'phonenumber' = 'textquery',
+  fields?: string,
+  locationbias?: string
+): Promise<any> => {
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[places-findplace] →', `${BACKEND_API_URL}/api/google/places/findplace`, { input, inputtype, fields, locationbias });
+  } catch {}
+  const { data } = await axios.get(
+    `${BACKEND_API_URL}/api/google/places/findplace`,
+    {
+      params: {
+        input,
+        inputtype,
+        fields: fields || 'place_id,name',
+        locationbias,
+      },
+    }
+  );
+
+  if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+    throw new Error(
+      `Find Place API error: ${data.status}`
+    );
+  }
+
+  return data;
+};

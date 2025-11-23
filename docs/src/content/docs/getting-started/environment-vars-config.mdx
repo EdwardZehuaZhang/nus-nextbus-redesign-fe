@@ -85,7 +85,7 @@ pnpm prebuild
 import { Env } from '@env';
 import axios from 'axios';
 export const client = axios.create({
-  baseURL: Env.API_URL,
+  baseURL: `${Env.BACKEND_API_URL}/api/bus`, // All API calls go through backend gateway
 });
 ```
 
@@ -155,6 +155,6 @@ Now the environment variables are ready to use in your project. You can access t
 import { Env } from '@env';
 import axios from 'axios';
 export const client = axios.create({
-  baseURL: Env.API_URL,
+  baseURL: `${Env.BACKEND_API_URL}/api/bus`, // All API calls go through backend gateway
 });
 ```

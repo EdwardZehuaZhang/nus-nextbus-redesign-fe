@@ -10,6 +10,7 @@ import {
   useServiceDescriptions,
 } from '@/api/bus';
 import type { LatLng } from '@/api/google-maps';
+import { findPlaceFromQuery } from '@/api/google-maps/places';
 import type { RouteStep } from '@/api/google-routes';
 import { createBusMarkerSVG, svgToDataURL } from '@/components/bus-marker-icon';
 import {
@@ -4589,29 +4590,26 @@ const useLandmarkMarkers = (
         // Use text search to find the place ID if we have coordinates
         if (onPlaceSelected) {
           try {
-            // Import the places library
-            const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+            console.log('[LandmarkMarker] Finding place ID from backend API...');
             
-            // Use findPlaceFromQuery to get the correct place ID
-            const service = new google.maps.places.PlacesService(map);
+            // Use backend API for finding place
+            const locationBias = `point:${landmark.coordinates.lat},${landmark.coordinates.lng}`;
+            const findPlaceData = await findPlaceFromQuery(
+              `${landmark.name}, ${landmark.address}`,
+              'textquery',
+              'place_id,name',
+              locationBias
+            );
             
-            const request = {
-              query: landmark.name + ', ' + landmark.address,
-              fields: ['place_id', 'name'],
-              locationBias: landmark.coordinates,
-            };
-            
-            service.findPlaceFromQuery(request, (results, status) => {
-              if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
-                const placeId = results[0].place_id;
-                console.log('[LandmarkMarker] Found Place ID:', placeId, 'for', landmark.name);
-                onPlaceSelected(placeId);
-              } else {
-                console.error('[LandmarkMarker] Failed to find place:', status);
-                // Fallback to info window
-                infoWindow.open(map, marker);
-              }
-            });
+            if (findPlaceData.status === 'OK' && findPlaceData.candidates && findPlaceData.candidates.length > 0) {
+              const placeId = findPlaceData.candidates[0].place_id;
+              console.log('[LandmarkMarker] Found Place ID:', placeId, 'for', landmark.name);
+              onPlaceSelected(placeId);
+            } else {
+              console.error('[LandmarkMarker] Failed to find place:', findPlaceData.status);
+              // Fallback to info window
+              infoWindow.open(map, marker);
+            }
           } catch (error) {
             console.error('[LandmarkMarker] Error finding place:', error);
             infoWindow.open(map, marker);

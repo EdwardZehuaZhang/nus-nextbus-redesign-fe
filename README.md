@@ -111,19 +111,17 @@ The app supports multiple environments with different backend configurations:
 
 **Development** (Local Backend)
 
-**Development** (Actual NUS NextBus API)
-
 ```bash
-API_URL=https://nnextbus.nus.edu.sg
+BACKEND_API_URL=http://localhost:3000
 ```
 
-**Production** (Actual NUS NextBus API)
+**Production** (Deployed Backend)
 
 ```bash
-API_URL=https://nnextbus.nus.edu.sg
+BACKEND_API_URL=https://nus-nextbus-redesign-be.onrender.com
 ```
 
-**Note**: The app now uses the official NUS NextBus API with HTTP Basic Authentication. Credentials are configured in the API client.
+**Note**: All external API calls (NUS NextBus, Google Maps, LTA) are proxied through the backend gateway for security. The backend handles all authentication - no credentials needed in the mobile app.
 
 Switch environments using:
 

@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 
+import { getDirections } from '@/api/google-maps/directions';
 import {
   FocusAwareStatusBar,
   Pressable,
@@ -187,45 +188,49 @@ export default function TurnByTurnNavigationPage() {
       },
     });
 
-    // Get directions
-    const directionsService = new google.maps.DirectionsService();
-    const directionsRenderer = new google.maps.DirectionsRenderer({
-      map,
-      suppressMarkers: true, // Hide default A/B markers
-      polylineOptions: {
-        strokeColor: '#274F9C',
-        strokeWeight: 5,
-        strokeOpacity: 0.8,
-      },
-    });
+    // Get directions from backend API instead of DirectionsService
+    const fetchDirections = async () => {
+      try {
+        const directionsData = await getDirections({
+          origin: `${userLocation.lat},${userLocation.lng}`,
+          destination: `${destLocation.lat},${destLocation.lng}`,
+          mode: 'walking',
+        });
 
-    directionsService.route(
-      {
-        origin: userLocation,
-        destination: destLocation,
-        travelMode: google.maps.TravelMode.WALKING,
-      },
-      (result, status) => {
-        if (status === 'OK' && result) {
-          directionsRenderer.setDirections(result);
-          
-          const route = result.routes[0];
+        if (directionsData.status === 'OK' && directionsData.routes && directionsData.routes.length > 0) {
+          const route = directionsData.routes[0];
           const leg = route.legs[0];
-          
+
+          // Render the route on the map using DirectionsRenderer
+          const directionsRenderer = new google.maps.DirectionsRenderer({
+            map,
+            directions: directionsData,
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: '#274F9C',
+              strokeWeight: 5,
+              strokeOpacity: 0.8,
+            },
+          });
+
           setDistance(leg.distance?.text || '--');
           setEta(leg.duration?.text || '--');
           setSteps(leg.steps);
-          
+
           if (leg.steps.length > 0) {
             setCurrentInstruction(leg.steps[0].instructions);
           }
 
           setIsMapLoaded(true);
         } else {
-          console.error('Directions request failed:', status);
+          console.error('Directions request failed:', directionsData.status);
         }
+      } catch (error) {
+        console.error('Error fetching directions:', error);
       }
-    );
+    };
+
+    fetchDirections();
   };
 
   return (

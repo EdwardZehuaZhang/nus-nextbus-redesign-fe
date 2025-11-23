@@ -44,105 +44,53 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       const busStationResults = searchBusStations(searchText);
       setBusResults(busStationResults);
 
-      // Search Google Places API for other locations
+      // Search Google Places API for other locations via backend
       const searchPlaces = async () => {
-        if (typeof window !== 'undefined' && window.google?.maps?.places?.AutocompleteSuggestion) {
-          try {
-            console.log('[SHARED SEARCH] 🔍 Searching with input:', searchText);
+        try {
+          console.log('[SHARED SEARCH] 🔍 Searching with input:', searchText);
 
-            // Prepare request options using new API - restrict to Singapore only  
-            const request: any = {
-              input: searchText,
-              includedRegionCodes: ['sg'], // Limit to Singapore
+          // Calculate location bias if user location is available
+          let location: { lat: number; lng: number } | undefined;
+          let radius: number | undefined;
+
+          if (userLocation?.latitude && userLocation?.longitude) {
+            location = {
+              lat: userLocation.latitude,
+              lng: userLocation.longitude,
             };
+            radius = 10000; // 10km radius in meters
+          }
 
-            // Bias results to user's location within Singapore
-            if (userLocation?.latitude && userLocation?.longitude) {
-              const userLat = userLocation.latitude;
-              const userLng = userLocation.longitude;
-              const radius = 0.1; // ~11km radius around user
-              
-              request.locationRestriction = {
-                west: userLng - radius,
-                north: userLat + radius,
-                east: userLng + radius, 
-                south: userLat - radius,
-              };
-            } else {
-              // Fallback to Singapore bounds
-              request.locationRestriction = {
-                west: 103.6,
-                north: 1.5,
-                east: 104.1,
-                south: 1.2,
-              };
-            }
+          // Call backend API for autocomplete
+          const data = await getPlaceAutocomplete(
+            searchText,
+            undefined, // sessiontoken
+            location,
+            radius
+          );
 
-            const { suggestions } = await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
-            
-            if (suggestions && suggestions.length > 0) {
-              // Convert to the expected format
-              const convertedResults: PlaceAutocompleteResult[] = suggestions.map((suggestion: any) => {
-                const placePrediction = suggestion.placePrediction;
-                const fullText = placePrediction?.text?.text || '';
-                const mainText = placePrediction?.structuredFormat?.mainText?.text || '';
-                const secondaryText = placePrediction?.structuredFormat?.secondaryText?.text || '';
+          if (data.predictions && data.predictions.length > 0) {
+            // Backend returns the standard autocomplete format
+            const convertedResults: PlaceAutocompleteResult[] = data.predictions.map((prediction: any) => ({
+              description: prediction.description || '',
+              matched_substrings: prediction.matched_substrings || [],
+              place_id: prediction.place_id || '',
+              reference: prediction.reference || prediction.place_id || '',
+              structured_formatting: {
+                main_text: prediction.structured_formatting?.main_text || '',
+                main_text_matched_substrings: prediction.structured_formatting?.main_text_matched_substrings || [],
+                secondary_text: prediction.structured_formatting?.secondary_text || '',
+              },
+              terms: prediction.terms || [],
+              types: prediction.types || [],
+            }));
 
-                console.log('[DEBUG] Raw API data:', { mainText, secondaryText, fullText });
-
-                let finalMainText = '';
-                let finalSecondaryText = '';
-
-                // If structured format has data, use it
-                if (mainText || secondaryText) {
-                  // Remove ", Singapore" from the place name (which comes in secondaryText)
-                  finalMainText = secondaryText.replace(/, Singapore$/, '');
-                  
-                  // Add ", Singapore" to address (which comes in mainText) if not already present
-                  finalSecondaryText = mainText && !mainText.includes('Singapore')
-                    ? `${mainText}, Singapore`
-                    : mainText;
-                } else if (fullText) {
-                  // Parse fullText: "Address, Place Name, Singapore"
-                  const parts = fullText.split(',').map(p => p.trim());
-                  
-                  if (parts.length >= 3 && parts[parts.length - 1] === 'Singapore') {
-                    // Last part is "Singapore", second-to-last is place name, rest is address
-                    finalMainText = parts[parts.length - 2]; // "Asf Home Store"
-                    finalSecondaryText = parts.slice(0, parts.length - 2).join(', ') + ', Singapore'; // "Mohamed Sultan Road, Singapore"
-                  } else {
-                    // Fallback
-                    finalMainText = parts[0] || '';
-                    finalSecondaryText = parts.slice(1).join(', ') || '';
-                  }
-                }
-
-                console.log('[DEBUG] Converted:', { main_text: finalMainText, secondary_text: finalSecondaryText });
-
-                return {
-                  description: fullText,
-                  matched_substrings: [],
-                  place_id: placePrediction?.placeId || '',
-                  reference: placePrediction?.placeId || '',
-                  structured_formatting: {
-                    main_text: finalMainText,
-                    main_text_matched_substrings: [],
-                    secondary_text: finalSecondaryText,
-                  },
-                  terms: [],
-                  types: placePrediction?.types || [],
-                };
-              });
-
-              setGooglePlaceResults(convertedResults.slice(0, 5)); // Limit to 5 results
-            } else {
-              setGooglePlaceResults([]);
-            }
-          } catch (error) {
-            console.error('[SHARED SEARCH] ❌ Places API Error:', error);
+            setGooglePlaceResults(convertedResults.slice(0, 5)); // Limit to 5 results
+          } else {
             setGooglePlaceResults([]);
           }
-        } else {
+        } catch (error) {
+          console.error('[SHARED SEARCH] ❌ Places API Error:', error);
           setGooglePlaceResults([]);
         }
       };

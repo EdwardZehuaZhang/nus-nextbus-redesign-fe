@@ -13,8 +13,8 @@ interface AuthState {
 }
 
 const _useAuth = create<AuthState>((set, get) => ({
-  status: 'signIn', // Changed from 'idle' to 'signIn' for development
-  token: { access: 'dev-token', refresh: 'dev-refresh' }, // Set default token for development
+  status: 'idle',
+  token: null,
   signIn: (token) => {
     setToken(token);
     set({ status: 'signIn', token });
@@ -29,16 +29,11 @@ const _useAuth = create<AuthState>((set, get) => ({
       if (userToken !== null) {
         get().signIn(userToken);
       } else {
-        // For development, don't sign out if no token - keep default signIn state
-        console.log(
-          'No token found, keeping default signIn state for development'
-        );
+        set({ status: 'signOut', token: null });
       }
     } catch (e) {
-      // only to remove eslint error, handle the error properly
-      console.error(e);
-      // catch error here
-      // Maybe sign_out user!
+      console.error('Auth hydration error:', e);
+      set({ status: 'signOut', token: null });
     }
   },
 }));

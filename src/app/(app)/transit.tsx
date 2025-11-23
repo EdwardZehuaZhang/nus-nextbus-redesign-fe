@@ -15,6 +15,7 @@ import {
   useShuttleService,
 } from '@/api';
 
+import { getPlaceDetails } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map.web';
@@ -1035,47 +1036,35 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     console.log('[GOOGLE PLACE] 📍 Place ID:', place.place_id);
     
     try {
-      console.log('[GOOGLE PLACE] 🔍 Fetching place details using Google Maps SDK...');
+      console.log('[GOOGLE PLACE] 🔍 Fetching place details from backend API...');
       
-      // Use Google Maps JavaScript API instead of direct HTTP request to avoid CORS
-      if (typeof window !== 'undefined' && window.google?.maps) {
-        const service = new window.google.maps.places.PlacesService(
-          document.createElement('div')
-        );
+      // Use backend API for place details
+      const placeDetailsData = await getPlaceDetails(place.place_id);
+      
+      if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+        const placeDetails = placeDetailsData.result;
+        console.log('[GOOGLE PLACE] ✅ Got details from backend:', placeDetails);
         
-        const request = {
-          placeId: place.place_id,
-          fields: ['geometry', 'name', 'formatted_address', 'place_id']
-        };
+        const destinationLat = placeDetails.geometry?.location?.lat;
+        const destinationLng = placeDetails.geometry?.location?.lng;
         
-        service.getDetails(request, (placeDetails, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && placeDetails) {
-            console.log('[GOOGLE PLACE] ✅ Got details via SDK:', placeDetails);
-            
-            const destinationLat = placeDetails.geometry?.location?.lat();
-            const destinationLng = placeDetails.geometry?.location?.lng();
-            
-            console.log('[GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
-            console.log('[GOOGLE PLACE] 🚀 Navigating to navigation page...');
+        console.log('[GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
+        console.log('[GOOGLE PLACE] 🚀 Navigating to navigation page...');
 
-            // Navigate to navigation page with place details and user location
-            router.push({
-              pathname: '/navigation' as any,
-              params: {
-                destination: place.structured_formatting.main_text,
-                destinationAddress: placeDetails.formatted_address || place.description,
-                destinationLat: destinationLat?.toString(),
-                destinationLng: destinationLng?.toString(),
-                userLat: userLocation?.latitude?.toString(),
-                userLng: userLocation?.longitude?.toString(),
-              },
-            });
-          } else {
-            console.error('[GOOGLE PLACE] ❌ PlacesService error:', status);
-          }
+        // Navigate to navigation page with place details and user location
+        router.push({
+          pathname: '/navigation' as any,
+          params: {
+            destination: place.structured_formatting.main_text,
+            destinationAddress: placeDetails.formatted_address || place.description,
+            destinationLat: destinationLat?.toString(),
+            destinationLng: destinationLng?.toString(),
+            userLat: userLocation?.latitude?.toString(),
+            userLng: userLocation?.longitude?.toString(),
+          },
         });
       } else {
-        console.error('[GOOGLE PLACE] ❌ Google Maps SDK not available');
+        console.error('[GOOGLE PLACE] ❌ Backend API error:', placeDetailsData.status);
       }
     } catch (error) {
       console.error('[GOOGLE PLACE] ❌ Error getting place details:', error);

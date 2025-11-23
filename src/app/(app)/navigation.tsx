@@ -14,6 +14,7 @@ import {
 } from '@/api';
 import type { RouteCode } from '@/api/bus';
 
+import { getPlaceDetails } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { useNearestBusStop, useStopsBetween } from '@/api/lta/hooks';
 import { BusIndicator } from '@/components/bus-indicator';
@@ -872,74 +873,62 @@ export default function NavigationPage() {
     console.log('[NAV GOOGLE PLACE] 📍 Place ID:', place.place_id);
     
     try {
-      console.log('[NAV GOOGLE PLACE] 🔍 Fetching place details using Google Maps SDK...');
+      console.log('[NAV GOOGLE PLACE] 🔍 Fetching place details from backend API...');
       
-      // Use Google Maps JavaScript API instead of direct HTTP request to avoid CORS
-      if (typeof window !== 'undefined' && window.google?.maps) {
-        const service = new window.google.maps.places.PlacesService(
-          document.createElement('div')
-        );
+      // Use backend API for place details
+      const placeDetailsData = await getPlaceDetails(place.place_id);
+      
+      if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+        const placeDetails = placeDetailsData.result;
+        console.log('[NAV GOOGLE PLACE] ✅ Got details from backend:', placeDetails);
         
-        const request = {
-          placeId: place.place_id,
-          fields: ['geometry', 'name', 'formatted_address', 'place_id'],
-        };
+        const destinationLat = placeDetails.geometry?.location?.lat;
+        const destinationLng = placeDetails.geometry?.location?.lng;
         
-        service.getDetails(request, (placeDetails, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK && placeDetails) {
-            console.log('[NAV GOOGLE PLACE] ✅ Got details via SDK:', placeDetails);
-            
-            const destinationLat = placeDetails.geometry?.location?.lat();
-            const destinationLng = placeDetails.geometry?.location?.lng();
-            
-            console.log('[NAV GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
-            
-            // Set the selected location based on search mode
-            if (searchMode === 'destination') {
-              console.log('[NAV GOOGLE PLACE] 🎯 Setting as destination');
-              // Update destination
-              router.push({
-                pathname: '/navigation' as any,
-                params: {
-                  destination: place.structured_formatting.main_text,
-                  destinationAddress: placeDetails.formatted_address,
-                  destinationLat: destinationLat?.toString(),
-                  destinationLng: destinationLng?.toString(),
-                  userLat: userLocation?.latitude?.toString(),
-                  userLng: userLocation?.longitude?.toString(),
-                  customOrigin,
-                  customOriginLat,
-                  customOriginLng,
-                },
-              });
-            } else {
-              console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
-              // Update origin
-              router.push({
-                pathname: '/navigation' as any,
-                params: {
-                  destination,
-                  destinationAddress,
-                  destinationLat,
-                  destinationLng,
-                  customOrigin: place.structured_formatting.main_text,
-                  customOriginLat: destinationLat?.toString(),
-                  customOriginLng: destinationLng?.toString(),
-                  userLat: userLocation?.latitude?.toString(),
-                  userLng: userLocation?.longitude?.toString(),
-                },
-              });
-            }
-            
-            // Close the search panel
-            setPanelState('closed');
-            setSearchText('');
-          } else {
-            console.error('[NAV GOOGLE PLACE] ❌ PlacesService error:', status);
-          }
-        });
+        console.log('[NAV GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
+        
+        // Set the selected location based on search mode
+        if (searchMode === 'destination') {
+          console.log('[NAV GOOGLE PLACE] 🎯 Setting as destination');
+          // Update destination
+          router.push({
+            pathname: '/navigation' as any,
+            params: {
+              destination: place.structured_formatting.main_text,
+              destinationAddress: placeDetails.formatted_address,
+              destinationLat: destinationLat?.toString(),
+              destinationLng: destinationLng?.toString(),
+              userLat: userLocation?.latitude?.toString(),
+              userLng: userLocation?.longitude?.toString(),
+              customOrigin,
+              customOriginLat,
+              customOriginLng,
+            },
+          });
+        } else {
+          console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
+          // Update origin
+          router.push({
+            pathname: '/navigation' as any,
+            params: {
+              destination,
+              destinationAddress,
+              destinationLat,
+              destinationLng,
+              customOrigin: place.structured_formatting.main_text,
+              customOriginLat: destinationLat?.toString(),
+              customOriginLng: destinationLng?.toString(),
+              userLat: userLocation?.latitude?.toString(),
+              userLng: userLocation?.longitude?.toString(),
+            },
+          });
+        }
+        
+        // Close the search panel
+        setPanelState('closed');
+        setSearchText('');
       } else {
-        console.error('[NAV GOOGLE PLACE] ❌ Google Maps SDK not available');
+        console.error('[NAV GOOGLE PLACE] ❌ Backend API error:', placeDetailsData.status);
       }
     } catch (error) {
       console.error('[NAV GOOGLE PLACE] ❌ Error getting place details:', error);
