@@ -35,8 +35,8 @@ require('dotenv').config({
 
 // TODO: Replace these values with your own
 
-const BUNDLE_ID = 'com.nus.nextbus'; // ios bundle id
-const PACKAGE = 'com.nus.nextbus'; // android package name
+const BUNDLE_ID = 'com.edwardzhang.nusnextbus'; // ios bundle id
+const PACKAGE = 'com.edwardzhang.nusnextbus'; // android package name
 const NAME = 'NUS NextBus'; // app name
 const EXPO_ACCOUNT_OWNER = 'edwardzehuazhang'; // expo account owner
 const EAS_PROJECT_ID = '52efcc10-65b2-4756-92c9-b44bcacf373e'; // eas project id

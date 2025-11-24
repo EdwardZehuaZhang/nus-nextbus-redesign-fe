@@ -1,15 +1,11 @@
-import 'react-device-frameset/styles/marvel-devices.min.css';
-
 import { useEffect } from 'react';
-import { DeviceFrameset } from 'react-device-frameset';
 import { Platform } from 'react-native';
 
 import { isMobileDevice } from '@/lib';
 
 /**
- * Demo page that wraps the app in a professional mobile phone frame for desktop viewing
+ * Demo page that redirects to the app
  * Automatically redirects to the actual app on mobile devices
- * Uses react-device-frameset for beautiful, realistic device mockups
  */
 export default function DemoPage() {
   // On real mobile devices, redirect to the actual app
@@ -27,7 +23,12 @@ export default function DemoPage() {
     return null;
   }
 
-  return (
+  // For desktop web, just redirect to main app
+  useEffect(() => {
+    window.location.replace('/');
+  }, []);
+
+  return null;
     <div style={styles.container}>
       {/* Background */}
       <div style={styles.background} />

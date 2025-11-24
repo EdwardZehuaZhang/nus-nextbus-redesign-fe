@@ -27,8 +27,8 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>obytesApp</string>
-          <string>com.obytes.development</string>
+          <string>nusnextbus</string>
+          <string>com.edwardzhang.nusnextbus.development</string>
         </array>
       </dict>
       <dict>
