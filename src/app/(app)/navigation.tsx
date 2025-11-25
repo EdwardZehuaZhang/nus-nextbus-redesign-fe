@@ -20,7 +20,7 @@ import { useNearestBusStop, useStopsBetween } from '@/api/lta/hooks';
 import { BusIndicator } from '@/components/bus-indicator';
 import { SearchResults } from '@/components/shared-search';
 import { Frame } from '@/components/frame';
-import { InteractiveMap } from '@/components/interactive-map.web';
+import { InteractiveMap } from '@/components/interactive-map';
 import { ToggleSwitch } from '@/components/toggle-switch';
 import {
   FocusAwareStatusBar,

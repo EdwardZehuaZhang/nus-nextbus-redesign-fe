@@ -11,6 +11,11 @@ npm-debug.*
 web-build/
 yarn-error.log
 /coverage
+
+# Prebuild/CNG - native folders are generated
+/ios
+/android
+
 # macOS
 .DS_Store
 

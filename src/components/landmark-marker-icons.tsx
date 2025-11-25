@@ -2,9 +2,8 @@
  * Landmark marker icons for Google Maps using Phosphor Icons
  */
 import React from 'react';
-import { renderToString } from 'react-dom/server';
 import { FirstAid, Subway, BookOpen, Bus } from 'phosphor-react-native';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 
 const DEFAULT_LANDMARK_COLOR = '#274F9C';
 

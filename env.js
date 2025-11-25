@@ -109,7 +109,7 @@ const _clientEnv = {
   VERSION: packageJSON.version,
 
   // ADD YOUR ENV VARS HERE TOO
-  BACKEND_API_URL: process.env.BACKEND_API_URL,
+  BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL,
   VAR_NUMBER: Number(process.env.VAR_NUMBER),
   VAR_BOOL: process.env.VAR_BOOL === 'true',
   // SECURITY: Google Maps API key for map rendering only (not for API calls)

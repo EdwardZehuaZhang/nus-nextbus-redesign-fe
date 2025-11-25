@@ -44,6 +44,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: Env.BUNDLE_ID,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      NSLocationWhenInUseUsageDescription: 'This app needs your location to show nearby bus stops and help you navigate to them.',
+      NSLocationAlwaysAndWhenInUseUsageDescription: 'This app needs your location to show nearby bus stops and help you navigate to them.',
     },
     config: {
       googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -58,6 +60,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#2E3C4B',
     },
     package: Env.PACKAGE,
+    permissions: [
+      'ACCESS_COARSE_LOCATION',
+      'ACCESS_FINE_LOCATION',
+    ],
     config: {
       googleMaps: {
         apiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -81,6 +87,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-font',
       {
         fonts: ['./assets/fonts/Inter.ttf'],
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationAlwaysAndWhenInUsePermission: 'This app needs your location to show nearby bus stops and help you navigate to them.',
       },
     ],
     'expo-localization',

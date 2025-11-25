@@ -2,6 +2,7 @@ import { router, usePathname } from 'expo-router';
 import React from 'react';
 import { Animated, TextInput, Keyboard, Platform } from 'react-native';
 
+import { storage } from '@/lib/storage';
 
 import {
   calculateDistance,
@@ -18,7 +19,7 @@ import {
 import { getPlaceDetails } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
-import { InteractiveMap } from '@/components/interactive-map.web';
+import { InteractiveMap } from '@/components/interactive-map';
 import { MapTypeSelector } from '@/components/map-type-selector';
 import {
   FocusAwareStatusBar,
@@ -368,40 +369,59 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
 
 const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
   const [searchText, setSearchText] = React.useState('');
+  const textInputRef = React.useRef<any>(null);
 
-  const handleSearchPress = () => {
-    console.log('[SEARCH BAR] 🖱️ Search bar pressed/focused');
+  const handleFocus = () => {
+    // Trigger search mode when user focuses on search
+    console.log('[SEARCH BAR] ⌨️ TextInput focused - keyboard should appear');
     if (onSearchPress) {
       onSearchPress();
     }
   };
 
-  const handleFocus = () => {
-    // Trigger search mode when user focuses on search
-    handleSearchPress();
+  const handleContainerPress = () => {
+    console.log('[SEARCH BAR] 🖱️ Container pressed - focusing input');
+    if (onSearchPress) {
+      onSearchPress();
+    }
+    // Delay focus slightly to ensure search mode animation completes
+    setTimeout(() => {
+      if (textInputRef.current) {
+        textInputRef.current.focus();
+      }
+    }, 100);
   };
 
   return (
-    <Pressable onPress={handleSearchPress}>
-      <View className="mb-4 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
-        <SearchIcon />
-        <TextInput
-          className="flex-1 text-base text-neutral-900"
-          placeholder="Search for location..."
-          placeholderTextColor="#737373"
-          value={searchText}
-          onChangeText={setSearchText}
-          onFocus={handleFocus}
-          style={{
-            outlineWidth: 0,
-            // @ts-ignore - Web-specific properties to remove Safari focus outline
-            outlineStyle: 'none',
-            outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
-          } as any}
-        />
-      </View>
-    </Pressable>
+    <View className="mb-4">
+      <Pressable onPress={handleContainerPress}>
+        <View className="flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+          <SearchIcon />
+          <TextInput
+            ref={textInputRef}
+            className="flex-1 text-base text-neutral-900"
+            placeholder="Search for location..."
+            placeholderTextColor="#737373"
+            value={searchText}
+            onChangeText={setSearchText}
+            onFocus={handleFocus}
+            editable={true}
+            keyboardType="default"
+            returnKeyType="search"
+            autoCapitalize="none"
+            autoCorrect={false}
+            blurOnSubmit={false}
+            style={{
+              outlineWidth: 0,
+              // @ts-ignore - Web-specific properties to remove Safari focus outline
+              outlineStyle: 'none',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+            } as any}
+          />
+        </View>
+      </Pressable>
+    </View>
   );
 };
 
@@ -1308,13 +1328,16 @@ const useDragHandlers = () => {
     const keyboardWillShow = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
+        const kbHeight = e.endCoordinates.height;
+        setKeyboardHeight(kbHeight);
+        console.log('[KEYBOARD] ⌨️ Keyboard showing, height:', kbHeight);
       }
     );
 
     const keyboardWillHide = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
+        console.log('[KEYBOARD] ⌨️ Keyboard hiding');
         setKeyboardHeight(0);
       }
     );
@@ -1326,9 +1349,6 @@ const useDragHandlers = () => {
   }, []);
 
   const handleDragMove = (dy: number) => {
-    // Don't allow drag when in search mode
-    if (isSearchMode) return;
-
     // Store the starting height when drag begins
     if (tempHeight === null) {
       startHeight.current = containerHeight;
@@ -1348,6 +1368,9 @@ const useDragHandlers = () => {
 
     setTempHeight(newHeight);
     setContainerHeight(newHeight);
+    
+    // Update heightAnimation to keep it in sync
+    heightAnimation.setValue(newHeight);
   };
 
   const handleDrag = (gestureState: { dy: number; vy: number }) => {
@@ -1358,7 +1381,7 @@ const useDragHandlers = () => {
     let targetHeight = DEFAULT_HEIGHT;
     let collapsed = false;
 
-    console.log('[DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy);
+    console.log('[DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy, 'isSearchMode:', isSearchMode);
 
     // Smart snapping based on current position and velocity
     // Consider both where we are and where we're going
@@ -1419,7 +1442,14 @@ const useDragHandlers = () => {
     setIsCollapsed(collapsed);
     setTempHeight(null);
     
-    heightAnimation.setValue(targetHeight);
+    // Smoothly animate to target height
+    Animated.spring(heightAnimation, {
+      toValue: targetHeight,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 8,
+    }).start();
+    
     console.log('[DRAG] ✅ Final height set to:', targetHeight, '- heightAnimation synced');
   };
 
@@ -1504,26 +1534,21 @@ const useDragHandlers = () => {
     }).start();
   };
 
-  const animatedStyle = isSearchMode
-    ? {
-        maxHeight: heightAnimation.interpolate({
-          inputRange: [DEFAULT_HEIGHT, MAX_HEIGHT],
-          outputRange: [`${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
+  const animatedStyle = {
+    height: heightAnimation.interpolate({
+      inputRange: [MIN_HEIGHT, DEFAULT_HEIGHT, MAX_HEIGHT],
+      outputRange: [`${MIN_HEIGHT}%`, `${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
+    }),
+    paddingBottom: keyboardHeight,
+    transform: isSearchMode ? [] : [
+      {
+        translateY: translateY.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 700],
         }),
-        bottom: keyboardHeight,
-      }
-    : {
-        maxHeight: `${containerHeight}%` as any,
-        bottom: keyboardHeight,
-        transform: [
-          {
-            translateY: translateY.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 700], // 0 for normal, 700 for collapsed
-            }),
-          },
-        ],
-      };
+      },
+    ],
+  };
 
   return {
     isCollapsed,
@@ -1558,17 +1583,16 @@ export default function TransitPage() {
         'bus-route-d2': false,
       };
 
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('map-filters');
+      // Load from storage (works on both web and native)
+      try {
+        const stored = storage.getString('map-filters');
         if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            // Always override academic to be false on initial load
-            return { ...parsed, academic: false };
-          } catch (error) {
-            console.error('Error loading map filters:', error);
-          }
+          const parsed = JSON.parse(stored);
+          // Always override academic to be false on initial load
+          return { ...parsed, academic: false };
         }
+      } catch (error) {
+        console.error('Error loading map filters:', error);
       }
       return defaultFilters;
     }
@@ -1611,9 +1635,7 @@ export default function TransitPage() {
   const handleFilterChange = (filters: Record<string, boolean>) => {
     console.log('Filter changes:', filters);
     setMapFilters(filters);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('map-filters', JSON.stringify(filters));
-    }
+    storage.set('map-filters', JSON.stringify(filters));
   };
 
   return (
@@ -1665,7 +1687,7 @@ export default function TransitPage() {
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.4)',
           opacity: backdropOpacity,
-          pointerEvents: 'none', // Allow touches to pass through
+          pointerEvents: 'none',
         }}
       />
 
@@ -1685,33 +1707,8 @@ export default function TransitPage() {
           },
           animatedStyle,
         ]}
-        onTouchStart={(e: any) => {
-          const touch = e.nativeEvent.touches?.[0];
-          if (touch && dragStartY && isDragging && dragStartTime) {
-            dragStartY.current = touch.pageY;
-            dragStartTime.current = Date.now();
-            isDragging.current = true;
-          }
-        }}
-        onTouchMove={(e: any) => {
-          if (!isDragging || !isDragging.current) return;
-          const touch = e.nativeEvent.touches?.[0];
-          if (touch && dragStartY) {
-            const dy = touch.pageY - dragStartY.current;
-            handleDragMove(dy);
-          }
-        }}
-        onTouchEnd={(e: any) => {
-          if (!isDragging || !isDragging.current) return;
-          const touch = e.nativeEvent.changedTouches?.[0];
-          if (touch && dragStartY && dragStartTime) {
-            const dy = touch.pageY - dragStartY.current;
-            const dt = Date.now() - dragStartTime.current;
-            const vy = dy / dt;
-            handleDrag({ dy, vy });
-            isDragging.current = false;
-          }
-        }}
+        onStartShouldSetResponder={() => false}
+        onMoveShouldSetResponder={() => false}
       >
         <View className="mb-3 items-center">
           <Frame 
