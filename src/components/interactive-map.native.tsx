@@ -78,9 +78,9 @@ const DEFAULT_REGION: Region = {
 };
 
 // Mobile zoom offset to align with web zoom levels
-// Mobile zoom 13 (default) should behave like web zoom 16
+// Mobile zoom 14 (default latitudeDelta 0.02) should behave like web zoom 16
 // This offset makes mobile zoom calculations match web behavior
-const MOBILE_ZOOM_OFFSET = 3;
+const MOBILE_ZOOM_OFFSET = 2;
 
 const getLandmarkColor = (type: string) => {
   switch (type) {
@@ -146,6 +146,50 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setCurrentRegion(initialRegion);
   }, [initialRegion]);
 
+  // Calculate Google Maps zoom level from latitudeDelta
+  // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
+  // This matches Google Maps zoom levels (0 = world, 21 = building)
+  // Add MOBILE_ZOOM_OFFSET to align with web zoom behavior
+  const getZoomLevel = (latitudeDelta: number): number => {
+    const zoom = Math.log2(360 / latitudeDelta);
+    return Math.round(zoom) + MOBILE_ZOOM_OFFSET;
+  };
+
+  const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
+
+  // Generate custom map style based on zoom level to hide/show POI and road labels
+  const customMapStyle = React.useMemo(() => {
+    const showDetails = currentZoom >= 16;
+    
+    if (showDetails) {
+      // Show all details at zoom 16+
+      return [];
+    }
+    
+    // Hide POI labels and road labels when zoomed out
+    return [
+      {
+        featureType: 'poi',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'poi.business',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'road',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'transit',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ];
+  }, [currentZoom]);
+
   // Force map to use correct initial region after it's ready - only once
   useEffect(() => {
     console.log('[Map] mapReady effect triggered:', { mapReady, hasOrigin: !!origin, hasDestination: !!destination, waypointsCount: waypoints.length, hasSetInitialRegion: hasSetInitialRegion.current });
@@ -180,17 +224,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Fetch bus stops data
   const { data: busStopsData } = useBusStops();
-
-  // Calculate Google Maps zoom level from latitudeDelta
-  // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
-  // This matches Google Maps zoom levels (0 = world, 21 = building)
-  // Add MOBILE_ZOOM_OFFSET to align with web zoom behavior
-  const getZoomLevel = (latitudeDelta: number): number => {
-    const zoom = Math.log2(360 / latitudeDelta);
-    return Math.round(zoom) + MOBILE_ZOOM_OFFSET;
-  };
-
-  const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
 
   // Log zoom level changes for debugging
   useEffect(() => {
@@ -379,10 +412,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapType={mapType}
         onRegionChangeComplete={handleRegionChange}
         onMapReady={() => setMapReady(true)}
-        showsPointsOfInterest={currentZoom >= 16}
-        showsBuildings={currentZoom >= 16}
-        showsTraffic={false}
+        customMapStyle={customMapStyle}
         showsIndoors={currentZoom >= 17}
+        showsTraffic={false}
+        loadingEnabled={true}
+        loadingIndicatorColor="#274F9C"
+        loadingBackgroundColor="#ffffff"
       >
         {/* Campus Boundary - always shown */}
         <Polygon
