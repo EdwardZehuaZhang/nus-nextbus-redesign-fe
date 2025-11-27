@@ -16,6 +16,14 @@ import type { LatLng } from '@/api/google-maps';
 import {
   NUS_CAMPUS_BOUNDARY,
   ORANGE_AREA_BOUNDARY,
+  BLUE_AREA_BOUNDARY,
+  DARK_BLUE_AREA_BOUNDARY,
+  YELLOW_AREA_BOUNDARY,
+  DARK_ORANGE_AREA_BOUNDARY,
+  CDE_AREA_BOUNDARY,
+  FASS_AREA_BOUNDARY,
+  COMBIZ_AREA_BOUNDARY,
+  LAW_AREA_BOUNDARY,
   PGPR_BOUNDARY,
   LIGHTHOUSE_BOUNDARY,
   PIONEER_HOUSE_BOUNDARY,
@@ -216,10 +224,90 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <Polygon
           key="academic-orange"
           coordinates={ORANGE_AREA_BOUNDARY}
-          strokeColor={shouldShowAcademic ? '#FF6B35' : 'transparent'}
+          strokeColor={shouldShowAcademic ? '#FF0000' : 'transparent'}
           strokeWidth={shouldShowAcademic ? 2 : 0}
           fillColor={
-            shouldShowAcademic ? 'rgba(255, 107, 53, 0.2)' : 'transparent'
+            shouldShowAcademic ? 'rgba(255, 0, 0, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-blue"
+          coordinates={BLUE_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#1E90FF' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(30, 144, 255, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-darkblue"
+          coordinates={DARK_BLUE_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#00008B' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(0, 0, 139, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-yellow"
+          coordinates={YELLOW_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#FA9E0D' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(250, 158, 13, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-darkorange"
+          coordinates={DARK_ORANGE_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#800080' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(128, 0, 128, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-cde"
+          coordinates={CDE_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#D7AE63' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(215, 174, 99, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-fass"
+          coordinates={FASS_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#006400' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(0, 100, 0, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-combiz"
+          coordinates={COMBIZ_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#8B0000' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(139, 0, 0, 0.2)' : 'transparent'
+          }
+          tappable={shouldShowAcademic}
+        />
+        <Polygon
+          key="academic-law"
+          coordinates={LAW_AREA_BOUNDARY}
+          strokeColor={shouldShowAcademic ? '#FFFFFF' : 'transparent'}
+          strokeWidth={shouldShowAcademic ? 2 : 0}
+          fillColor={
+            shouldShowAcademic ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
           }
           tappable={shouldShowAcademic}
         />
