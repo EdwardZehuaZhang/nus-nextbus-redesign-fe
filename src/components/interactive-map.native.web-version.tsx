@@ -1,5 +1,6 @@
 import polyline from '@mapbox/polyline';
 import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { View, Text, StyleSheet as RNStyleSheet } from 'react-native';
 
 import type { ActiveBus, BusStop, RouteCode } from '@/api/bus';
 import {
@@ -3721,11 +3722,9 @@ const useBusStopMarkers = (
       if (visibleBusStops && visibleBusStops.length > 0) {
         const visibleStopsSet = new Set(visibleBusStops);
         
-        // Handle circle markers - show only specified stops when zoomed in
+        // Handle circle markers - always hidden (removed feature)
         circleMarkersRef.current.forEach((marker) => {
-          const title = marker.getTitle();
-          const isVisible = title ? visibleStopsSet.has(title) : false;
-          marker.setVisible(isVisible && showAllStops);
+          marker.setVisible(false);
         });
 
         // Handle label markers - show only specified stops (labels visible at all zoom levels)
@@ -3739,13 +3738,9 @@ const useBusStopMarkers = (
 
       // If a route is selected, only show stops belonging to that route
       if (activeRoute) {
-        // Handle circle markers - show only route stops AND only when zoomed in
+        // Handle circle markers - always hidden (removed feature)
         circleMarkersRef.current.forEach((marker) => {
-          const title = marker.getTitle();
-          const belongsToActiveRoute = title
-            ? routeStopNames.has(title)
-            : false;
-          marker.setVisible(belongsToActiveRoute && showAllStops); // Added zoom check
+          marker.setVisible(false);
         });
 
         // Handle label markers - show route stops (labels visible at all zoom levels)
@@ -3758,9 +3753,9 @@ const useBusStopMarkers = (
         });
       } else {
         // No route selected - use default priority behavior
-        // Handle circle markers - hide when zoomed out, show all when zoomed in
+        // Handle circle markers - always hidden (removed feature)
         circleMarkersRef.current.forEach((marker) => {
-          marker.setVisible(showAllStops);
+          marker.setVisible(false);
         });
 
         // Handle label markers - show priority when zoomed out, all when zoomed in
@@ -3889,21 +3884,22 @@ const useBusStopMarkers = (
       const labelOffsetLat = labelBelow ? -0.0001 : 0.0001; // Negative offset moves south
       const svgAnchorY = labelBelow ? 5 : 25; // Anchor point changes based on position
 
-      // Create circle marker
+      // REMOVED: Circle markers - only showing text labels now
+      // Create a transparent/invisible circle marker as placeholder
       const marker = new google.maps.Marker({
         position: { lat: stop.latitude, lng: stop.longitude },
         map: map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           fillColor: stopColor,
-          fillOpacity: 0.8,
+          fillOpacity: 0, // Invisible
           strokeColor: '#FFFFFF',
-          strokeWeight: 2,
-          scale: 4, // Reduced from 6 to make circles smaller
+          strokeWeight: 0, // No stroke
+          scale: 0, // No size
         },
         title: stop.ShortName, // Use short name for hover tooltip
         zIndex: 600, // Higher than Google Maps pins (500)
-        visible: false, // Circles hidden by default when zoomed out
+        visible: false, // Always hidden
       });
 
       // Create label marker with dynamic position
@@ -5257,36 +5253,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const isSyncingFromActiveRouteRef = useRef(false); // Track if we're syncing from activeRoute to prevent loops
   const savedFilterStateRef = useRef<Record<string, boolean> | null>(null); // Save filter state before route selection
 
-  // Map filter state - use external state if provided, otherwise use internal state with localStorage persistence
+  // Map filter state - use external state if provided, otherwise use internal state
+  // Note: React Native doesn't support localStorage
   const [internalMapFilters, setInternalMapFilters] = useState<
     Record<string, boolean>
-  >(() => {
-    const defaultFilters = {
-      important: true,
-      'bus-stops': true,
-      academic: false, // Always default to false
-      residences: false,
-      'bus-route-a1': false,
-      'bus-route-a2': false,
-      'bus-route-d1': false,
-      'bus-route-d2': false,
-      'bus-route-btc': false,
-      'bus-route-e': false,
-      'bus-route-k': false,
-      'bus-route-l': false,
-    };
-
-    try {
-      const saved = localStorage.getItem('nus-nextbus-map-filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Always override academic to be false on initial load
-        return { ...parsed, academic: false };
-      }
-    } catch (error) {
-      console.error('Error loading map filters:', error);
-    }
-    return defaultFilters;
+  >({
+    important: true,
+    'bus-stops': true,
+    academic: false, // Always default to false
+    residences: false,
+    'bus-route-a1': false,
+    'bus-route-a2': false,
+    'bus-route-d1': false,
+    'bus-route-d2': false,
+    'bus-route-btc': false,
+    'bus-route-e': false,
+    'bus-route-k': false,
+    'bus-route-l': false,
   });
 
   // Use external filters if provided, otherwise use internal state
@@ -5297,14 +5280,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         onMapFiltersChange(filters);
       } else {
         setInternalMapFilters(filters);
-        try {
-          localStorage.setItem(
-            'nus-nextbus-map-filters',
-            JSON.stringify(filters)
-          );
-        } catch (error) {
-          console.error('Error saving map filters:', error);
-        }
+        // Note: localStorage not available in React Native
       }
     },
     [onMapFiltersChange]
@@ -5751,15 +5727,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             backgroundColor: '#E8EAF6',
           }}
         >
-          <span
+          <Text
             style={{
-              fontSize: '16px',
+              fontSize: 16,
               color: '#274F9C',
               fontWeight: '500',
             }}
           >
             Loading Map...
-          </span>
+          </Text>
         </div>
       )}
       <div
@@ -5773,17 +5749,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }}
         className="google-map-container"
       />
-      <style>{`
-        .google-map-container .gm-style > div:first-child {
-          filter: blur(0px) !important;
-        }
-        .google-map-container .gm-style img[src^="data:image/svg"] {
-          overflow: visible !important;
-        }
-        .google-map-container .gm-style > div > div > div > div {
-          overflow: visible !important;
-        }
-      `}</style>
       {/* Always show controls, not just when map is loaded */}
       {showMapControls && (
         <div

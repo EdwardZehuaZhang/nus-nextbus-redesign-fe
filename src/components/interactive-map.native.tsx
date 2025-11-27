@@ -9,6 +9,7 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
+import Svg, { Text as SvgText } from 'react-native-svg';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
@@ -70,10 +71,10 @@ interface InteractiveMapProps {
 }
 
 const DEFAULT_REGION: Region = {
-  latitude: 1.2966,
-  longitude: 103.7764,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
+  latitude: 1.289, // Moved further down (south)
+  longitude: 103.777, // Adjusted slightly right (east)
+  latitudeDelta: 0.02, // Zoom level 14 - zoomed out to see full campus
+  longitudeDelta: 0.02,
 };
 
 const getLandmarkColor = (type: string) => {
@@ -115,11 +116,132 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [internalMapType, setInternalMapType] = useState<
     'standard' | 'satellite' | 'hybrid' | 'terrain'
   >('standard');
+  const [currentRegion, setCurrentRegion] = useState<Region>(initialRegion);
+  const [mapReady, setMapReady] = useState(false);
+  const hasSetInitialRegion = useRef(false);
+  const isInitializing = useRef(true);
 
   const mapType = externalMapType ?? internalMapType;
 
+  // Force map to use correct initial region after it's ready - only once
+  useEffect(() => {
+    console.log('[Map] mapReady effect triggered:', { mapReady, hasOrigin: !!origin, hasDestination: !!destination, waypointsCount: waypoints.length, hasSetInitialRegion: hasSetInitialRegion.current });
+    if (mapReady && mapRef.current && !origin && !destination && waypoints.length === 0 && !hasSetInitialRegion.current) {
+      console.log('[Map] Forcing region to:', initialRegion);
+      // Mark as set IMMEDIATELY to prevent double-execution
+      hasSetInitialRegion.current = true;
+      isInitializing.current = true;
+      
+      // Only set region if there's no route being displayed
+      setTimeout(() => {
+        mapRef.current?.animateToRegion(initialRegion, 100);
+        // After setting initial region, allow region updates
+        setTimeout(() => {
+          console.log('[Map] Initialization complete, enabling region tracking');
+          isInitializing.current = false;
+        }, 500);
+      }, 100);
+    }
+  }, [mapReady, initialRegion, origin, destination, waypoints.length]);
+  
+  // Handle region changes, but ignore during initialization
+  const handleRegionChange = (region: Region) => {
+    if (!isInitializing.current) {
+      setCurrentRegion(region);
+    }
+  };
+
+  // Debug: Log the initialRegion being used
+  useEffect(() => {
+    console.log('[Map] initialRegion:', initialRegion);
+    console.log('[Map] Expected zoom level:', Math.log2(360 / initialRegion.latitudeDelta).toFixed(2));
+  }, [initialRegion]);
+
   // Fetch bus stops data
   const { data: busStopsData } = useBusStops();
+
+  // Calculate Google Maps zoom level from latitudeDelta
+  // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
+  // This matches Google Maps zoom levels (0 = world, 21 = building)
+  const getZoomLevel = (latitudeDelta: number): number => {
+    const zoom = Math.log2(360 / latitudeDelta);
+    return Math.round(zoom);
+  };
+
+  const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
+
+  // Log zoom level changes for debugging
+  useEffect(() => {
+    console.log(
+      `[Map Zoom] latitudeDelta: ${currentRegion.latitudeDelta.toFixed(6)}, zoom level: ${currentZoom}, coords: ${currentRegion.latitude.toFixed(6)}, ${currentRegion.longitude.toFixed(6)}`
+    );
+  }, [currentRegion.latitudeDelta, currentZoom, currentRegion.latitude, currentRegion.longitude]);
+
+  // Priority stops shown at zoom level 14 (minimal set of key locations)
+  const zoom14PriorityStops = [
+    'KR MRT',
+    'PGP',
+    'COM 3',
+    'KR Bus Ter',
+    'CLB',
+    'EA',
+    'Museum',
+    'UTown',
+    'UHC',
+    'S 17',
+    'UHall',
+    'TCOMS',
+  ];
+
+  // Priority stops that should be shown at zoom level 15-16 (expanded key locations)
+  const priorityStops = [
+    'BIZ 2',
+    'COM 3',
+    'TCOMS',
+    'PGP',
+    'PGP Foyer',
+    'KR MRT',
+    'S 17',
+    'UHall',
+    'UHC',
+    'YIH',
+    'Museum',
+    'Kent Vale',
+    'EA',
+    'UTown',
+    'SDE3',
+    'KR Bus Ter',
+    'Ventus',
+    'CLB',
+    'Opp NUSS',
+    'College Gr',
+    'BG MRT',
+    'OTH Bldg',
+  ];
+
+  // Helper function to check if a stop should be shown at current zoom
+  const shouldShowStop = (stopName: string): boolean => {
+    // If visibleBusStops is provided, use that filter
+    if (visibleBusStops && visibleBusStops.length > 0) {
+      return visibleBusStops.includes(stopName);
+    }
+
+    // Show based on zoom level (matching web version exactly):
+    // - Zoom 17+: Show all stops
+    // - Zoom 15-16: Show priority stops
+    // - Zoom 14 and below: Show only zoom14 priority stops
+    if (currentZoom >= 17) {
+      return true; // Show all stops
+    } else if (currentZoom >= 15) {
+      // Show priority stops
+      return priorityStops.some((p) => stopName === p || stopName.trim() === p);
+    } else {
+      // Show only zoom14 priority stops
+      return zoom14PriorityStops.some(
+        (p) => stopName === p || stopName.trim() === p
+      );
+    }
+  };
 
   useEffect(() => {
     if (onMapTypeChangeReady) {
@@ -163,6 +285,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Fit map to show all markers
   useEffect(() => {
+    // Only fit to coordinates if we actually have markers to show
     if (mapRef.current && (origin || destination || waypoints.length > 0)) {
       const coordinates = [
         origin && { latitude: origin.lat, longitude: origin.lng },
@@ -211,6 +334,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         showsCompass
         showsScale
         mapType={mapType}
+        onRegionChangeComplete={handleRegionChange}
+        onMapReady={() => setMapReady(true)}
       >
         {/* Campus Boundary - always shown */}
         <Polygon
@@ -476,14 +601,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             />
           ))}
 
-        {/* Bus Stop Markers */}
+        {/* Bus Stop Markers - Text with white stroke outline (matching web version) */}
         {shouldShowBusStops &&
           busStopsData?.BusStopsResult?.busstops?.map((stop) => {
-            // If visibleBusStops is provided, only show those stops
-            if (
-              visibleBusStops &&
-              !visibleBusStops.includes(stop.caption || '')
-            ) {
+            const stopName = stop.ShortName || stop.caption || stop.name;
+            
+            // Check if this stop should be shown at current zoom level
+            if (!shouldShowStop(stopName)) {
               return null;
             }
 
@@ -494,9 +618,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   latitude: stop.latitude,
                   longitude: stop.longitude,
                 }}
-                title={stop.caption || stop.name}
-                pinColor="#274F9C"
-              />
+                title={stopName}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <View
+                  style={{
+                    width: 100,
+                    height: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Svg width="100" height="20" viewBox="0 0 100 20">
+                    {/* White stroke outline - rendered first (behind) */}
+                    <SvgText
+                      x="50"
+                      y="14"
+                      fontSize="12"
+                      fontWeight="600"
+                      fill="none"
+                      textAnchor="middle"
+                      stroke="#FFFFFF"
+                      strokeWidth="3"
+                    >
+                      {stopName}
+                    </SvgText>
+                    {/* Blue text on top */}
+                    <SvgText
+                      x="50"
+                      y="14"
+                      fontSize="12"
+                      fontWeight="600"
+                      fill="#274F9C"
+                      textAnchor="middle"
+                    >
+                      {stopName}
+                    </SvgText>
+                  </Svg>
+                </View>
+              </Marker>
             );
           })}
 
