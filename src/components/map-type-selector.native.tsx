@@ -1,9 +1,9 @@
+import { Funnel, MapPin } from 'phosphor-react-native';
 import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { MapPin, Funnel } from 'phosphor-react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { Text } from './ui';
 import { MapFilterSelector } from './map-filter-selector';
+import { Text } from './ui';
 
 const mapOptions = [
   { id: 'standard', label: 'Standard' },
@@ -13,12 +13,15 @@ const mapOptions = [
 ];
 
 interface MapTypeSelectorProps {
-  onMapTypeChange?: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void;
+  onMapTypeChange?: (
+    mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain'
+  ) => void;
   onFilterChange?: (filters: Record<string, boolean>) => void;
   filters?: Record<string, boolean>;
   initialMapType?: 'standard' | 'satellite' | 'hybrid' | 'terrain';
 }
 
+// eslint-disable-next-line max-lines-per-function
 export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
   onMapTypeChange,
   onFilterChange,
@@ -68,10 +71,13 @@ export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
 
       {isFilterOpen && (
         <View style={styles.dropdown}>
-          <MapFilterSelector onFilterChange={onFilterChange} filters={filters} />
+          <MapFilterSelector
+            onFilterChange={onFilterChange}
+            filters={filters}
+          />
         </View>
       )}
-      
+
       {isMapTypeOpen && (
         <View style={styles.dropdown}>
           {mapOptions.map((option) => (

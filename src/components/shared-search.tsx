@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { getPlaceAutocomplete } from '@/api/google-maps/places';
@@ -26,6 +26,7 @@ interface SearchResultsProps {
   useStyleProp?: boolean; // For navigation page compatibility
 }
 
+// eslint-disable-next-line max-lines-per-function
 export const SearchResults: React.FC<SearchResultsProps> = ({
   searchText,
   userLocation,
@@ -35,7 +36,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   useStyleProp = false,
 }) => {
   const [busResults, setBusResults] = useState<BusStation[]>([]);
-  const [googlePlaceResults, setGooglePlaceResults] = useState<PlaceAutocompleteResult[]>([]);
+  const [googlePlaceResults, setGooglePlaceResults] = useState<
+    PlaceAutocompleteResult[]
+  >([]);
 
   // Handle search input changes with Google Maps API + local bus stations
   useEffect(() => {
@@ -71,19 +74,23 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
           if (data.predictions && data.predictions.length > 0) {
             // Backend returns the standard autocomplete format
-            const convertedResults: PlaceAutocompleteResult[] = data.predictions.map((prediction: any) => ({
-              description: prediction.description || '',
-              matched_substrings: prediction.matched_substrings || [],
-              place_id: prediction.place_id || '',
-              reference: prediction.reference || prediction.place_id || '',
-              structured_formatting: {
-                main_text: prediction.structured_formatting?.main_text || '',
-                main_text_matched_substrings: prediction.structured_formatting?.main_text_matched_substrings || [],
-                secondary_text: prediction.structured_formatting?.secondary_text || '',
-              },
-              terms: prediction.terms || [],
-              types: prediction.types || [],
-            }));
+            const convertedResults: PlaceAutocompleteResult[] =
+              data.predictions.map((prediction: any) => ({
+                description: prediction.description || '',
+                matched_substrings: prediction.matched_substrings || [],
+                place_id: prediction.place_id || '',
+                reference: prediction.reference || prediction.place_id || '',
+                structured_formatting: {
+                  main_text: prediction.structured_formatting?.main_text || '',
+                  main_text_matched_substrings:
+                    prediction.structured_formatting
+                      ?.main_text_matched_substrings || [],
+                  secondary_text:
+                    prediction.structured_formatting?.secondary_text || '',
+                },
+                terms: prediction.terms || [],
+                types: prediction.types || [],
+              }));
 
             setGooglePlaceResults(convertedResults.slice(0, 5)); // Limit to 5 results
           } else {
@@ -120,7 +127,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
         </View>
       );
     }
-    
+
     return (
       <View className="size-9 items-center justify-center rounded-full bg-neutral-100 p-2">
         {children}
@@ -130,7 +137,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 
   const renderBusStationItem = (item: BusStation, index: number) => {
     const IconComponent = item.icon;
-    
+
     if (useStyleProp) {
       return (
         <Pressable
@@ -145,7 +152,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
             borderBottomColor: '#E5E5E5',
           }}
         >
-          {renderIconContainer(<IconComponent style={{ width: 20, height: 20 }} />)}
+          {renderIconContainer(
+            <IconComponent style={{ width: 20, height: 20 }} />
+          )}
           <Text
             style={{
               flex: 1,
@@ -178,7 +187,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     );
   };
 
-  const renderGooglePlaceItem = (place: PlaceAutocompleteResult, index: number) => {
+  const renderGooglePlaceItem = (
+    place: PlaceAutocompleteResult,
+    index: number
+  ) => {
     if (useStyleProp) {
       return (
         <Pressable
@@ -223,7 +235,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
         key={place.place_id}
         onPress={() => onGooglePlacePress(place)}
         className={`flex-row items-center gap-3 py-3 ${
-          index < googlePlaceResults.length - 1 ? 'border-b border-neutral-200' : ''
+          index < googlePlaceResults.length - 1
+            ? 'border-b border-neutral-200'
+            : ''
         }`}
       >
         {renderIconContainer(<MapPin />)}
@@ -256,7 +270,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     }
 
     return (
-      <Text className="mb-3 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
+      <Text
+        className="mb-3 text-sm font-medium text-neutral-500"
+        style={{ fontFamily: 'Inter' }}
+      >
         {title} ({count})
       </Text>
     );
@@ -267,7 +284,7 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       return (
         <View style={{ alignItems: 'center', paddingVertical: 32 }}>
           <Text style={{ fontSize: 16, color: '#737373' }}>
-            No results found for "{searchText}"
+            No results found for &quot;{searchText}&quot;
           </Text>
           <Text
             style={{
@@ -286,9 +303,9 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     return (
       <View className="items-center py-8">
         <Text className="text-base text-neutral-500">
-          No results found for "{searchText}"
+          No results found for &quot;{searchText}&quot;
         </Text>
-        <Text className="mt-2 text-sm text-neutral-400 text-center">
+        <Text className="mt-2 text-center text-sm text-neutral-400">
           Try searching with different keywords
         </Text>
       </View>
@@ -309,12 +326,17 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       {googlePlaceResults.length > 0 && (
         <View>
           {renderSectionTitle('Other Locations', googlePlaceResults.length)}
-          {googlePlaceResults.map((place, index) => renderGooglePlaceItem(place, index))}
+          {googlePlaceResults.map((place, index) =>
+            renderGooglePlaceItem(place, index)
+          )}
         </View>
       )}
 
       {/* No results message */}
-      {busResults.length === 0 && googlePlaceResults.length === 0 && searchText.trim().length > 0 && renderNoResults()}
+      {busResults.length === 0 &&
+        googlePlaceResults.length === 0 &&
+        searchText.trim().length > 0 &&
+        renderNoResults()}
     </View>
   );
 };
