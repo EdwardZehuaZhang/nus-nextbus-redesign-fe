@@ -1,1 +1,2 @@
+PATH="/Users/gel/.nvm/versions/node/v24.11.1/bin:$PATH"
 /Users/gel/.nvm/versions/node/v24.11.1/bin/npx --no-install commitlint --edit $1
