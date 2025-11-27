@@ -77,6 +77,11 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.02,
 };
 
+// Mobile zoom offset to align with web zoom levels
+// Mobile zoom 13 (default) should behave like web zoom 16
+// This offset makes mobile zoom calculations match web behavior
+const MOBILE_ZOOM_OFFSET = 3;
+
 const getLandmarkColor = (type: string) => {
   switch (type) {
     case 'hospital':
@@ -90,6 +95,19 @@ const getLandmarkColor = (type: string) => {
     default:
       return '#274F9C';
   }
+};
+
+/**
+ * Calculate scale for landmark markers based on zoom level
+ * Matches web version behavior (zoom levels now aligned)
+ */
+const getLandmarkScale = (zoom: number): number => {
+  if (zoom <= 14) return 0.7;
+  else if (zoom <= 15) return 0.85;
+  else if (zoom === 16) return 1;
+  else if (zoom === 17) return 1.15;
+  else if (zoom === 18) return 1.3;
+  else return 1.5;
 };
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -123,6 +141,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   const mapType = externalMapType ?? internalMapType;
 
+  // Initialize currentRegion with initialRegion when it changes
+  useEffect(() => {
+    setCurrentRegion(initialRegion);
+  }, [initialRegion]);
+
   // Force map to use correct initial region after it's ready - only once
   useEffect(() => {
     console.log('[Map] mapReady effect triggered:', { mapReady, hasOrigin: !!origin, hasDestination: !!destination, waypointsCount: waypoints.length, hasSetInitialRegion: hasSetInitialRegion.current });
@@ -144,11 +167,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [mapReady, initialRegion, origin, destination, waypoints.length]);
   
-  // Handle region changes, but ignore during initialization
+  // Handle region changes
   const handleRegionChange = (region: Region) => {
-    if (!isInitializing.current) {
-      setCurrentRegion(region);
-    }
+    setCurrentRegion(region);
   };
 
   // Debug: Log the initialRegion being used
@@ -163,9 +184,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Calculate Google Maps zoom level from latitudeDelta
   // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
   // This matches Google Maps zoom levels (0 = world, 21 = building)
+  // Add MOBILE_ZOOM_OFFSET to align with web zoom behavior
   const getZoomLevel = (latitudeDelta: number): number => {
     const zoom = Math.log2(360 / latitudeDelta);
-    return Math.round(zoom);
+    return Math.round(zoom) + MOBILE_ZOOM_OFFSET;
   };
 
   const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
@@ -219,6 +241,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     'OTH Bldg',
   ];
 
+  // Helper function to determine if label should be below (south) based on nearby stops
+  const shouldLabelBelow = (stop: any, allStops: any[]): boolean => {
+    // Find nearby stops (within ~50 meters / 0.0005 degrees)
+    const nearbyStops = allStops.filter((otherStop: any) => {
+      if (otherStop.name === stop.name) return false;
+      const latDiff = Math.abs(otherStop.latitude - stop.latitude);
+      const lngDiff = Math.abs(otherStop.longitude - stop.longitude);
+      return latDiff < 0.0005 && lngDiff < 0.0005;
+    });
+
+    // If there are nearby stops, check if this stop is more southern (lower latitude)
+    if (nearbyStops.length > 0) {
+      const hasStopToNorth = nearbyStops.some(
+        (otherStop: any) => otherStop.latitude > stop.latitude
+      );
+      return hasStopToNorth; // Label below if this stop is more south
+    }
+
+    return false; // Default to label above
+  };
+
   // Helper function to check if a stop should be shown at current zoom
   const shouldShowStop = (stopName: string): boolean => {
     // If visibleBusStops is provided, use that filter
@@ -226,17 +269,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return visibleBusStops.includes(stopName);
     }
 
-    // Show based on zoom level (matching web version exactly):
+    // Show based on zoom level (now aligned with web):
     // - Zoom 17+: Show all stops
     // - Zoom 15-16: Show priority stops
-    // - Zoom 14 and below: Show only zoom14 priority stops
+    // - Zoom 14 and below: Show only zoom14 priority stops (minimal set)
     if (currentZoom >= 17) {
-      return true; // Show all stops
+      return true; // Show all stops at zoom 17 and above
     } else if (currentZoom >= 15) {
-      // Show priority stops
+      // Show priority stops at zoom 15-16
       return priorityStops.some((p) => stopName === p || stopName.trim() === p);
     } else {
-      // Show only zoom14 priority stops
+      // Show only minimal priority stops at zoom 14 and below
       return zoom14PriorityStops.some(
         (p) => stopName === p || stopName.trim() === p
       );
@@ -336,6 +379,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapType={mapType}
         onRegionChangeComplete={handleRegionChange}
         onMapReady={() => setMapReady(true)}
+        showsPointsOfInterest={currentZoom >= 16}
+        showsBuildings={currentZoom >= 16}
+        showsTraffic={false}
+        showsIndoors={currentZoom >= 17}
       >
         {/* Campus Boundary - always shown */}
         <Polygon
@@ -589,77 +636,149 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           tappable={shouldShowResidences}
         />
 
-        {/* Landmark Markers */}
-        {shouldShowLandmarks &&
-          NUS_LANDMARKS.map((landmark, index) => (
+        {/* Landmark Markers - Pre-rendered, visibility controlled by opacity */}
+        {NUS_LANDMARKS.map((landmark, index) => {
+          const scale = getLandmarkScale(currentZoom);
+          const baseSize = 40;
+          const size = baseSize * scale;
+          const color = getLandmarkColor(landmark.type);
+          
+          return (
             <Marker
               key={`landmark-${index}`}
               coordinate={landmark.coordinates}
               title={landmark.name}
               description={landmark.address}
-              pinColor={getLandmarkColor(landmark.type)}
-            />
-          ))}
-
-        {/* Bus Stop Markers - Text with white stroke outline (matching web version) */}
-        {shouldShowBusStops &&
-          busStopsData?.BusStopsResult?.busstops?.map((stop) => {
-            const stopName = stop.ShortName || stop.caption || stop.name;
-            
-            // Check if this stop should be shown at current zoom level
-            if (!shouldShowStop(stopName)) {
-              return null;
-            }
-
-            return (
-              <Marker
-                key={`bus-stop-${stop.name}`}
-                coordinate={{
-                  latitude: stop.latitude,
-                  longitude: stop.longitude,
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={shouldShowLandmarks ? 1 : 0}
+            >
+              <View
+                style={{
+                  width: size,
+                  height: size,
+                  backgroundColor: color,
+                  borderRadius: size / 2,
+                  borderWidth: 3,
+                  borderColor: '#FFFFFF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 3,
+                  elevation: 5,
                 }}
-                title={stopName}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
               >
+                {/* Icon placeholder - can be enhanced with actual icons later */}
                 <View
                   style={{
-                    width: 100,
-                    height: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    width: size * 0.6,
+                    height: size * 0.6,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: (size * 0.6) / 2,
                   }}
-                >
-                  <Svg width="100" height="20" viewBox="0 0 100 20">
-                    {/* White stroke outline - rendered first (behind) */}
-                    <SvgText
-                      x="50"
-                      y="14"
-                      fontSize="12"
-                      fontWeight="600"
-                      fill="none"
-                      textAnchor="middle"
-                      stroke="#FFFFFF"
-                      strokeWidth="3"
-                    >
-                      {stopName}
-                    </SvgText>
-                    {/* Blue text on top */}
-                    <SvgText
-                      x="50"
-                      y="14"
-                      fontSize="12"
-                      fontWeight="600"
-                      fill="#274F9C"
-                      textAnchor="middle"
-                    >
-                      {stopName}
-                    </SvgText>
-                  </Svg>
-                </View>
-              </Marker>
-            );
-          })}
+                />
+              </View>
+            </Marker>
+          );
+        })}
+
+        {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ */}
+        {busStopsData?.BusStopsResult?.busstops?.map((stop) => {
+          const showCircle = shouldShowBusStops && currentZoom >= 17;
+
+          return (
+            <Marker
+              key={`bus-stop-circle-${stop.name}`}
+              coordinate={{
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={showCircle ? 1 : 0}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  backgroundColor: '#274F9C',
+                  borderRadius: 4,
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }}
+              />
+            </Marker>
+          );
+        })}
+
+        {/* Bus Stop Label Markers - Text labels with dynamic positioning */}
+        {busStopsData?.BusStopsResult?.busstops?.map((stop) => {
+          const stopName = stop.ShortName || stop.caption || stop.name;
+          const allStops = busStopsData?.BusStopsResult?.busstops || [];
+          const labelBelow = shouldLabelBelow(stop, allStops);
+          const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
+          
+          // Determine if label should be visible based on zoom and filters
+          const isLabelVisible = shouldShowBusStops && shouldShowStop(stopName);
+          
+          // Calculate font size based on zoom level (matching web version)
+          let fontSize = 12;
+          let strokeWidth = 3;
+          if (currentZoom >= 17) {
+            fontSize = Math.min(18, 12 + (currentZoom - 16) * 2);
+            strokeWidth = Math.min(4, 3 + (currentZoom - 16) * 0.3);
+          }
+
+          return (
+            <Marker
+              key={`bus-stop-label-${stop.name}`}
+              coordinate={{
+                latitude: stop.latitude + labelOffsetLat,
+                longitude: stop.longitude,
+              }}
+              title={stopName}
+              anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
+              tracksViewChanges={false}
+              opacity={isLabelVisible ? 1 : 0}
+            >
+              <View
+                style={{
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Svg width="200" height="30" viewBox="0 0 200 30">
+                  {/* White stroke outline - rendered first (behind) */}
+                  <SvgText
+                    x="100"
+                    y="20"
+                    fontSize={fontSize}
+                    fontWeight="600"
+                    fill="none"
+                    textAnchor="middle"
+                    stroke="#FFFFFF"
+                    strokeWidth={strokeWidth}
+                  >
+                    {stopName}
+                  </SvgText>
+                  {/* Blue text on top */}
+                  <SvgText
+                    x="100"
+                    y="20"
+                    fontSize={fontSize}
+                    fontWeight="600"
+                    fill="#274F9C"
+                    textAnchor="middle"
+                  >
+                    {stopName}
+                  </SvgText>
+                </Svg>
+              </View>
+            </Marker>
+          );
+        })}
 
         {/* Origin Marker */}
         {origin && (
