@@ -282,8 +282,13 @@ const BusRouteCard = ({
       <View
         style={{
           position: 'relative',
-          borderRadius: '6px',
-          overflow: 'hidden',
+          borderTopLeftRadius: 6,
+          borderTopRightRadius: 6,
+          borderBottomLeftRadius: 6,
+          borderBottomRightRadius: 6,
+          borderWidth: 1,
+          borderColor: '#e5e5e5',
+          borderTopWidth: 0,
         }}
       >
         {/* Selection indicator overlay - doesn't affect layout */}
@@ -297,7 +302,7 @@ const BusRouteCard = ({
               bottom: 0,
               borderWidth: 3,
               borderColor: route.color,
-              borderRadius: '6px',
+              borderRadius: 6,
               pointerEvents: 'none',
               zIndex: 10,
             }}
@@ -307,7 +312,12 @@ const BusRouteCard = ({
         {/* Route Header */}
         <View
           className="h-8 items-center justify-center shadow-sm"
-          style={{ backgroundColor: route.color }}
+          style={{ 
+            backgroundColor: route.color,
+            borderTopLeftRadius: 6,
+            borderTopRightRadius: 6,
+            overflow: 'hidden',
+          }}
         >
           <Text
             className="text-base font-semibold"
@@ -331,10 +341,6 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
   return (
     <View
       style={{
-        borderBottomWidth: 1,
-        borderLeftWidth: 1,
-        borderRightWidth: 1,
-        borderColor: '#e5e5e5',
         borderBottomLeftRadius: 6,
         borderBottomRightRadius: 6,
         overflow: 'hidden',
