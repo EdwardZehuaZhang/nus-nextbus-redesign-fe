@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { Svg, Path } from 'react-native-svg';
+import { storage } from '@/lib/storage';
 
 const CheckIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
+  <Svg
     width="12"
     height="12"
     viewBox="0 0 24 24"
@@ -12,8 +14,8 @@ const CheckIcon = () => (
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <path d="M20 6 9 17l-5-5" />
-  </svg>
+    <Path d="M20 6 9 17l-5-5" />
+  </Svg>
 );
 
 const STORAGE_KEY = 'nus-nextbus-map-filters';
@@ -44,10 +46,10 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
 }) => {
   const [items, setItems] = useState(defaultFilterItems);
 
-  // Load saved filters from localStorage on mount
+  // Load saved filters from storage on mount
   useEffect(() => {
     try {
-      const savedFilters = localStorage.getItem(STORAGE_KEY);
+      const savedFilters = storage.getString(STORAGE_KEY);
       if (savedFilters) {
         const parsedFilters = JSON.parse(savedFilters);
         const updatedItems = defaultFilterItems.map((item) => ({
@@ -116,9 +118,9 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
       {}
     );
 
-    // Save to localStorage
+    // Save to storage
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+      storage.set(STORAGE_KEY, JSON.stringify(filters));
     } catch (error) {
       console.error('Error saving filters:', error);
     }
@@ -129,72 +131,56 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
   };
 
   return (
-    <div className="border-shadcn-ui-app-border relative flex flex-col items-start rounded-md border border-solid bg-white px-4 py-2" style={{ zIndex: 10000 }}>
+    <View className="relative flex flex-col items-start" style={{ zIndex: 10000 }}>
       {items.map((item, index) => (
         <React.Fragment key={item.id}>
-          <div className="flex h-8 w-full items-center self-stretch rounded-[var(--border-radius-rounded-sm)] py-[var(--tw-padding-py-1-5)]">
-            <label
-              htmlFor={item.id}
-              className="font-text-sm-regular text-shadcn-ui-app-popover-foreground relative mt-[-1.00px] cursor-pointer whitespace-nowrap text-[length:var(--text-sm-regular-font-size)] font-[number:var(--text-sm-regular-font-weight)] leading-[var(--text-sm-regular-line-height)] tracking-[var(--text-sm-regular-letter-spacing)] [font-style:var(--text-sm-regular-font-style)]"
-              onClick={() => handleToggle(item.id)}
+          <TouchableOpacity 
+            className="flex h-8 w-full flex-row items-center self-stretch rounded-[var(--border-radius-rounded-sm)]"
+            onPress={() => handleToggle(item.id)}
+            activeOpacity={0.7}
+          >
+            <Text
+              className="font-text-sm-regular text-shadcn-ui-app-popover-foreground flex-1 text-[length:var(--text-sm-regular-font-size)] font-[number:var(--text-sm-regular-font-weight)] leading-[var(--text-sm-regular-line-height)] tracking-[var(--text-sm-regular-letter-spacing)] [font-style:var(--text-sm-regular-font-style)]"
             >
               {item.label}
-            </label>
+            </Text>
 
-            <div className="relative ml-auto shrink-0 pl-8">
+            <View className="ml-2">
               {item.type === 'radio' ? (
                 // Radio button (circle) - but render as checkbox for bus-stops
                 item.id === 'bus-stops' ? (
                   // Render checkbox for bus-stops
                   item.checked ? (
-                    <div
-                      className="flex size-[17.18px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]"
-                      onClick={() => handleToggle(item.id)}
-                    >
+                    <View className="flex size-[17.18px] flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]">
                       <CheckIcon />
-                    </div>
+                    </View>
                   ) : (
-                    <div
-                      className="size-[17.18px] cursor-pointer rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]"
-                      onClick={() => handleToggle(item.id)}
-                    />
+                    <View className="size-[17.18px] rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]" />
                   )
                 ) : item.checked ? (
-                  <div
-                    className="border-shadcn-ui-app-border shadow-box-shadow-shadow-xs size-4 cursor-pointer rounded-full border border-solid border-[#274F9C] bg-[#274F9C]"
-                    onClick={() => handleToggle(item.id)}
-                  >
-                    <div className="flex size-full items-center justify-center">
-                      <div className="size-1.5 rounded-full bg-white"></div>
-                    </div>
-                  </div>
+                  <View className="border-shadcn-ui-app-border shadow-box-shadow-shadow-xs size-4 rounded-full border border-solid border-[#274F9C] bg-[#274F9C]">
+                    <View className="flex size-full items-center justify-center">
+                      <View className="size-1.5 rounded-full bg-white"></View>
+                    </View>
+                  </View>
                 ) : (
-                  <div
-                    className="size-4 cursor-pointer rounded-full border-[0.72px] border-solid border-[#cdcdcd]"
-                    onClick={() => handleToggle(item.id)}
-                  />
+                  <View className="size-4 rounded-full border-[0.72px] border-solid border-[#cdcdcd]" />
                 )
               ) : item.checked ? (
-                <div
-                  className="flex size-[17.18px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]"
-                  onClick={() => handleToggle(item.id)}
-                >
+                <View className="flex size-[17.18px] flex-col items-center justify-center overflow-hidden rounded-[2.86px] bg-[#274f9c]">
                   <CheckIcon />
-                </div>
+                </View>
               ) : (
-                <div
-                  className="size-[17.18px] cursor-pointer rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]"
-                  onClick={() => handleToggle(item.id)}
-                />
+                <View className="size-[17.18px] rounded-[2.86px] border-[0.72px] border-solid border-[#cdcdcd]" />
               )}
-            </div>
-          </div>
+            </View>
+          </TouchableOpacity>
           {/* Add divider between Residences and A1 */}
           {item.id === 'residences' && index < items.length - 1 && (
-            <div className="my-1 w-full border-t border-solid border-[#e5e5e5]"></div>
+            <View className="my-1 w-full border-t border-solid border-[#e5e5e5]"></View>
           )}
         </React.Fragment>
       ))}
-    </div>
+    </View>
   );
 };

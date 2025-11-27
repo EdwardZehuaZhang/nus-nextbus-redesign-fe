@@ -80,23 +80,27 @@ export const MapTypeSelector: React.FC<MapTypeSelectorProps> = ({
 
       {isMapTypeOpen && (
         <View style={styles.dropdown}>
-          {mapOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.option}
-              onPress={() => handleMapChange(option.id)}
-            >
-              <Text style={styles.optionText}>{option.label}</Text>
-              <View
-                style={[
-                  styles.radio,
-                  selectedMap === option.id && styles.radioSelected,
-                ]}
+          <View style={styles.dropdownContent}>
+            {mapOptions.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.option}
+                onPress={() => handleMapChange(option.id)}
+                activeOpacity={0.7}
               >
-                {selectedMap === option.id && <View style={styles.radioDot} />}
-              </View>
-            </TouchableOpacity>
-          ))}
+                <Text style={styles.optionText}>{option.label}</Text>
+                <View style={styles.radioContainer}>
+                  {selectedMap === option.id ? (
+                    <View style={styles.radioSelected}>
+                      <View style={styles.radioDot} />
+                    </View>
+                  ) : (
+                    <View style={styles.radio} />
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       )}
     </View>
@@ -141,30 +145,40 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  dropdownContent: {
+    flexDirection: 'column',
+  },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    minHeight: 32,
+    height: 28,
   },
   optionText: {
     fontSize: 14,
     color: '#1f2937',
+    flex: 1,
+  },
+  radioContainer: {
+    marginLeft: 8,
   },
   radio: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderWidth: 0.72,
+    borderColor: '#cdcdcd',
     backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   radioSelected: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
     borderColor: '#274F9C',
     backgroundColor: '#274F9C',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   radioDot: {
     width: 6,

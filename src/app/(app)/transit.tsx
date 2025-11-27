@@ -1,6 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
 import { Animated, TextInput, Keyboard, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { storage } from '@/lib/storage';
 
@@ -1571,6 +1572,7 @@ const useDragHandlers = () => {
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(
@@ -1736,7 +1738,7 @@ export default function TransitPage() {
         <View
           style={{
             position: 'absolute' as any,
-            top: 40,
+            top: insets.top + 8,
             right: 20,
             zIndex: 99999,
             pointerEvents: 'box-none',
