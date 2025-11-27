@@ -1,5 +1,5 @@
 import polyline from '@mapbox/polyline';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
@@ -22,6 +22,10 @@ interface InteractiveMapProps {
   ) => void;
   initialRegion?: Region;
   style?: any;
+  mapType?: 'standard' | 'satellite' | 'hybrid' | 'terrain';
+  onMapTypeChangeReady?: (
+    handler: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void
+  ) => void;
 }
 
 const DEFAULT_REGION: Region = {
@@ -39,8 +43,25 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMarkerPress,
   initialRegion = DEFAULT_REGION,
   style,
+  mapType: externalMapType,
+  onMapTypeChangeReady,
 }) => {
   const mapRef = useRef<MapView>(null);
+  const [internalMapType, setInternalMapType] = useState<
+    'standard' | 'satellite' | 'hybrid' | 'terrain'
+  >('standard');
+
+  // Use external mapType if provided, otherwise use internal state
+  const mapType = externalMapType ?? internalMapType;
+
+  // Expose map type change handler to parent
+  useEffect(() => {
+    if (onMapTypeChangeReady) {
+      onMapTypeChangeReady((newMapType) => {
+        setInternalMapType(newMapType);
+      });
+    }
+  }, [onMapTypeChangeReady]);
 
   // Decode polyline and convert to coordinates
   const routeCoordinates = routePolyline
@@ -98,6 +119,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         showsMyLocationButton
         showsCompass
         showsScale
+        mapType={mapType}
       >
         {/* Origin Marker */}
         {origin && (

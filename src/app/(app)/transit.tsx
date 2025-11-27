@@ -1629,11 +1629,11 @@ export default function TransitPage() {
 
   // Store the map type change handler from InteractiveMap
   const mapTypeChangeHandlerRef = React.useRef<
-    ((mapType: google.maps.MapTypeId | 'dark' | 'light') => void) | null
+    ((mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) | null
   >(null);
 
   const handleMapTypeChange = (
-    mapType: google.maps.MapTypeId | 'dark' | 'light'
+    mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain'
   ) => {
     if (mapTypeChangeHandlerRef.current) {
       mapTypeChangeHandlerRef.current(mapType);
