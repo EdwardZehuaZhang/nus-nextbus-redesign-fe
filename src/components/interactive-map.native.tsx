@@ -9,7 +9,8 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { Text as SvgText } from 'react-native-svg';
+import Svg, { Text as SvgText, Path, G } from 'react-native-svg';
+import { FirstAid, Subway, BookOpen, Bus } from 'phosphor-react-native';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
@@ -40,9 +41,9 @@ import {
   RVRC_BOUNDARY,
   TEMBUSU_COLLEGE_BOUNDARY,
   VALOUR_HOUSE_BOUNDARY,
-  NUS_LANDMARKS,
   type Coordinate,
 } from '@/lib/map-boundaries';
+import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 
 interface InteractiveMapProps {
   origin?: LatLng;
@@ -95,6 +96,51 @@ const getLandmarkColor = (type: string) => {
     default:
       return '#274F9C';
   }
+};
+
+/**
+ * Pin marker component with icon inside - matches web version exactly
+ */
+const PinMarker: React.FC<{
+  type: 'hospital' | 'mrt' | 'library' | 'bus-terminal';
+  scale: number;
+}> = ({ type, scale }) => {
+  const color = getLandmarkColor(type);
+  const width = 40 * scale;
+  const height = 52 * scale;
+  const iconSize = 22 * scale;
+  const iconOffset = 9 * scale;
+
+  // Select the appropriate icon component
+  const IconComponent = {
+    hospital: FirstAid,
+    mrt: Subway,
+    library: BookOpen,
+    'bus-terminal': Bus,
+  }[type];
+
+  return (
+    <View
+      style={{
+        width,
+        height,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+      }}
+    >
+      <Svg width={width} height={height} viewBox="0 0 40 52">
+        {/* Pin shape */}
+        <Path
+          d="M20 0C9 0 0 9 0 20C0 35 20 52 20 52C20 52 40 35 40 20C40 9 31 0 20 0Z"
+          fill={color}
+        />
+        {/* Icon inside the pin */}
+        <G transform={`translate(${iconOffset}, ${iconOffset})`}>
+          <IconComponent size={iconSize} color="white" weight="fill" />
+        </G>
+      </Svg>
+    </View>
+  );
 };
 
 /**
@@ -674,47 +720,21 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Landmark Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_LANDMARKS.map((landmark, index) => {
           const scale = getLandmarkScale(currentZoom);
-          const baseSize = 40;
-          const size = baseSize * scale;
-          const color = getLandmarkColor(landmark.type);
           
           return (
             <Marker
               key={`landmark-${index}`}
-              coordinate={landmark.coordinates}
+              coordinate={{
+                latitude: landmark.coordinates.lat,
+                longitude: landmark.coordinates.lng,
+              }}
               title={landmark.name}
               description={landmark.address}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={false}
               opacity={shouldShowLandmarks ? 1 : 0}
             >
-              <View
-                style={{
-                  width: size,
-                  height: size,
-                  backgroundColor: color,
-                  borderRadius: size / 2,
-                  borderWidth: 3,
-                  borderColor: '#FFFFFF',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 3,
-                  elevation: 5,
-                }}
-              >
-                {/* Icon placeholder - can be enhanced with actual icons later */}
-                <View
-                  style={{
-                    width: size * 0.6,
-                    height: size * 0.6,
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: (size * 0.6) / 2,
-                  }}
-                />
-              </View>
+              <PinMarker type={landmark.type} scale={scale} />
             </Marker>
           );
         })}
