@@ -51,7 +51,7 @@ export const getPlaceDetails = async (
     {
       params: {
         place_id: placeId,
-        fields: 'geometry,name,formatted_address,place_id',
+        fields: 'geometry,name,formatted_address,place_id,photos,rating,user_ratings_total,price_level,opening_hours,types,vicinity',
       },
     }
   );

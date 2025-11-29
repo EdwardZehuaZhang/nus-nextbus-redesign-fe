@@ -77,7 +77,7 @@ export const NUS_LANDMARKS: Landmark[] = [
     address: '301 South Buona Vista Rd, Singapore 118177',
     coordinates: { lat: 1.2934291, lng: 103.7846561 },
     type: 'mrt',
-    placeId: 'ChIJ_9hQHswb2jERDyOL3',
+    placeId: 'ChIJ_9hQHswb2jERDyOL3-rPBxg',
   },
   {
     name: 'NUS Central Library',
@@ -91,7 +91,7 @@ export const NUS_LANDMARKS: Landmark[] = [
     address: '37B Clementi Rd, Singapore 129762',
     coordinates: { lat: 1.2946866, lng: 103.7700484 },
     type: 'bus-terminal',
-    placeId: 'ChIJbQOuVPka2jERT0AKxPVa',
+    placeId: 'ChIJbQOuVPka2jERT0AKxPVa-NU',
   },
 ];
 

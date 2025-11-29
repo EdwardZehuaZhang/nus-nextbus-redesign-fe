@@ -1,6 +1,7 @@
 import polyline from '@mapbox/polyline';
+import { BookOpen, Bus, FirstAid, Subway } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -9,41 +10,41 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { Text as SvgText, Path, G } from 'react-native-svg';
-import { FirstAid, Subway, BookOpen, Bus } from 'phosphor-react-native';
+import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
 import type { LatLng } from '@/api/google-maps';
+import { getPlaceDetails } from '@/api/google-maps/places';
+import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 import {
+  BLUE_AREA_BOUNDARY,
+  CAPT_BOUNDARY,
+  CDE_AREA_BOUNDARY,
+  COMBIZ_AREA_BOUNDARY,
+  type Coordinate,
+  DARK_BLUE_AREA_BOUNDARY,
+  DARK_ORANGE_AREA_BOUNDARY,
+  EUSOFF_HALL_BOUNDARY,
+  FASS_AREA_BOUNDARY,
+  HELIX_HOUSE_BOUNDARY,
+  KENT_RIDGE_HALL_BOUNDARY,
+  KING_EDWARD_VII_HALL_BOUNDARY,
+  LAW_AREA_BOUNDARY,
+  LIGHTHOUSE_BOUNDARY,
   NUS_CAMPUS_BOUNDARY,
   ORANGE_AREA_BOUNDARY,
-  BLUE_AREA_BOUNDARY,
-  DARK_BLUE_AREA_BOUNDARY,
-  YELLOW_AREA_BOUNDARY,
-  DARK_ORANGE_AREA_BOUNDARY,
-  CDE_AREA_BOUNDARY,
-  FASS_AREA_BOUNDARY,
-  COMBIZ_AREA_BOUNDARY,
-  LAW_AREA_BOUNDARY,
   PGPR_BOUNDARY,
-  LIGHTHOUSE_BOUNDARY,
   PIONEER_HOUSE_BOUNDARY,
-  HELIX_HOUSE_BOUNDARY,
-  SHEARES_HALL_BOUNDARY,
-  KENT_RIDGE_HALL_BOUNDARY,
-  TEMASEK_HALL_BOUNDARY,
-  EUSOFF_HALL_BOUNDARY,
-  KING_EDWARD_VII_HALL_BOUNDARY,
   RAFFLES_HALL_BOUNDARY,
-  CAPT_BOUNDARY,
   RC4_BOUNDARY,
   RVRC_BOUNDARY,
+  SHEARES_HALL_BOUNDARY,
+  TEMASEK_HALL_BOUNDARY,
   TEMBUSU_COLLEGE_BOUNDARY,
   VALOUR_HOUSE_BOUNDARY,
-  type Coordinate,
+  YELLOW_AREA_BOUNDARY,
 } from '@/lib/map-boundaries';
-import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 
 interface InteractiveMapProps {
   origin?: LatLng;
@@ -184,6 +185,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [mapReady, setMapReady] = useState(false);
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
+  const [selectedPlace, setSelectedPlace] = useState<{
+    name: string;
+    address?: string;
+    coordinates: { latitude: number; longitude: number };
+    type?:
+      | 'hospital'
+      | 'mrt'
+      | 'library'
+      | 'bus-terminal'
+      | 'bus-stop'
+      | 'location'
+      | 'google-place';
+    photo?: string;
+    rating?: number;
+    userRatingsTotal?: number;
+    priceLevel?: number;
+    openNow?: boolean;
+  } | null>(null);
 
   const mapType = externalMapType ?? internalMapType;
 
@@ -206,12 +225,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Generate custom map style based on zoom level to hide/show POI and road labels
   const customMapStyle = React.useMemo(() => {
     const showDetails = currentZoom >= 16;
-    
+
     if (showDetails) {
       // Show all details at zoom 16+
       return [];
     }
-    
+
     // Hide POI labels and road labels when zoomed out
     return [
       {
@@ -238,34 +257,102 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Force map to use correct initial region after it's ready - only once
   useEffect(() => {
-    console.log('[Map] mapReady effect triggered:', { mapReady, hasOrigin: !!origin, hasDestination: !!destination, waypointsCount: waypoints.length, hasSetInitialRegion: hasSetInitialRegion.current });
-    if (mapReady && mapRef.current && !origin && !destination && waypoints.length === 0 && !hasSetInitialRegion.current) {
+    console.log('[Map] mapReady effect triggered:', {
+      mapReady,
+      hasOrigin: !!origin,
+      hasDestination: !!destination,
+      waypointsCount: waypoints.length,
+      hasSetInitialRegion: hasSetInitialRegion.current,
+    });
+    if (
+      mapReady &&
+      mapRef.current &&
+      !origin &&
+      !destination &&
+      waypoints.length === 0 &&
+      !hasSetInitialRegion.current
+    ) {
       console.log('[Map] Forcing region to:', initialRegion);
       // Mark as set IMMEDIATELY to prevent double-execution
       hasSetInitialRegion.current = true;
       isInitializing.current = true;
-      
+
       // Only set region if there's no route being displayed
       setTimeout(() => {
         mapRef.current?.animateToRegion(initialRegion, 100);
         // After setting initial region, allow region updates
         setTimeout(() => {
-          console.log('[Map] Initialization complete, enabling region tracking');
+          console.log(
+            '[Map] Initialization complete, enabling region tracking'
+          );
           isInitializing.current = false;
         }, 500);
       }, 100);
     }
   }, [mapReady, initialRegion, origin, destination, waypoints.length]);
-  
+
   // Handle region changes
   const handleRegionChange = (region: Region) => {
     setCurrentRegion(region);
   };
 
+  // Find nearest known landmark or bus stop to a tapped coordinate
+  const findNearestKnownLocation = (lat: number, lng: number) => {
+    let nearest: {
+      name: string;
+      address?: string;
+      lat: number;
+      lng: number;
+      type: string;
+    } | null = null;
+    let bestDist = Infinity;
+
+    // Check landmarks
+    for (const lm of NUS_LANDMARKS) {
+      const d = Math.hypot(lm.coordinates.lat - lat, lm.coordinates.lng - lng);
+      if (d < bestDist) {
+        bestDist = d;
+        nearest = {
+          name: lm.name,
+          address: lm.address,
+          lat: lm.coordinates.lat,
+          lng: lm.coordinates.lng,
+          type: lm.type,
+        };
+      }
+    }
+
+    // Check bus stops if available
+    const allStops = busStopsData?.BusStopsResult?.busstops || [];
+    for (const stop of allStops) {
+      const d = Math.hypot(stop.latitude - lat, stop.longitude - lng);
+      if (d < bestDist) {
+        bestDist = d;
+        nearest = {
+          name: stop.ShortName || stop.caption || stop.name,
+          address: undefined,
+          lat: stop.latitude,
+          lng: stop.longitude,
+          type: 'bus-stop',
+        };
+      }
+    }
+
+    // Threshold ~50m (0.0005 degrees)
+    if (bestDist <= 0.0005 && nearest) {
+      return nearest;
+    }
+    return null;
+  };
+
+  // Map tap handler: show place details popup when tapping on map
   // Debug: Log the initialRegion being used
   useEffect(() => {
     console.log('[Map] initialRegion:', initialRegion);
-    console.log('[Map] Expected zoom level:', Math.log2(360 / initialRegion.latitudeDelta).toFixed(2));
+    console.log(
+      '[Map] Expected zoom level:',
+      Math.log2(360 / initialRegion.latitudeDelta).toFixed(2)
+    );
   }, [initialRegion]);
 
   // Fetch bus stops data
@@ -276,7 +363,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     console.log(
       `[Map Zoom] latitudeDelta: ${currentRegion.latitudeDelta.toFixed(6)}, zoom level: ${currentZoom}, coords: ${currentRegion.latitude.toFixed(6)}, ${currentRegion.longitude.toFixed(6)}`
     );
-  }, [currentRegion.latitudeDelta, currentZoom, currentRegion.latitude, currentRegion.longitude]);
+  }, [
+    currentRegion.latitudeDelta,
+    currentZoom,
+    currentRegion.latitude,
+    currentRegion.longitude,
+  ]);
 
   // Priority stops shown at zoom level 14 (minimal set of key locations)
   const zoom14PriorityStops = [
@@ -444,6 +536,127 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onMarkerPress?.('waypoint', index);
   };
 
+  const handleLandmarkPress =
+    (landmark: (typeof NUS_LANDMARKS)[0]) => async (e: MarkerPressEvent) => {
+      e.stopPropagation();
+
+      // If we have a Google Place ID, fetch full details (matching web behavior)
+      if (landmark.placeId) {
+        try {
+          const data = await getPlaceDetails(landmark.placeId);
+          if (data.result) {
+            const place: any = data.result;
+
+            // Build photo URL if available
+            let photoUrl: string | undefined;
+            if (place.photos && place.photos.length > 0) {
+              const photoReference = place.photos[0].photo_reference;
+              const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+              photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
+            }
+
+            setSelectedPlace({
+              name: place.name || landmark.name,
+              address: place.formatted_address || landmark.address,
+              coordinates: {
+                latitude: place.geometry?.location?.lat || landmark.coordinates.lat,
+                longitude: place.geometry?.location?.lng || landmark.coordinates.lng,
+              },
+              type: 'google-place',
+              photo: photoUrl,
+              rating: place.rating,
+              userRatingsTotal: place.user_ratings_total,
+              priceLevel: place.price_level,
+              openNow: place.opening_hours?.open_now,
+            });
+            return;
+          }
+        } catch (err) {
+          console.error('[Landmark] Failed to fetch place details for', landmark.name, err);
+        }
+      }
+
+      // Fallback: just show basic landmark info
+      setSelectedPlace({
+        name: landmark.name,
+        address: landmark.address,
+        coordinates: {
+          latitude: landmark.coordinates.lat,
+          longitude: landmark.coordinates.lng,
+        },
+        type: landmark.type,
+      });
+    };
+
+  const handleBusStopPress = (stop: any) => (e: MarkerPressEvent) => {
+    e.stopPropagation();
+    const stopName = stop.ShortName || stop.caption || stop.name;
+    setSelectedPlace({
+      name: stopName,
+      address: undefined,
+      coordinates: { latitude: stop.latitude, longitude: stop.longitude },
+      type: 'bus-stop',
+    });
+  };
+
+  // Handle Google Places POI clicks
+  const handlePoiClick = async (event: any) => {
+    const { placeId, name, coordinate } = event.nativeEvent;
+    console.log('[Map] POI clicked:', { placeId, name, coordinate });
+
+    if (!placeId) return;
+
+    try {
+      // Fetch place details from backend using the API helper
+      const data = await getPlaceDetails(placeId);
+
+      if (data.result) {
+        const place = data.result as any;
+        
+        // Get photo URL if available - use Google's photo service directly
+        let photoUrl: string | undefined;
+        if (place.photos && place.photos.length > 0) {
+          const photoReference = place.photos[0].photo_reference;
+          const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+          // Use Google's Place Photo API directly
+          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
+        }
+        
+        setSelectedPlace({
+          name: place.name || name,
+          address: place.formatted_address || place.vicinity,
+          coordinates: {
+            latitude: place.geometry?.location?.lat || coordinate.latitude,
+            longitude: place.geometry?.location?.lng || coordinate.longitude,
+          },
+          type: 'google-place',
+          photo: photoUrl,
+          rating: place.rating,
+          userRatingsTotal: place.user_ratings_total,
+          priceLevel: place.price_level,
+          openNow: place.opening_hours?.open_now,
+        });
+      } else {
+        // Fallback if API fails
+        setSelectedPlace({
+          name: name,
+          address: undefined,
+          coordinates: coordinate,
+          type: 'google-place',
+        });
+      }
+    } catch (error) {
+      console.error('[Map] Error fetching place details:', error);
+      // Fallback on error
+      setSelectedPlace({
+        name: name,
+        address: undefined,
+        coordinates: coordinate,
+        type: 'google-place',
+      });
+    }
+  };
+
   return (
     <View style={[styles.container, style]}>
       <MapView
@@ -458,6 +671,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapType={mapType}
         onRegionChangeComplete={handleRegionChange}
         onMapReady={() => setMapReady(true)}
+        onPoiClick={handlePoiClick}
         customMapStyle={customMapStyle}
         showsIndoors={currentZoom >= 17}
         showsTraffic={false}
@@ -728,18 +942,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 latitude: landmark.coordinates.lat,
                 longitude: landmark.coordinates.lng,
               }}
-              title={landmark.name}
-              description={landmark.address}
               anchor={{ x: 0.5, y: 1 }}
               tracksViewChanges={false}
               opacity={shouldShowLandmarks ? 1 : 0}
+              onPress={handleLandmarkPress(landmark)}
             >
               <PinMarker type={landmark.type} scale={scale} />
             </Marker>
           );
-        })}
-
-        {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ */}
+        })}        {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ */}
         {busStopsData?.BusStopsResult?.busstops?.map((stop) => {
           const showCircle = shouldShowBusStops && currentZoom >= 17;
 
@@ -753,6 +964,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
               opacity={showCircle ? 1 : 0}
+              onPress={handleBusStopPress(stop)}
             >
               <View
                 style={{
@@ -774,10 +986,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const allStops = busStopsData?.BusStopsResult?.busstops || [];
           const labelBelow = shouldLabelBelow(stop, allStops);
           const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
-          
+
           // Determine if label should be visible based on zoom and filters
           const isLabelVisible = shouldShowBusStops && shouldShowStop(stopName);
-          
+
           // Calculate font size based on zoom level (matching web version)
           let fontSize = 12;
           let strokeWidth = 3;
@@ -793,10 +1005,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 latitude: stop.latitude + labelOffsetLat,
                 longitude: stop.longitude,
               }}
-              title={stopName}
               anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
               tracksViewChanges={false}
               opacity={isLabelVisible ? 1 : 0}
+              onPress={handleBusStopPress(stop)}
             >
               <View
                 style={{
@@ -839,8 +1051,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {origin && (
           <Marker
             coordinate={{ latitude: origin.lat, longitude: origin.lng }}
-            title="Your Location"
-            description="Starting point"
             pinColor="#274F9C"
             onPress={handleOriginPress}
           />
@@ -851,7 +1061,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <Marker
             key={`waypoint-${index}`}
             coordinate={{ latitude: waypoint.lat, longitude: waypoint.lng }}
-            title={`Stop ${index + 1}`}
             pinColor="#FF8C00"
             onPress={handleWaypointPress(index)}
           />
@@ -864,8 +1073,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               latitude: destination.lat,
               longitude: destination.lng,
             }}
-            title="Destination"
-            description="Final destination"
             pinColor="#D32F2F"
             onPress={handleDestinationPress}
           />
@@ -881,7 +1088,96 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             lineJoin="round"
           />
         )}
+
       </MapView>
+
+      {/* Place Details Popup - positioned absolutely on screen like web version */}
+      {selectedPlace && (
+        <View style={styles.placePopupContainer}>
+          <View style={styles.placeCard}>
+            {/* Horizontal layout: Photo LEFT, Content RIGHT (matching web) */}
+            <View style={styles.placeHorizontalRow}>
+              {/* Left: Photo */}
+              {selectedPlace.photo ? (
+                <Image
+                  source={{ uri: selectedPlace.photo }}
+                  style={styles.placePhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.placePhotoPlaceholder} />
+              )}
+
+              {/* Right: Content */}
+              <View style={styles.placeTextContent}>
+                {/* Title */}
+                <Text style={styles.placeTitle} numberOfLines={2}>
+                  {selectedPlace.name}
+                </Text>
+
+                {/* Rating row */}
+                {selectedPlace.rating && (
+                  <View style={styles.placeMetaRow}>
+                    <Text style={styles.placeRatingText}>
+                      {selectedPlace.rating.toFixed(1)}
+                    </Text>
+                    <Text style={styles.placeRatingStar}> ★ </Text>
+                    {selectedPlace.userRatingsTotal && (
+                      <Text style={styles.placeRatingCount}>
+                        ({selectedPlace.userRatingsTotal})
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Type (e.g., Restaurant) + Price */}
+                {(selectedPlace.type === 'google-place') && (
+                  <View style={styles.placeMetaRow}>
+                    <Text style={styles.placeTypeText}>Restaurant</Text>
+                    {selectedPlace.priceLevel && (
+                      <Text style={styles.placeTypePriceText}>
+                        {' · '}
+                        {selectedPlace.priceLevel === 1 ? '$10-20' : selectedPlace.priceLevel === 2 ? '$20-30' : selectedPlace.priceLevel === 3 ? '$30-50' : '$50+'}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Open status with hours */}
+                {selectedPlace.openNow !== undefined && (
+                  <Text
+                    style={[
+                      styles.placeOpenText,
+                      { color: selectedPlace.openNow ? '#188038' : '#d93025' },
+                    ]}
+                  >
+                    {selectedPlace.openNow ? 'Open' : 'Closed'}
+                    <Text style={styles.placeHoursText}> · Closes 9:30 PM</Text>
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Buttons overlaid on the card - positioned absolutely like web */}
+            <TouchableOpacity
+              style={styles.placeCloseBtn}
+              onPress={() => setSelectedPlace(null)}
+            >
+              <Text style={styles.placeCloseBtnText}>×</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.placeDirectionsBtn}>
+              <Svg width={16} height={16} viewBox="0 0 20 20">
+                <Path
+                  d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
+                  fill="#FFFFFF"
+                />
+              </Svg>
+              <Text style={styles.placeDirectionsBtnText}>Directions</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -893,5 +1189,143 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
+  },
+  placePopupContainer: {
+    position: 'absolute',
+    top: 84,
+    left: '5%',
+    right: '5%',
+    alignItems: 'center',
+    zIndex: 999999,
+    pointerEvents: 'box-none',
+  },
+  placeCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+    position: 'relative',
+  },
+  // Horizontal layout: photo on left, text on right
+  placeHorizontalRow: {
+    flexDirection: 'row',
+    padding: 12,
+  },
+  placePhoto: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  placePhotoPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#e8eaed',
+  },
+  placeTextContent: {
+    flex: 1,
+    paddingLeft: 12,
+    justifyContent: 'flex-start',
+  },
+  placeTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f1f1f',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  placeMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  placeRatingText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#1f1f1f',
+  },
+  placeRatingStar: {
+    fontSize: 14,
+    color: '#fbbc04',
+  },
+  placeRatingCount: {
+    fontSize: 14,
+    color: '#70757a',
+  },
+  placePriceText: {
+    fontSize: 14,
+    color: '#70757a',
+  },
+  placeTypeText: {
+    fontSize: 14,
+    color: '#70757a',
+  },
+  placeTypePriceText: {
+    fontSize: 14,
+    color: '#70757a',
+  },
+  placeOpenText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  placeHoursText: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#70757a',
+  },
+  // Buttons overlaid on card - positioned absolutely like web version
+  placeCloseBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    zIndex: 10,
+  },
+  placeCloseBtnText: {
+    fontSize: 22,
+    color: '#5f6368',
+    fontWeight: '300',
+    lineHeight: 22,
+  },
+  placeDirectionsBtn: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    height: 36,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#1a73e8',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+    zIndex: 10,
+  },
+  placeDirectionsBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#ffffff',
   },
 });
