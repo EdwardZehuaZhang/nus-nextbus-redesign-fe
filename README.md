@@ -70,6 +70,42 @@ NUS NextBus Redesign is a complete overhaul of the NUS Internal Shuttle Bus Serv
    - Or press `i` for iOS simulator
    - Or press `a` for Android emulator
 
+### Development with Physical iOS Device
+
+If you already have a development build installed on your iPhone:
+
+1. **Update environment configuration**
+   
+   Edit `.env.local` to use the production backend:
+   ```bash
+   EXPO_PUBLIC_BACKEND_API_URL=https://nus-nextbus-redesign-be.onrender.com
+   ```
+
+2. **Start the development server**
+   
+   ```bash
+   npx expo start --clear
+   ```
+
+3. **Connect your iPhone**
+   
+   - Ensure your iPhone and Mac are on the same Wi-Fi network
+   - Open the app on your iPhone
+   - Shake the device to open the developer menu
+   - Tap "Enter URL manually" and enter the URL shown in the terminal (e.g., `exp://192.168.x.x:8081`)
+   - Or scan the QR code with your camera app
+
+4. **Live reload**
+   
+   - The app will automatically reload when you save changes
+   - Press `r` in the terminal to manually reload
+   - Press `j` to open the debugger
+
+**Note**: If you need to rebuild the development client with different environment variables, use:
+```bash
+APP_ENV=production eas build --profile development --platform ios
+```
+
 ---
 
 ## 🏗️ Project Structure

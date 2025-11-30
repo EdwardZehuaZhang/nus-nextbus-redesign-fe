@@ -14,9 +14,11 @@ import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
+// Removed getRouteColor import; using explicit mapping to match web
 import type { LatLng } from '@/api/google-maps';
 import { getPlaceDetails } from '@/api/google-maps/places';
 import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
+import routeCheckpointsData from '@/data/route-checkpoints.json';
 import {
   BLUE_AREA_BOUNDARY,
   CAPT_BOUNDARY,
@@ -155,6 +157,14 @@ const getLandmarkScale = (zoom: number): number => {
   else if (zoom === 17) return 1.15;
   else if (zoom === 18) return 1.3;
   else return 1.5;
+};
+
+// Debug logging for route rendering
+const DEBUG_ROUTES = true;
+const logRoute = (message: string, data?: any) => {
+  if (DEBUG_ROUTES) {
+    console.log(`[BUS_ROUTE] ${message}`, data || '');
+  }
 };
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -296,54 +306,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setCurrentRegion(region);
   };
 
-  // Find nearest known landmark or bus stop to a tapped coordinate
-  const findNearestKnownLocation = (lat: number, lng: number) => {
-    let nearest: {
-      name: string;
-      address?: string;
-      lat: number;
-      lng: number;
-      type: string;
-    } | null = null;
-    let bestDist = Infinity;
-
-    // Check landmarks
-    for (const lm of NUS_LANDMARKS) {
-      const d = Math.hypot(lm.coordinates.lat - lat, lm.coordinates.lng - lng);
-      if (d < bestDist) {
-        bestDist = d;
-        nearest = {
-          name: lm.name,
-          address: lm.address,
-          lat: lm.coordinates.lat,
-          lng: lm.coordinates.lng,
-          type: lm.type,
-        };
-      }
-    }
-
-    // Check bus stops if available
-    const allStops = busStopsData?.BusStopsResult?.busstops || [];
-    for (const stop of allStops) {
-      const d = Math.hypot(stop.latitude - lat, stop.longitude - lng);
-      if (d < bestDist) {
-        bestDist = d;
-        nearest = {
-          name: stop.ShortName || stop.caption || stop.name,
-          address: undefined,
-          lat: stop.latitude,
-          lng: stop.longitude,
-          type: 'bus-stop',
-        };
-      }
-    }
-
-    // Threshold ~50m (0.0005 degrees)
-    if (bestDist <= 0.0005 && nearest) {
-      return nearest;
-    }
-    return null;
-  };
+  // Removed unused nearest-location helper to reduce component size and re-render cost
 
   // Map tap handler: show place details popup when tapping on map
   // Debug: Log the initialRegion being used
@@ -471,6 +434,92 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         .map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
     : [];
 
+  // Static route colors (no API dependency)
+  const routeColors: Record<string, string> = React.useMemo(
+    () => ({
+      A1: '#BE1E2D',
+      A2: '#E3CE0B',
+      D1: '#C77DE2',
+      D2: '#6F1B6F',
+      BTC: '#EF8136',
+      L: '#BFBFBF',
+      E: '#00B050',
+      K: '#345A9B',
+    }),
+    []
+  );
+
+  // Derive active bus route codes from mapFilters (e.g. keys: bus-route-a1)
+  const activeBusRouteCodes = React.useMemo(() => {
+    const codes = Object.entries(mapFilters)
+      .filter(([key, value]) => key.startsWith('bus-route-') && !!value)
+      .map(([key]) => key.replace('bus-route-', '').toUpperCase());
+    logRoute('Active bus route codes from filters', { codes });
+    return codes;
+  }, [mapFilters]);
+
+  // Only render ACTIVE route polylines - prevents AIRGoogleMap insertReactSubview crash
+  // Pre-render ALL bus routes once with stable coordinate arrays (like academic/residences)
+  // Visibility is controlled by strokeColor, never by mounting/unmounting children
+  const allRoutesPrecomputed = React.useMemo(() => {
+    const codes = Object.keys(routeColors);
+    const pre = codes.map((routeCode) => {
+      const checkpoints = (routeCheckpointsData as Record<string, any>)[routeCode] || [];
+      const coordinates = checkpoints.map((pt: any) => ({
+        latitude: pt.latitude,
+        longitude: pt.longitude,
+      }));
+      logRoute(`Precomputed ${routeCode} coordinates`, { count: coordinates.length });
+      return { routeCode, coordinates };
+    });
+    return pre;
+  }, [routeColors]);
+
+  // Precompute route -> stop membership map (near checkpoint) on first load
+  const routeStopMembershipRef = useRef<Map<string, Set<string>>>(new Map());
+  useEffect(() => {
+    const allStops = busStopsData?.BusStopsResult?.busstops;
+    if (!allStops) return;
+    
+    // Only compute for routes we haven't seen yet
+    const LAT_THRESHOLD = 0.0005;
+    const LNG_THRESHOLD = 0.0005;
+    Object.keys(routeColors).forEach((routeCode) => {
+      if (routeStopMembershipRef.current.has(routeCode)) return;
+
+      const checkpoints =
+        (routeCheckpointsData as Record<string, any>)[routeCode] || [];
+      const set = new Set<string>();
+      allStops.forEach((stop: any) => {
+        const match = checkpoints.some(
+          (pt: any) =>
+            Math.abs(pt.latitude - stop.latitude) < LAT_THRESHOLD &&
+            Math.abs(pt.longitude - stop.longitude) < LNG_THRESHOLD
+        );
+        if (match) set.add(stop.name);
+      });
+      routeStopMembershipRef.current.set(routeCode, set);
+      logRoute(`Computed stops for route ${routeCode}`, {
+        stopCount: set.size,
+      });
+    });
+  }, [busStopsData, routeColors]);
+
+  const isStopVisibleForActiveRoutes = React.useCallback(
+    (stop: any): boolean => {
+      if (activeBusRouteCodes.length === 0) return true;
+      return activeBusRouteCodes.some((code) =>
+        routeStopMembershipRef.current.get(code)?.has(stop.name)
+      );
+    },
+    [activeBusRouteCodes]
+  );
+
+  // Always render ALL bus stops; control visibility via opacity to keep children count/order stable
+  const allBusStops: any[] = React.useMemo(() => {
+    return busStopsData?.BusStopsResult?.busstops || [];
+  }, [busStopsData]);
+
   // Extract individual filter values to ensure proper re-rendering
   const filterImportant = mapFilters?.important ?? false;
   const filterBusStops = mapFilters?.['bus-stops'] ?? false;
@@ -559,8 +608,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               name: place.name || landmark.name,
               address: place.formatted_address || landmark.address,
               coordinates: {
-                latitude: place.geometry?.location?.lat || landmark.coordinates.lat,
-                longitude: place.geometry?.location?.lng || landmark.coordinates.lng,
+                latitude:
+                  place.geometry?.location?.lat || landmark.coordinates.lat,
+                longitude:
+                  place.geometry?.location?.lng || landmark.coordinates.lng,
               },
               type: 'google-place',
               photo: photoUrl,
@@ -572,7 +623,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             return;
           }
         } catch (err) {
-          console.error('[Landmark] Failed to fetch place details for', landmark.name, err);
+          console.error(
+            '[Landmark] Failed to fetch place details for',
+            landmark.name,
+            err
+          );
         }
       }
 
@@ -612,7 +667,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       if (data.result) {
         const place = data.result as any;
-        
+
         // Get photo URL if available - use Google's photo service directly
         let photoUrl: string | undefined;
         if (place.photos && place.photos.length > 0) {
@@ -621,7 +676,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           // Use Google's Place Photo API directly
           photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
         }
-        
+
         setSelectedPlace({
           name: place.name || name,
           address: place.formatted_address || place.vicinity,
@@ -778,7 +833,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           }
           tappable={shouldShowAcademic}
         />
-
         {/* Residence Overlays - Always rendered, visibility controlled */}
         <Polygon
           key="residence-pgpr"
@@ -930,11 +984,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           }
           tappable={shouldShowResidences}
         />
-
         {/* Landmark Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_LANDMARKS.map((landmark, index) => {
           const scale = getLandmarkScale(currentZoom);
-          
+
           return (
             <Marker
               key={`landmark-${index}`}
@@ -950,9 +1003,32 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <PinMarker type={landmark.type} scale={scale} />
             </Marker>
           );
-        })}        {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ */}
-        {busStopsData?.BusStopsResult?.busstops?.map((stop) => {
+        })}
+        {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ (filtered by route if active) */}
+        {allBusStops.map((stop: any) => {
           const showCircle = shouldShowBusStops && currentZoom >= 17;
+          const visibleByRoute = isStopVisibleForActiveRoutes(stop);
+          const opacity = showCircle && visibleByRoute ? 1 : 0;
+          // Choose circle color: if multiple routes active, color by first matching route membership
+          let circleColor = '#274F9C';
+          if (visibleByRoute) {
+            // Try primary active route first
+            if (
+              _activeRoute &&
+              routeStopMembershipRef.current
+                .get(_activeRoute)
+                ?.has(stop.name)
+            ) {
+              circleColor = routeColors[_activeRoute] || circleColor;
+            } else {
+              // Fallback: first filtered active route that includes this stop
+              const matchCode = activeBusRouteCodes.find((code) =>
+                routeStopMembershipRef.current.get(code)?.has(stop.name)
+              );
+              if (matchCode)
+                circleColor = routeColors[matchCode] || circleColor;
+            }
+          }
 
           return (
             <Marker
@@ -963,14 +1039,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
-              opacity={showCircle ? 1 : 0}
+              opacity={opacity}
               onPress={handleBusStopPress(stop)}
             >
               <View
                 style={{
                   width: 8,
                   height: 8,
-                  backgroundColor: '#274F9C',
+                  backgroundColor: circleColor,
                   borderRadius: 4,
                   borderWidth: 2,
                   borderColor: '#FFFFFF',
@@ -979,16 +1055,34 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </Marker>
           );
         })}
-
-        {/* Bus Stop Label Markers - Text labels with dynamic positioning */}
-        {busStopsData?.BusStopsResult?.busstops?.map((stop) => {
+        {/* Bus Stop Label Markers - Text labels with dynamic positioning (filtered by route if active) */}
+        {allBusStops.map((stop: any) => {
           const stopName = stop.ShortName || stop.caption || stop.name;
-          const allStops = busStopsData?.BusStopsResult?.busstops || [];
+          const allStops = allBusStops;
           const labelBelow = shouldLabelBelow(stop, allStops);
           const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
 
           // Determine if label should be visible based on zoom and filters
-          const isLabelVisible = shouldShowBusStops && shouldShowStop(stopName);
+          const visibleByRoute = isStopVisibleForActiveRoutes(stop);
+          const isLabelVisible =
+            shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
+          // Choose label color: per-route membership (same logic as circle)
+          let labelColor = '#274F9C';
+          if (visibleByRoute) {
+            if (
+              _activeRoute &&
+              routeStopMembershipRef.current
+                .get(_activeRoute)
+                ?.has(stop.name)
+            ) {
+              labelColor = routeColors[_activeRoute] || labelColor;
+            } else {
+              const matchCode = activeBusRouteCodes.find((code) =>
+                routeStopMembershipRef.current.get(code)?.has(stop.name)
+              );
+              if (matchCode) labelColor = routeColors[matchCode] || labelColor;
+            }
+          }
 
           // Calculate font size based on zoom level (matching web version)
           let fontSize = 12;
@@ -1030,13 +1124,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   >
                     {stopName}
                   </SvgText>
-                  {/* Blue text on top */}
+                  {/* Route-colored text on top */}
                   <SvgText
                     x="100"
                     y="20"
                     fontSize={fontSize}
                     fontWeight="600"
-                    fill="#274F9C"
+                    fill={labelColor}
                     textAnchor="middle"
                   >
                     {stopName}
@@ -1046,7 +1140,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </Marker>
           );
         })}
-
         {/* Origin Marker */}
         {origin && (
           <Marker
@@ -1055,7 +1148,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             onPress={handleOriginPress}
           />
         )}
-
         {/* Waypoint Markers */}
         {waypoints.map((waypoint, index) => (
           <Marker
@@ -1065,7 +1157,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             onPress={handleWaypointPress(index)}
           />
         ))}
-
         {/* Destination Marker */}
         {destination && (
           <Marker
@@ -1077,7 +1168,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             onPress={handleDestinationPress}
           />
         )}
-
         {/* Route Polyline */}
         {routeCoordinates.length > 0 && (
           <Polyline
@@ -1088,7 +1178,41 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             lineJoin="round"
           />
         )}
+        {/* Bus Route Polylines - pre-render ALL with stable arrays; control visibility via color */}
+        {allRoutesPrecomputed.map(({ routeCode, coordinates }) => {
+          if (coordinates.length === 0) return null;
+          const isPrimaryActive = _activeRoute === routeCode;
+          const isFilteredActive = activeBusRouteCodes.includes(routeCode);
+          // Hide all routes by default unless a bus-route filter or an active route is set
+          const hasAnyRouteActive =
+            !!_activeRoute || activeBusRouteCodes.length > 0;
+          const isVisible =
+            hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
+          const color = routeColors[routeCode] || '#000000';
+          // Use strokeWidth=0 when not visible to ensure nothing is drawn
+          const strokeColor = color;
+          const strokeWidth = isVisible ? (isPrimaryActive ? 5 : 4) : 0;
 
+          logRoute(`Render ${routeCode}`, {
+            anyActive: hasAnyRouteActive,
+            visible: isVisible,
+            coordCount: coordinates.length,
+            color: strokeColor,
+            strokeWidth,
+          });
+
+          return (
+            <Polyline
+              key={`bus-route-${routeCode}`}
+              coordinates={coordinates}
+              strokeColor={strokeColor}
+              strokeWidth={strokeWidth}
+              lineCap="round"
+              lineJoin="round"
+              geodesic
+            />
+          );
+        })}
       </MapView>
 
       {/* Place Details Popup - positioned absolutely on screen like web version */}
@@ -1131,13 +1255,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 )}
 
                 {/* Type (e.g., Restaurant) + Price */}
-                {(selectedPlace.type === 'google-place') && (
+                {selectedPlace.type === 'google-place' && (
                   <View style={styles.placeMetaRow}>
                     <Text style={styles.placeTypeText}>Restaurant</Text>
                     {selectedPlace.priceLevel && (
                       <Text style={styles.placeTypePriceText}>
                         {' · '}
-                        {selectedPlace.priceLevel === 1 ? '$10-20' : selectedPlace.priceLevel === 2 ? '$20-30' : selectedPlace.priceLevel === 3 ? '$30-50' : '$50+'}
+                        {selectedPlace.priceLevel === 1
+                          ? '$10-20'
+                          : selectedPlace.priceLevel === 2
+                            ? '$20-30'
+                            : selectedPlace.priceLevel === 3
+                              ? '$30-50'
+                              : '$50+'}
                       </Text>
                     )}
                   </View>
@@ -1165,7 +1295,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             >
               <Text style={styles.placeCloseBtnText}>×</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity style={styles.placeDirectionsBtn}>
               <Svg width={16} height={16} viewBox="0 0 20 20">
                 <Path
