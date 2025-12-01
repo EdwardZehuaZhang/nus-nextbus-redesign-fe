@@ -48,6 +48,19 @@ import {
   YELLOW_AREA_BOUNDARY,
 } from '@/lib/map-boundaries';
 
+// Helper to convert hex colors to rgba for iOS Google Maps reliability
+const hexToRgba = (hex: string, alpha = 1): string => {
+  let h = hex.replace('#', '');
+  if (h.length === 3) {
+    h = h.split('').map((c) => c + c).join('');
+  }
+  const bigint = parseInt(h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 interface InteractiveMapProps {
   origin?: LatLng;
   destination?: LatLng;
@@ -1178,26 +1191,50 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             lineJoin="round"
           />
         )}
-        {/* Bus Route Polylines - pre-render ALL with stable arrays; control visibility via color */}
-        {allRoutesPrecomputed.map(({ routeCode, coordinates }) => {
+        {/* Bus Route Polylines - TESTING: Show all routes with distinct colors */}
+        {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
           if (coordinates.length === 0) return null;
-          const isPrimaryActive = _activeRoute === routeCode;
-          const isFilteredActive = activeBusRouteCodes.includes(routeCode);
-          // Hide all routes by default unless a bus-route filter or an active route is set
-          const hasAnyRouteActive =
-            !!_activeRoute || activeBusRouteCodes.length > 0;
-          const isVisible =
-            hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
-          const color = routeColors[routeCode] || '#000000';
-          // Use strokeWidth=0 when not visible to ensure nothing is drawn
-          const strokeColor = color;
-          const strokeWidth = isVisible ? (isPrimaryActive ? 5 : 4) : 0;
+          
+          // Get color for this specific route - using very distinct, bright colors for testing
+          let color: string;
+          switch (routeCode) {
+            case 'A1':
+              color = '#FF0000'; // Bright red
+              break;
+            case 'A2':
+              color = '#FFFF00'; // Bright yellow
+              break;
+            case 'D1':
+              color = '#FF00FF'; // Bright magenta
+              break;
+            case 'D2':
+              color = '#800080'; // Purple
+              break;
+            case 'BTC':
+              color = '#FFA500'; // Orange
+              break;
+            case 'L':
+              color = '#808080'; // Gray
+              break;
+            case 'E':
+              color = '#00FF00'; // Bright green
+              break;
+            case 'K':
+              color = '#0000FF'; // Bright blue
+              break;
+            default:
+              color = '#00FFFF'; // Cyan to make it obvious
+              console.warn(`[BUS_ROUTE] Unknown route code: ${routeCode}`);
+          }
+          
+          // TESTING: Always show all routes, ignore filters
+          const strokeWidth = 4;
+          const rgbaColor = hexToRgba(color, 1);
+          const zIndex = 100 + idx; // ensure consistent draw order
 
-          logRoute(`Render ${routeCode}`, {
-            anyActive: hasAnyRouteActive,
-            visible: isVisible,
+          console.log(`[BUS_ROUTE] TEST MODE - Rendering ${routeCode}:`, {
             coordCount: coordinates.length,
-            color: strokeColor,
+            color: rgbaColor,
             strokeWidth,
           });
 
@@ -1205,12 +1242,73 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             <Polyline
               key={`bus-route-${routeCode}`}
               coordinates={coordinates}
-              strokeColor={strokeColor}
+              strokeColor={rgbaColor}
+              // Attempt per-segment coloring for iOS Google Maps SDK
+              strokeColors={coordinates.map(() => rgbaColor)}
               strokeWidth={strokeWidth}
               lineCap="round"
               lineJoin="round"
-              geodesic
+              // Avoid geodesic on iOS Google provider; can sometimes affect styling
+              geodesic={false}
+              zIndex={zIndex}
+              tappable={false}
             />
+          );
+        })}
+
+        {/* DEBUG: show a small colored dot at start of each route to verify color */}
+        {allRoutesPrecomputed.map(({ routeCode, coordinates }) => {
+          if (coordinates.length === 0) return null;
+          let color: string;
+          switch (routeCode) {
+            case 'A1':
+              color = '#FF0000';
+              break;
+            case 'A2':
+              color = '#FFFF00';
+              break;
+            case 'D1':
+              color = '#FF00FF';
+              break;
+            case 'D2':
+              color = '#800080';
+              break;
+            case 'BTC':
+              color = '#FFA500';
+              break;
+            case 'L':
+              color = '#808080';
+              break;
+            case 'E':
+              color = '#00FF00';
+              break;
+            case 'K':
+              color = '#0000FF';
+              break;
+            default:
+              color = '#00FFFF';
+          }
+          const rgbaColor = hexToRgba(color, 1);
+          const coord = coordinates[0];
+          return (
+            <Marker
+              key={`bus-route-debug-${routeCode}`}
+              coordinate={coord}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={0.9}
+            >
+              <View
+                style={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: rgbaColor,
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }}
+              />
+            </Marker>
           );
         })}
       </MapView>

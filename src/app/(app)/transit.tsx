@@ -886,8 +886,8 @@ const NearestStopsSection = ({
 
     return sortedShuttles
       .map((shuttle) => {
-        // Remove "PUB:" prefix from public bus routes
-        const routeName = shuttle.name.replace(/^PUB:/, '');
+        // Remove "PUB:" prefix from public bus routes and convert to uppercase
+        const routeName = shuttle.name.replace(/^PUB:/, '').toUpperCase();
 
         // Use special color for public buses, otherwise use route color
         const isPublicBus = shuttle.name.startsWith('PUB:');
@@ -1664,7 +1664,7 @@ export default function TransitPage() {
         <InteractiveMap
           style={{ width: '100%', height: '100%' }}
           showD1Route={selectedRoute === 'D1'}
-          activeRoute={selectedRoute as any} // Pass selected route to show real-time buses
+          activeRoute={selectedRoute?.toUpperCase() as any} // Pass selected route to show real-time buses (ensure uppercase)
           onActiveRouteChange={(route) => setSelectedRoute(route)} // Sync filter selection back to transit page
           showBusStops={true} // Show bus stop markers with labels
           showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
