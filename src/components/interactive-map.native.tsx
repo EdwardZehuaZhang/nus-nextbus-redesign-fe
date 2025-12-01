@@ -1191,48 +1191,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             lineJoin="round"
           />
         )}
-        {/* Bus Route Polylines - TESTING: Show all routes with distinct colors */}
+        {/* Bus Route Polylines - normal visibility using filters/active route */}
         {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
           if (coordinates.length === 0) return null;
-          
-          // Get color for this specific route - using very distinct, bright colors for testing
-          let color: string;
-          switch (routeCode) {
-            case 'A1':
-              color = '#FF0000'; // Bright red
-              break;
-            case 'A2':
-              color = '#FFFF00'; // Bright yellow
-              break;
-            case 'D1':
-              color = '#FF00FF'; // Bright magenta
-              break;
-            case 'D2':
-              color = '#800080'; // Purple
-              break;
-            case 'BTC':
-              color = '#FFA500'; // Orange
-              break;
-            case 'L':
-              color = '#808080'; // Gray
-              break;
-            case 'E':
-              color = '#00FF00'; // Bright green
-              break;
-            case 'K':
-              color = '#0000FF'; // Bright blue
-              break;
-            default:
-              color = '#00FFFF'; // Cyan to make it obvious
-              console.warn(`[BUS_ROUTE] Unknown route code: ${routeCode}`);
-          }
-          
-          // TESTING: Always show all routes, ignore filters
-          const strokeWidth = 4;
-          const rgbaColor = hexToRgba(color, 1);
-          const zIndex = 100 + idx; // ensure consistent draw order
+          const isPrimaryActive = _activeRoute === routeCode;
+          const isFilteredActive = activeBusRouteCodes.includes(routeCode);
+          // Show only when an active route or filters are set, and this route matches
+          const hasAnyRouteActive = !!_activeRoute || activeBusRouteCodes.length > 0;
+          const isVisible = hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
 
-          console.log(`[BUS_ROUTE] TEST MODE - Rendering ${routeCode}:`, {
+          // Use canonical palette but render via RGBA for iOS reliability
+          const paletteColor = routeColors[routeCode] || '#000000';
+          const rgbaColor = hexToRgba(paletteColor, 1);
+          const strokeWidth = isVisible ? (isPrimaryActive ? 5 : 4) : 0;
+          const zIndex = 100 + idx;
+
+          logRoute(`Render ${routeCode}`, {
+            anyActive: hasAnyRouteActive,
+            visible: isVisible,
             coordCount: coordinates.length,
             color: rgbaColor,
             strokeWidth,
@@ -1243,72 +1219,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               key={`bus-route-${routeCode}`}
               coordinates={coordinates}
               strokeColor={rgbaColor}
-              // Attempt per-segment coloring for iOS Google Maps SDK
               strokeColors={coordinates.map(() => rgbaColor)}
               strokeWidth={strokeWidth}
               lineCap="round"
               lineJoin="round"
-              // Avoid geodesic on iOS Google provider; can sometimes affect styling
               geodesic={false}
               zIndex={zIndex}
               tappable={false}
             />
-          );
-        })}
-
-        {/* DEBUG: show a small colored dot at start of each route to verify color */}
-        {allRoutesPrecomputed.map(({ routeCode, coordinates }) => {
-          if (coordinates.length === 0) return null;
-          let color: string;
-          switch (routeCode) {
-            case 'A1':
-              color = '#FF0000';
-              break;
-            case 'A2':
-              color = '#FFFF00';
-              break;
-            case 'D1':
-              color = '#FF00FF';
-              break;
-            case 'D2':
-              color = '#800080';
-              break;
-            case 'BTC':
-              color = '#FFA500';
-              break;
-            case 'L':
-              color = '#808080';
-              break;
-            case 'E':
-              color = '#00FF00';
-              break;
-            case 'K':
-              color = '#0000FF';
-              break;
-            default:
-              color = '#00FFFF';
-          }
-          const rgbaColor = hexToRgba(color, 1);
-          const coord = coordinates[0];
-          return (
-            <Marker
-              key={`bus-route-debug-${routeCode}`}
-              coordinate={coord}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              opacity={0.9}
-            >
-              <View
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                  backgroundColor: rgbaColor,
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                }}
-              />
-            </Marker>
           );
         })}
       </MapView>
