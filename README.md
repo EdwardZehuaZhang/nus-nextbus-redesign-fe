@@ -84,7 +84,8 @@ If you already have a development build installed on your iPhone:
 2. **Start the development server**
    
    ```bash
-   npx expo start --clear
+   cd nus-nextbus-redesign-fe
+   npx expo start --clear | tee -a ./.logs/expo.log
    ```
 
 3. **Connect your iPhone**
