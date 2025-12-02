@@ -755,6 +755,26 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           fillColor="transparent"
         />
 
+        {/* Gray overlay outside campus - creates dimming effect */}
+        <Polygon
+          coordinates={[
+            // Large outer boundary covering the entire visible map area
+            { latitude: 1.35, longitude: 103.65 },
+            { latitude: 1.35, longitude: 103.9 },
+            { latitude: 1.23, longitude: 103.9 },
+            { latitude: 1.23, longitude: 103.65 },
+            { latitude: 1.35, longitude: 103.65 },
+          ]}
+          holes={[
+            // Campus boundary as a hole - this area stays clear
+            NUS_CAMPUS_BOUNDARY,
+          ]}
+          strokeWidth={0}
+          strokeColor="transparent"
+          fillColor="rgba(0, 0, 0, 0.4)"
+          tappable={false}
+        />
+
         {/* Academic Area Overlays - Always rendered, visibility controlled */}
         <Polygon
           key="academic-orange"
