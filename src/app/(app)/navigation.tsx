@@ -712,13 +712,26 @@ export default function NavigationPage() {
     return null;
   }, [userLat, userLng]);
 
-  // Calculate the effective origin for routing - priority order:
-  // 1. Custom origin explicit coordinates (customOriginLat/Lng)
-  // 2. Custom origin from bus station lookup by name
-  // 3. User location from URL (userLat/Lng)  
-  // 4. GPS userLocation state
-  // 5. Global user location from context
+  // NUS Campus approximate bounds for validation
+  const NUS_CAMPUS_BOUNDS = {
+    north: 1.31,
+    south: 1.29,
+    east: 103.79,
+    west: 103.76
+  };
+  
+  // Helper to check if coordinates are within NUS campus
+  const isWithinNUSCampus = (lat: number, lng: number): boolean => {
+    return lat >= NUS_CAMPUS_BOUNDS.south && 
+           lat <= NUS_CAMPUS_BOUNDS.north && 
+           lng >= NUS_CAMPUS_BOUNDS.west && 
+           lng <= NUS_CAMPUS_BOUNDS.east;
+  };
+  
+  // Memoize the effective origin - only recalculate when explicitly selecting a location
+  // NOT when GPS updates, to prevent infinite re-renders and cascading API calls
   const effectiveOrigin = React.useMemo(() => {
+    // If user explicitly selected a custom origin, use it (highest priority)
     if (customOriginCoords) {
       console.log('🎯 Using custom origin explicit coords:', customOriginCoords);
       return customOriginCoords;
@@ -727,24 +740,23 @@ export default function NavigationPage() {
       console.log('🎯 Using custom origin from bus station:', customOriginFromBusStation);
       return customOriginFromBusStation;
     }
-    if (urlUserLocation) {
-      console.log('🎯 Using URL user location:', urlUserLocation);
-      return urlUserLocation;
-    }
+    
+    // For "Your location", only use userLocation state which is controlled
+    // This prevents infinite loops from constant GPS updates (globalUserLocation)
     if (userLocation) {
-      console.log('🎯 Using GPS user location:', userLocation);
+      console.log('🎯 Using user location (state):', userLocation);
       return userLocation;
     }
-    if (globalUserLocation) {
-      console.log('🎯 Using global user location:', globalUserLocation);
-      return {
-        latitude: globalUserLocation.latitude,
-        longitude: globalUserLocation.longitude,
-      };
+    
+    // Fall back to URL location only if state location is unavailable
+    if (urlUserLocation) {
+      console.log('🎯 Using URL user location (fallback):', urlUserLocation);
+      return urlUserLocation;
     }
-    console.warn('⚠️ No user location available!');
+    
+    console.warn('⚠️ No valid location available!');
     return null;
-  }, [customOriginCoords, customOriginFromBusStation, urlUserLocation, userLocation, globalUserLocation]);
+  }, [customOriginCoords, customOriginFromBusStation, userLocation, urlUserLocation]);
 
   // Debug logging for internal route finder
   useEffect(() => {
@@ -812,12 +824,17 @@ export default function NavigationPage() {
     }
   }, [showArrivalTimeDropdown]);
 
-  // Update userLocation state when effectiveOrigin changes (for map display)
+  // Initialize userLocation from GPS on component mount ONLY
+  // This prevents infinite loops from constant GPS updates
   useEffect(() => {
-    if (effectiveOrigin) {
-      setUserLocation(effectiveOrigin);
+    if (globalUserLocation && !userLocation && !hasCustomOrigin) {
+      console.log('📋 [INIT] Setting userLocation from GPS for first time:', globalUserLocation);
+      setUserLocation({
+        latitude: globalUserLocation.latitude,
+        longitude: globalUserLocation.longitude,
+      });
     }
-  }, [effectiveOrigin]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Animate search panel slide up/down based on panelState
   useEffect(() => {
@@ -1096,6 +1113,7 @@ export default function NavigationPage() {
 
       // If we don't have an origin yet, wait
       if (!effectiveOrigin) {
+        setRouteError('Waiting for your location...');
         setIsLoadingRoutes(false);
         return;
       }
@@ -1801,9 +1819,9 @@ export default function NavigationPage() {
             maxHeight: searchPanelAnimation.interpolate({
               inputRange: [0, 1],
               outputRange: [
-                panelState === 'expanded' ? '75%' : `${containerHeight}%`, 
-                '75%'
-              ], // If already expanded, stay at 75%, otherwise expand from containerHeight to 75%
+                `${containerHeight}%`, 
+                '92%' // Match web version (MAX_HEIGHT = 92%) for nearly full-screen expansion
+              ],
             }) as any,
           }}
           onTouchStart={(e: any) => {

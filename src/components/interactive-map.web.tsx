@@ -4480,6 +4480,24 @@ const useFilteredBusRoutes = (
 };
 
 /**
+ * Get landmark color based on type - matches mobile version
+ */
+const getLandmarkColor = (type: string) => {
+  switch (type) {
+    case 'hospital':
+      return '#D32F2F'; // Red
+    case 'mrt':
+      return '#274F9C'; // Blue
+    case 'library':
+      return '#FF8C00'; // Orange
+    case 'bus-terminal':
+      return '#00B050'; // Green
+    default:
+      return '#274F9C';
+  }
+};
+
+/**
  * Custom hook to render landmark markers (hospital, MRT, library, bus terminal)
  */
 const useLandmarkMarkers = (
@@ -4542,9 +4560,10 @@ const useLandmarkMarkers = (
 
         const scaledWidth = baseWidth * scale;
         const scaledHeight = baseHeight * scale;
+        const color = getLandmarkColor(landmark.type);
 
         marker.setIcon({
-          url: getLandmarkMarkerSVG(landmark.type),
+          url: getLandmarkMarkerSVG(landmark.type, color),
           scaledSize: new google.maps.Size(scaledWidth, scaledHeight),
           anchor: new google.maps.Point(scaledWidth / 2, scaledHeight),
         });
@@ -4557,12 +4576,13 @@ const useLandmarkMarkers = (
       const initialScale = getScaleForZoom(initialZoom);
       const initialWidth = 40 * initialScale;
       const initialHeight = 52 * initialScale;
+      const color = getLandmarkColor(landmark.type);
 
       const marker = new google.maps.Marker({
         position: landmark.coordinates,
         map,
         icon: {
-          url: getLandmarkMarkerSVG(landmark.type),
+          url: getLandmarkMarkerSVG(landmark.type, color),
           scaledSize: new google.maps.Size(initialWidth, initialHeight),
           anchor: new google.maps.Point(initialWidth / 2, initialHeight),
         },

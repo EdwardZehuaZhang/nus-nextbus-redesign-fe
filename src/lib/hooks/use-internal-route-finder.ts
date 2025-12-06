@@ -122,7 +122,9 @@ export function useInternalRouteFinder({
     destination?.longitude,
     googleMapsTimeSeconds,
     enabled,
-    arrivalTime?.getTime(),
+    // For arrivalTime, only track the second-level timestamp to avoid re-fetches
+    // when Date object is recreated but represents the same time
+    arrivalTime ? Math.floor(arrivalTime.getTime() / 1000) : null,
   ]);
 
   return {

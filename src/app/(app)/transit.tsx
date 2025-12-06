@@ -401,33 +401,41 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
 
   return (
     <View className="mb-4">
-      <Pressable onPress={handleContainerPress}>
-        <View className="flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
-          <SearchIcon />
-          <TextInput
-            ref={textInputRef}
-            className="flex-1 text-base text-neutral-900"
-            placeholder="Search for location..."
-            placeholderTextColor="#737373"
-            value={searchText}
-            onChangeText={setSearchText}
-            onFocus={handleFocus}
-            editable={true}
-            keyboardType="default"
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-            blurOnSubmit={false}
-            style={{
-              outlineWidth: 0,
-              // @ts-ignore - Web-specific properties to remove Safari focus outline
-              outlineStyle: 'none',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-            } as any}
-          />
-        </View>
-      </Pressable>
+      <View className="flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 shadow-sm" style={{ height: 40 }}>
+        <SearchIcon />
+        <TextInput
+          ref={textInputRef}
+          placeholder="Search for location..."
+          placeholderTextColor="#737373"
+          value={searchText}
+          onChangeText={setSearchText}
+          onFocus={handleFocus}
+          editable={true}
+          keyboardType="default"
+          returnKeyType="search"
+          autoCapitalize="none"
+          autoCorrect={false}
+          blurOnSubmit={false}
+          style={{
+            flex: 1,
+            fontSize: 16,
+            color: '#09090B',
+            height: 40,
+            paddingVertical: 0,
+            paddingHorizontal: 0,
+            margin: 0,
+            textAlignVertical: 'center', // Android centering
+            includeFontPadding: false as any, // Android typography padding
+            lineHeight: 20, // match text-base (~16) with comfortable line height
+            transform: [{ translateY: -2 }], // slight upward nudge to visually center
+            outlineWidth: 0,
+            // @ts-ignore - Web-specific properties to remove Safari focus outline
+            outlineStyle: 'none',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+          } as any}
+        />
+      </View>
     </View>
   );
 };
@@ -802,6 +810,24 @@ const NearestStopsSection = ({
   // Get user's current location
   const { coords: userLocation, error: locationError, loading: locationLoading } = useLocation();
 
+  // Log user location when homepage loads
+  React.useEffect(() => {
+    console.log('🏠 Homepage (Transit) Loaded - User Location:');
+    if (locationLoading) {
+      console.log('   Status: Loading location...');
+    } else if (locationError) {
+      console.log('   Status: Error -', locationError);
+      console.log('   Will use fallback location (SDE3)');
+    } else if (userLocation) {
+      console.log('   ✅ GPS Location:', {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+      });
+    } else {
+      console.log('   Status: No location available yet');
+    }
+  }, [userLocation, locationError, locationLoading]);
+
   // Fallback to SDE3 coordinates if geolocation fails
   const SDE3_FALLBACK_COORDS: LocationCoords = {
     latitude: 1.2976164142477022,
@@ -1174,7 +1200,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
     <>
       {/* Search Header */}
       <View className="mb-5 flex-row items-center gap-4">
-        <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+        <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 shadow-sm" style={{ height: 40 }}>
           <SearchIcon />
           <TextInput
             className="flex-1 text-base text-neutral-900"
@@ -1184,6 +1210,12 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
             onChangeText={setSearchText}
             autoFocus={true}
             style={{
+              height: 40,
+              paddingVertical: 0,
+              textAlignVertical: 'center', // Android centering
+              includeFontPadding: false as any, // Android typography padding
+              lineHeight: 20, // match text-base (~16) with comfortable line height
+              transform: [{ translateY: -2 }], // slight upward nudge to visually center
               outlineWidth: 0,
               // @ts-ignore - Web-specific properties to remove Safari focus outline
               outlineStyle: 'none',
@@ -1733,14 +1765,14 @@ export default function TransitPage() {
         />
       </Animated.View>
 
-      {/* Map controls - rendered at top level to ensure proper z-index stacking */}
-      {pathname === '/transit' && (
+      {/* Map controls - hide when bottom panel/search is up */}
+      {pathname === '/transit' && !isSearchMode && (
         <View
           style={{
             position: 'absolute' as any,
             top: insets.top + 8,
             right: 20,
-            zIndex: 99999,
+            zIndex: 1,
             pointerEvents: 'box-none',
           }}
         >

@@ -1,7 +1,7 @@
 import polyline from '@mapbox/polyline';
 import { BookOpen, Bus, FirstAid, Subway } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -10,12 +10,13 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
 // Removed getRouteColor import; using explicit mapping to match web
 import type { LatLng } from '@/api/google-maps';
+import { useLocation } from '@/lib/hooks/use-location';
 import { getPlaceDetails } from '@/api/google-maps/places';
 import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
@@ -115,6 +116,63 @@ const getLandmarkColor = (type: string) => {
 };
 
 /**
+ * Native-style User Location Marker with heading arrow
+ * Mimics the iOS blue dot with direction indicator
+ */
+const UserLocationMarker: React.FC<{
+  heading?: number | null;
+}> = ({ heading }) => {
+  const size = 40;
+  const hasHeading = heading !== null && heading !== undefined && !isNaN(heading);
+  const rotation = hasHeading ? heading : 0;
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Outer pulsing circle (light blue) */}
+        <Circle 
+          cx={size / 2} 
+          cy={size / 2} 
+          r={size / 2 - 2} 
+          fill="#4A90E2" 
+          opacity="0.3"
+        />
+        
+        {/* Inner blue dot */}
+        <Circle 
+          cx={size / 2} 
+          cy={size / 2} 
+          r={9} 
+          fill="#007AFF" 
+          stroke="white" 
+          strokeWidth="2.5"
+        />
+        
+        {/* Direction arrow (only if heading available) */}
+        {hasHeading && (
+          <G
+            origin={`${size / 2}, ${size / 2}`}
+            rotation={rotation}
+          >
+            <Path
+              d={`M ${size / 2} 6 L ${size / 2 + 4} ${size / 2 - 2} L ${size / 2} ${size / 2 - 6} L ${size / 2 - 4} ${size / 2 - 2} Z`}
+              fill="white"
+            />
+          </G>
+        )}
+      </Svg>
+    </View>
+  );
+};
+
+/**
  * Pin marker component with icon inside - matches web version exactly
  */
 const PinMarker: React.FC<{
@@ -173,7 +231,7 @@ const getLandmarkScale = (zoom: number): number => {
 };
 
 // Debug logging for route rendering
-const DEBUG_ROUTES = true;
+const DEBUG_ROUTES = false;
 const logRoute = (message: string, data?: any) => {
   if (DEBUG_ROUTES) {
     console.log(`[BUS_ROUTE] ${message}`, data || '');
@@ -228,6 +286,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   } | null>(null);
 
   const mapType = externalMapType ?? internalMapType;
+
+  // Get user's current location from hook
+  const { coords: userLocation } = useLocation();
+
+  // Debug: Log user location
+  useEffect(() => {
+    console.log('[USER_LOCATION] Location update:', {
+      hasLocation: !!userLocation,
+      latitude: userLocation?.latitude,
+      longitude: userLocation?.longitude,
+      heading: userLocation?.heading,
+      accuracy: userLocation?.accuracy,
+    });
+  }, [userLocation]);
 
   // Initialize currentRegion with initialRegion when it changes
   useEffect(() => {
@@ -732,7 +804,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={initialRegion}
-        showsUserLocation
+        showsUserLocation={Platform.OS === 'android'}
+        userLocationAnnotationTitle="My Location"
+        userLocationCalloutEnabled={false}
+        userLocationUpdateInterval={1000}
         showsMyLocationButton
         showsCompass
         showsScale
@@ -1173,6 +1248,26 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </Marker>
           );
         })}
+        {/* Custom User Location Marker - Shows with heading if available */}
+        {userLocation &&
+          typeof userLocation.latitude === 'number' &&
+          typeof userLocation.longitude === 'number' &&
+          !isNaN(userLocation.latitude) &&
+          !isNaN(userLocation.longitude) && (
+            <Marker
+              key="custom-user-location"
+              coordinate={{
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat={true}
+              zIndex={1000}
+            >
+              <UserLocationMarker heading={userLocation.heading} />
+            </Marker>
+          )}
+        
         {/* Origin Marker */}
         {origin && (
           <Marker
