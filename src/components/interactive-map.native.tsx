@@ -17,6 +17,7 @@ import { useBusStops } from '@/api/bus';
 // Removed getRouteColor import; using explicit mapping to match web
 import type { LatLng } from '@/api/google-maps';
 import { useLocation } from '@/lib/hooks/use-location';
+import { getTransitLineColor } from '@/lib/transit-colors';
 import { getPlaceDetails } from '@/api/google-maps/places';
 import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
@@ -67,6 +68,13 @@ interface InteractiveMapProps {
   destination?: LatLng;
   waypoints?: LatLng[];
   routePolyline?: string;
+  routeSteps?: any[];
+  internalRoutePolylines?: {
+    walkToStop: { lat: number; lng: number }[];
+    busSegment: { lat: number; lng: number }[];
+    walkFromStop: { lat: number; lng: number }[];
+    busRouteColor?: string;
+  };
   onMarkerPress?: (
     type: 'origin' | 'destination' | 'waypoint',
     index?: number
@@ -257,6 +265,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   visibleBusStops,
   mapFilters = {},
   onMapFiltersChange: _onMapFiltersChange,
+  routeSteps,
+  internalRoutePolylines,
 }) => {
   const mapRef = useRef<MapView>(null);
   const [internalMapType, setInternalMapType] = useState<
@@ -518,6 +528,99 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         .decode(routePolyline)
         .map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
     : [];
+
+  // Build segment polylines for transit routes (Google steps) or internal routes
+  const transitSegments = React.useMemo(() => {
+    if (internalRoutePolylines) {
+      const toStop = (internalRoutePolylines.walkToStop || []).map((p) => ({
+        latitude: p.lat,
+        longitude: p.lng,
+      }));
+      const busSeg = (internalRoutePolylines.busSegment || []).map((p) => ({
+        latitude: p.lat,
+        longitude: p.lng,
+      }));
+      const fromStop = (internalRoutePolylines.walkFromStop || []).map((p) => ({
+        latitude: p.lat,
+        longitude: p.lng,
+      }));
+
+      return [
+        toStop.length > 1
+          ? {
+              key: 'walk-to-stop',
+              coordinates: toStop,
+              strokeColor: '#274F9C',
+              strokeWidth: 4,
+              lineDashPattern: [6, 6],
+              zIndex: 30,
+            }
+          : null,
+        busSeg.length > 1
+          ? {
+              key: 'bus-segment',
+              coordinates: busSeg,
+              strokeColor: internalRoutePolylines.busRouteColor || '#274F9C',
+              strokeWidth: 5,
+              zIndex: 35,
+            }
+          : null,
+        fromStop.length > 1
+          ? {
+              key: 'walk-from-stop',
+              coordinates: fromStop,
+              strokeColor: '#274F9C',
+              strokeWidth: 4,
+              lineDashPattern: [6, 6],
+              zIndex: 30,
+            }
+          : null,
+      ].filter(Boolean) as any[];
+    }
+
+    if (routeSteps && routeSteps.length > 0) {
+      return routeSteps
+        .map((step: any, idx: number) => {
+          if (!step?.polyline?.encodedPolyline) return null;
+          const coordinates = polyline
+            .decode(step.polyline.encodedPolyline)
+            .map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+
+          let strokeColor = '#9CA3AF';
+          let lineDashPattern: number[] | undefined;
+          let zIndex = 20;
+
+          if (step.travelMode === 'TRANSIT' && step.transitDetails) {
+            const lineName =
+              step.transitDetails?.transitLine?.nameShort ||
+              step.transitDetails?.transitLine?.name;
+            const apiColor = step.transitDetails?.transitLine?.color;
+            if (apiColor) {
+              strokeColor = apiColor.startsWith('#') ? apiColor : `#${apiColor}`;
+            } else {
+              strokeColor = getTransitLineColor(lineName);
+            }
+            zIndex = 25;
+          } else if (step.travelMode === 'WALK') {
+            strokeColor = '#274F9C';
+            lineDashPattern = [6, 6];
+            zIndex = 15;
+          }
+
+          return {
+            key: `step-${idx}`,
+            coordinates,
+            strokeColor,
+            strokeWidth: 4,
+            lineDashPattern,
+            zIndex,
+          };
+        })
+        .filter(Boolean) as any[];
+    }
+
+    return [];
+  }, [internalRoutePolylines, routeSteps]);
 
   // Static route colors (no API dependency)
   const routeColors: Record<string, string> = React.useMemo(
@@ -1296,8 +1399,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             onPress={handleDestinationPress}
           />
         )}
-        {/* Route Polyline */}
-        {routeCoordinates.length > 0 && (
+        {/* Transit/Internal Route Segments (colored per segment) */}
+        {transitSegments.map((seg) => (
+          <Polyline
+            key={seg.key}
+            coordinates={seg.coordinates}
+            strokeColor={seg.strokeColor}
+            strokeWidth={seg.strokeWidth}
+            lineCap="round"
+            lineJoin="round"
+            lineDashPattern={seg.lineDashPattern}
+            zIndex={seg.zIndex}
+          />
+        ))}
+
+        {/* Fallback: single polyline when no segmented steps are available */}
+        {transitSegments.length === 0 && routeCoordinates.length > 0 && (
           <Polyline
             coordinates={routeCoordinates}
             strokeColor="#274F9C"
