@@ -573,7 +573,7 @@ const IntermediateStops = ({
               style={{
                 width: 6,
                 height: 6,
-                borderRadius: '3px',
+                borderRadius: 3,
                 backgroundColor: isFirst || isLast ? '#211F26' : '#A3A3A3',
               }}
             />
@@ -1601,7 +1601,7 @@ export default function NavigationPage() {
           style={{
             marginHorizontal: 10,
             marginTop: 40,
-            borderRadius: '12px',
+            borderRadius: 12,
             backgroundColor: '#FFFFFF',
             padding: 12,
             paddingHorizontal: 20,
@@ -1802,6 +1802,8 @@ export default function NavigationPage() {
             right: 0,
             borderTopLeftRadius: 12,
             borderTopRightRadius: 12,
+            borderBottomLeftRadius: 12,
+            borderBottomRightRadius: 12,
             backgroundColor: '#FFFFFF',
             paddingHorizontal: 20,
             paddingTop: 4,
@@ -1816,13 +1818,7 @@ export default function NavigationPage() {
               inputRange: [0, 1],
               outputRange: [5, 10],
             }) as any,
-            maxHeight: searchPanelAnimation.interpolate({
-              inputRange: [0, 1],
-              outputRange: [
-                `${containerHeight}%`, 
-                '92%' // Match web version (MAX_HEIGHT = 92%) for nearly full-screen expansion
-              ],
-            }) as any,
+            maxHeight: `${containerHeight}%`, // Use state directly, not animated interpolation
           }}
           onTouchStart={(e: any) => {
             const touch = e.nativeEvent.touches?.[0];
@@ -1888,7 +1884,7 @@ export default function NavigationPage() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 8,
-                      borderRadius: '8px',
+                      borderRadius: 8,
                       borderWidth: 1,
                       borderColor: '#E5E5E5',
                       backgroundColor: '#FFFFFF',
@@ -1990,7 +1986,7 @@ export default function NavigationPage() {
                               height: 36,
                               alignItems: 'center',
                               justifyContent: 'center',
-                              borderRadius: '18px',
+                              borderRadius: 18,
                               backgroundColor: '#F5F5F5',
                               padding: 8,
                             }}
@@ -2029,12 +2025,19 @@ export default function NavigationPage() {
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                paddingTop: 4,
                 paddingBottom: 8,
                 marginBottom: 16,
+                minHeight: 36, // Ensure enough height for large text
               }}
             >
               <Text
-                style={{ fontSize: 24, fontWeight: '500', color: '#211F26' }}
+                style={{ 
+                  fontSize: 24, 
+                  fontWeight: '500', 
+                  color: '#211F26',
+                  lineHeight: 32, // Ensure text doesn't get cut off
+                }}
               >
                 {isLoadingRoutes || isLoadingInternalRoutes 
                   ? '— Mins' 
@@ -2057,19 +2060,19 @@ export default function NavigationPage() {
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderRadius: '6px',
+                    borderRadius: 6,
                     borderWidth: 1,
                     borderColor: '#E5E5E5',
                     backgroundColor: '#FFFFFF',
                     paddingHorizontal: 12,
                     paddingVertical: 8,
+                    minHeight: 40, // Ensure sufficient height for content
                     boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                     elevation: 1,
                     width: 154,
-                    height: 32,
                   }}
                 >
-                  <Text style={{ fontSize: 14, color: '#09090B' }}>
+                  <Text style={{ fontSize: 14, color: '#09090B', lineHeight: 20 }}>
                     {selectedArrivalTime 
                       ? `Arrive ${formatArrivalTime(selectedArrivalTime)}`
                       : 'Leave now'
@@ -2088,7 +2091,7 @@ export default function NavigationPage() {
                       left: 0,
                       zIndex: 1000,
                       backgroundColor: '#FFFFFF',
-                      borderRadius: '8px',
+                      borderRadius: 8,
                       borderWidth: 1,
                       borderColor: '#E5E5E5',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
@@ -2306,7 +2309,7 @@ export default function NavigationPage() {
                   </View>
                 </>
               ) : routeError && !bestInternalRoute ? (
-                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: '8px', marginBottom: 16 }}>
+                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
                     �?Error: {routeError}
                   </Text>
@@ -2475,7 +2478,7 @@ export default function NavigationPage() {
                                   flexDirection: 'row',
                                   alignItems: 'center',
                                   height: 37,
-                                  borderRadius: '5px',
+                                    borderRadius: 5,
                                   marginTop: 8,
                                 }}
                               >
@@ -2594,7 +2597,7 @@ export default function NavigationPage() {
                                         style={{
                                           width: 6,
                                           height: 6,
-                                          borderRadius: '3px',
+                                          borderRadius: 3,
                                           backgroundColor: '#A3A3A3',
                                         }}
                                       />
@@ -2935,7 +2938,7 @@ export default function NavigationPage() {
                                       flexDirection: 'row',
                                       alignItems: 'center',
                                       height: 37,
-                                      borderRadius: '5px',
+                                      borderRadius: 5,
                                     }}
                                   >
                                     {/* Bus Number Badge */}
@@ -3223,7 +3226,7 @@ export default function NavigationPage() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   gap: 4,
-                  borderRadius: '8px',
+                  borderRadius: 8,
                   backgroundColor: '#274F9C',
                   boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
                   elevation: 1,
@@ -3256,7 +3259,7 @@ export default function NavigationPage() {
                   justifyContent: 'center',
                   alignItems: 'center',
                   gap: 4,
-                  borderRadius: '8px',
+                  borderRadius: 8,
                   borderWidth: 1,
                   borderColor: favorited ? '#6B7280' : '#E5E5E5',
                   backgroundColor: favorited ? '#6B7280' : '#FFFFFF',

@@ -276,6 +276,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [mapReady, setMapReady] = useState(false);
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
+  const hasFitToCoordinates = useRef(false); // Guard to prevent repeated fitToCoordinates calls
   const [selectedPlace, setSelectedPlace] = useState<{
     name: string;
     address?: string;
@@ -545,12 +546,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         longitude: p.lng,
       }));
 
+      const walkColor = '#274F9C';
+      const busColor = internalRoutePolylines.busRouteColor || '#274F9C';
+
       return [
         toStop.length > 1
           ? {
               key: 'walk-to-stop',
               coordinates: toStop,
-              strokeColor: '#274F9C',
+              strokeColor: hexToRgba(walkColor, 0.9),
+              strokeColorArray: toStop.map(() => hexToRgba(walkColor, 0.9)),
               strokeWidth: 4,
               lineDashPattern: [6, 6],
               zIndex: 30,
@@ -560,7 +565,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           ? {
               key: 'bus-segment',
               coordinates: busSeg,
-              strokeColor: internalRoutePolylines.busRouteColor || '#274F9C',
+              strokeColor: hexToRgba(busColor, 1),
+              strokeColorArray: busSeg.map(() => hexToRgba(busColor, 1)),
               strokeWidth: 5,
               zIndex: 35,
             }
@@ -569,7 +575,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           ? {
               key: 'walk-from-stop',
               coordinates: fromStop,
-              strokeColor: '#274F9C',
+              strokeColor: hexToRgba(walkColor, 0.9),
+              strokeColorArray: fromStop.map(() => hexToRgba(walkColor, 0.9)),
               strokeWidth: 4,
               lineDashPattern: [6, 6],
               zIndex: 30,
@@ -607,10 +614,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             zIndex = 15;
           }
 
+          // Convert hex to RGBA for proper rendering on React Native Maps
+          const rgbaColor = hexToRgba(strokeColor, 1);
+
           return {
             key: `step-${idx}`,
             coordinates,
-            strokeColor,
+            strokeColor: rgbaColor,
+            strokeColorArray: coordinates.map(() => rgbaColor),
             strokeWidth: 4,
             lineDashPattern,
             zIndex,
@@ -734,10 +745,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     residences: shouldShowResidences,
   });
 
-  // Fit map to show all markers
+  // Fit map to show all markers ONLY on initial route load (not on every render)
   useEffect(() => {
-    // Only fit to coordinates if we actually have markers to show
-    if (mapRef.current && (origin || destination || waypoints.length > 0)) {
+    // Only fit to coordinates if we actually have markers to show AND haven't fit yet
+    if (mapRef.current && (origin || destination || waypoints.length > 0) && !hasFitToCoordinates.current) {
       const coordinates = [
         origin && { latitude: origin.lat, longitude: origin.lng },
         destination && {
@@ -748,6 +759,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       ].filter(Boolean) as Coordinate[];
 
       if (coordinates.length > 0) {
+        hasFitToCoordinates.current = true; // Mark that we've fitted coordinates
         setTimeout(() => {
           mapRef.current?.fitToCoordinates(coordinates, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -1405,6 +1417,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             key={seg.key}
             coordinates={seg.coordinates}
             strokeColor={seg.strokeColor}
+            strokeColors={seg.strokeColorArray}
             strokeWidth={seg.strokeWidth}
             lineCap="round"
             lineJoin="round"
