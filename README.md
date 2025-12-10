@@ -81,6 +81,10 @@ If you already have a development build installed on your iPhone:
    EXPO_PUBLIC_BACKEND_API_URL=https://nus-nextbus-redesign-be.onrender.com
    ```
 
+2. **Build**
+pnpm install
+npx expo run:ios --configuration Debug
+
 2. **Start the development server**
    
    ```bash

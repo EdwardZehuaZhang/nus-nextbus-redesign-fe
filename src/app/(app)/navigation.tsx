@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Animated, TextInput, Platform, ActivityIndicator } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   getTransitRoute,
@@ -1529,6 +1530,9 @@ export default function NavigationPage() {
     };
   }, [internalRoutePolylines, bestInternalRoute]);
 
+  // Safe area insets for notch and home indicator
+  const insets = useSafeAreaInsets();
+
   // showInternal determines whether to display the internal route in the UI
   const showInternal = recommendInternal && !hasIntermediateStops;
 
@@ -1600,7 +1604,7 @@ export default function NavigationPage() {
         <View
           style={{
             marginHorizontal: 10,
-            marginTop: 40,
+            marginTop: 40 + insets.top,
             borderRadius: 12,
             backgroundColor: '#FFFFFF',
             padding: 12,
@@ -1807,6 +1811,7 @@ export default function NavigationPage() {
             backgroundColor: '#FFFFFF',
             paddingHorizontal: 20,
             paddingTop: 4,
+            paddingBottom: Math.max(insets.bottom, 16),
             boxShadow: searchPanelAnimation.interpolate({
               inputRange: [0, 1],
               outputRange: [

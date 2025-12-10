@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { storage } from '@/lib/storage';
 
@@ -131,7 +131,10 @@ export const MapFilterSelector: React.FC<MapFilterSelectorProps> = ({
   };
 
   return (
-    <View className="relative flex flex-col items-start" style={{ zIndex: 10000 }}>
+    <View 
+      className={`relative flex flex-col items-start ${Platform.OS === 'web' ? 'w-full rounded-md border border-neutral-200 bg-white px-4 py-2 shadow-sm' : ''}`}
+      style={{ zIndex: 10000 }}
+    >
       {items.map((item, index) => (
         <React.Fragment key={item.id}>
           <TouchableOpacity 
