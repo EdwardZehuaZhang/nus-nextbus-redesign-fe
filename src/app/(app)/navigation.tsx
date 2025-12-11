@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Animated, TextInput, Platform, ActivityIndicator } from 'react-native';
+import { Animated, TextInput, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -318,10 +318,29 @@ const useDragHandlers = () => {
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
   const isDragging = React.useRef(false);
+  const heightAnimation = React.useRef(new Animated.Value(39)).current;
 
   const MIN_HEIGHT = 5; // Minimum height - just frame visible
   const MAX_HEIGHT = 75; // Maximum height - reduced to better fit content
   const DEFAULT_HEIGHT = 39; // Default state
+
+  // Animate to target height smoothly
+  const animateToHeight = (targetHeight: number) => {
+    Animated.spring(heightAnimation, {
+      toValue: targetHeight,
+      useNativeDriver: false,
+      tension: 80,
+      friction: 12,
+    }).start();
+  };
+
+  // Listen to animation value changes and update state
+  React.useEffect(() => {
+    const listenerId = heightAnimation.addListener(({ value }) => {
+      setContainerHeight(value);
+    });
+    return () => heightAnimation.removeListener(listenerId);
+  }, [heightAnimation]);
 
   const handleDragMove = (dy: number) => {
     // Store the starting height when drag begins
@@ -329,9 +348,11 @@ const useDragHandlers = () => {
       startHeight.current = containerHeight;
     }
 
-    // Convert dy (pixels) to percentage of screen height
-    const screenHeight =
-      typeof window !== 'undefined' ? window.innerHeight : 800;
+    // Get screen height - use Dimensions for React Native
+    const screenHeight = Platform.OS === 'web' 
+      ? (typeof window !== 'undefined' ? window.innerHeight : 800)
+      : Dimensions.get('window').height;
+    
     const heightChange = (dy / screenHeight) * 100;
 
     // Calculate new height (dragging down increases dy, so we subtract)
@@ -342,6 +363,7 @@ const useDragHandlers = () => {
 
     setTempHeight(newHeight);
     setContainerHeight(newHeight);
+    heightAnimation.setValue(newHeight);
   };
 
   const handleDrag = (gestureState: { dy: number; vy: number }) => {
@@ -358,18 +380,17 @@ const useDragHandlers = () => {
     console.log('[NAV DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy);
 
     // Smart snapping based on current position and velocity
-    // Consider both where we are and where we're going
     // Three states: MIN (5%) -> DEFAULT (39%) -> MAX (75%)
     
-    if (Math.abs(vy) > 0.5) {
-      // Fast swipe detected
+    if (Math.abs(vy) > 0.8) {
+      // Fast swipe detected (increased threshold for more deliberate swipes)
       if (vy < 0) {
         // Fast upward swipe
         if (currentHeight < DEFAULT_HEIGHT - 5) {
           // From collapsed/below DEFAULT - snap to DEFAULT
           targetHeight = DEFAULT_HEIGHT;
           console.log('[NAV DRAG] ⬆️ Fast swipe UP from collapsed - Snapping to DEFAULT');
-        } else if (currentHeight <= DEFAULT_HEIGHT + 5) {
+        } else if (currentHeight < DEFAULT_HEIGHT + 10) {
           // From around DEFAULT - snap to MAX
           targetHeight = MAX_HEIGHT;
           console.log('[NAV DRAG] ⬆️ Fast swipe UP from DEFAULT - Snapping to EXPANDED (MAX_HEIGHT)');
@@ -391,11 +412,14 @@ const useDragHandlers = () => {
         }
       }
     } else {
-      // Slow drag - snap based on position
-      if (currentHeight < 22) {
+      // Slow drag - snap based on position with wider zones
+      const midLower = (MIN_HEIGHT + DEFAULT_HEIGHT) / 2; // ~22%
+      const midUpper = (DEFAULT_HEIGHT + MAX_HEIGHT) / 2; // ~57%
+      
+      if (currentHeight < midLower) {
         targetHeight = MIN_HEIGHT;
         console.log('[NAV DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
-      } else if (currentHeight > 50) {
+      } else if (currentHeight > midUpper) {
         targetHeight = MAX_HEIGHT;
         console.log('[NAV DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
       } else {
@@ -404,9 +428,9 @@ const useDragHandlers = () => {
       }
     }
 
-    setContainerHeight(targetHeight);
+    animateToHeight(targetHeight);
     setTempHeight(null);
-    console.log('[NAV DRAG] �?Final height set to:', targetHeight);
+    console.log('[NAV DRAG] ✨ Animating to height:', targetHeight);
   };
 
   const handleDragEnd = () => {
@@ -429,7 +453,7 @@ const useDragHandlers = () => {
 /**
  * Component to display intermediate bus stops using LTA API
  */
-const IntermediateStops = ({
+const IntermediateStops = React.memo(({
   step,
   serviceNo,
   isExpanded,
@@ -443,21 +467,21 @@ const IntermediateStops = ({
 
   // LTA API doesn't work on web due to CORS - only fetch on mobile
   const isWeb = Platform.OS === 'web';
-  const enableFetch = isExpanded && !isWeb;
 
+  // Always call hooks (never conditionally) - moved outside conditional
   // Find nearest LTA bus stops to the Google Maps coordinates
   const { data: fromLTAStop } = useNearestBusStop(
     departureStop?.location?.latLng?.latitude || 0,
     departureStop?.location?.latLng?.longitude || 0,
     150, // 150m radius
-    enableFetch && !!departureStop
+    !isWeb && !!departureStop && isExpanded
   );
 
   const { data: toLTAStop } = useNearestBusStop(
     arrivalStop?.location?.latLng?.latitude || 0,
     arrivalStop?.location?.latLng?.longitude || 0,
     150,
-    enableFetch && !!arrivalStop
+    !isWeb && !!arrivalStop && isExpanded
   );
 
   // Fetch intermediate stops if we found matching LTA stops
@@ -466,7 +490,7 @@ const IntermediateStops = ({
     fromLTAStop?.BusStopCode || '',
     toLTAStop?.BusStopCode || '',
     1, // Default to direction 1 (we could make this smarter)
-    enableFetch && !!fromLTAStop && !!toLTAStop
+    !isWeb && !!fromLTAStop && !!toLTAStop && isExpanded
   );
 
   if (!isExpanded) return null;
@@ -593,7 +617,9 @@ const IntermediateStops = ({
       })}
     </View>
   );
-};
+});
+
+IntermediateStops.displayName = 'IntermediateStops';
 
 export default function NavigationPage() {
   console.log('[COMPONENT] 🔄 NavigationPage rendered');
@@ -1378,6 +1404,12 @@ export default function NavigationPage() {
         let currentPoint = { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude };
 
         for (const target of segmentTargets) {
+          // Safety check for target
+          if (!target || typeof target.lat !== 'number' || typeof target.lng !== 'number') {
+            console.warn('[NAV] ⚠️ Invalid target coordinates, skipping segment');
+            continue;
+          }
+          
           const originWp: Waypoint = { location: { latLng: { latitude: currentPoint.latitude, longitude: currentPoint.longitude } } };
           const destWp: Waypoint = { location: { latLng: { latitude: target.lat, longitude: target.lng } } };
 
@@ -1391,19 +1423,31 @@ export default function NavigationPage() {
                 res = walkRes;
                 firstRoute = walkRes.routes[0];
               }
-            } catch {}
+            } catch (walkError) {
+              console.warn('[NAV] ⚠️ Failed to get walking route for segment:', walkError);
+            }
           }
           const firstLeg = firstRoute?.legs?.[0];
-          if (firstLeg?.steps) {
+          if (firstLeg?.steps && Array.isArray(firstLeg.steps)) {
             combinedSteps.push(...firstLeg.steps);
             // Prefer leg duration/distance; fallback to route-level if leg is missing in field mask
-            const segDuration = parseDurationSeconds(firstLeg.duration) || parseDurationSeconds(firstRoute?.duration);
+            const segDuration = parseDurationSeconds(firstLeg.duration) || parseDurationSeconds(firstRoute?.duration) || 0;
             const segDistance = (firstLeg.distanceMeters ?? firstRoute?.distanceMeters ?? 0) as number;
             totalDurationSeconds += segDuration;
             totalDistanceMeters += segDistance;
+          } else {
+            console.warn('[NAV] ⚠️ No steps found for segment, using default values');
           }
 
           currentPoint = { latitude: target.lat, longitude: target.lng };
+        }
+
+        // Safety check: ensure we have at least some steps
+        if (combinedSteps.length === 0) {
+          console.warn('[NAV] ⚠️ No route steps found after combining segments');
+          setRouteError('No route found with the selected stops');
+          setIsLoadingRoutes(false);
+          return;
         }
 
         const combinedRoute: Route = {
@@ -1424,6 +1468,7 @@ export default function NavigationPage() {
           polyline: { encodedPolyline: '' },
         };
 
+        console.log('[NAV] ✅ Combined route created with', combinedSteps.length, 'steps');
         setRoutes([combinedRoute]);
         setRouteError(null);
       } catch (err) {
@@ -1495,6 +1540,10 @@ export default function NavigationPage() {
   // Show X and drag icons when there are 3+ locations (origin + at least 1 stop + destination)
   const showControls = locations.length >= 3;
 
+  // 🔧 TEMPORARY: Disable map when 3+ stops to isolate crash
+  const numIntermediateStops = locations.filter(l => l.type === 'stop').length;
+  const shouldDisableMapFor3rdStop = numIntermediateStops >= 3;
+
   // Get bus route color for internal route display
   const getBusRouteColor = (routeCode: string): string => {
     const colorMap: Record<string, string> = {
@@ -1549,62 +1598,76 @@ export default function NavigationPage() {
     ];
   }, [showInternal, bestInternalRoute]);
 
+  // 🔧 TEMPORARY: Completely disable InteractiveMap on navigation page for crash debugging
+  const DISABLE_MAP_ENTIRELY = true;
+
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
 
       {/* Map Background */}
       <View className="flex-1" style={{ overflow: 'visible' }}>
-        <InteractiveMap
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
-          routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.legs?.[0]?.steps : undefined}
-          internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
-          origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
-          destination={destinationCoords || undefined}
-          initialRegion={
-            userLocation
-              ? {
-                  latitude: userLocation.latitude,
-                  longitude: userLocation.longitude,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }
-              : {
-                  // Default to NUS center when no user location
-                  latitude: 1.295123780071173,
-                  longitude: 103.77776037392553,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                }
-          }
-          showLandmarks={false}
-          showMapControls={false}
-          activeRoute={showInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
-          showBusStops={showInternal} // Show bus stops when displaying internal route
-          visibleBusStops={visibleBusStops} // Only show stops on the internal route
-          enablePlaceDetails={false} // Disable place details on navigation page
-          mapFilters={{
-            important: true,
-            'bus-stops': false,
-            academic: false,
-            residences: false,
-            'bus-route-a1': false,
-            'bus-route-a2': false,
-            'bus-route-d1': false,
-            'bus-route-d2': false,
-            'bus-route-btc': false,
-            'bus-route-e': false,
-            'bus-route-k': false,
-            'bus-route-l': false,
-          }}
-        />
+        {!DISABLE_MAP_ENTIRELY ? (
+          <InteractiveMap
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
+            routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.legs?.[0]?.steps : undefined}
+            internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
+            origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
+            destination={destinationCoords || undefined}
+            initialRegion={
+              userLocation
+                ? {
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }
+                : {
+                    // Default to NUS center when no user location
+                    latitude: 1.295123780071173,
+                    longitude: 103.77776037392553,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }
+            }
+            showLandmarks={false}
+            showMapControls={false}
+            activeRoute={showInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
+            showBusStops={showInternal} // Show bus stops when displaying internal route
+            visibleBusStops={visibleBusStops} // Only show stops on the internal route
+            enablePlaceDetails={false} // Disable place details on navigation page
+            mapFilters={{
+              important: true,
+              'bus-stops': false,
+              academic: false,
+              residences: false,
+              'bus-route-a1': false,
+              'bus-route-a2': false,
+              'bus-route-d1': false,
+              'bus-route-d2': false,
+              'bus-route-btc': false,
+              'bus-route-e': false,
+              'bus-route-k': false,
+              'bus-route-l': false,
+            }}
+          />
+        ) : (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#D0D0D0', justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333', textAlign: 'center', marginBottom: 10 }}>
+              🔧 Map Disabled
+            </Text>
+            <Text style={{ fontSize: 13, color: '#666', textAlign: 'center', paddingHorizontal: 20 }}>
+              InteractiveMap component is temporarily disabled for debugging
+            </Text>
+          </View>
+        )}
 
         {/* Location Input Card */}
         <View
           style={{
             marginHorizontal: 10,
-            marginTop: 40 + insets.top,
+            marginTop: insets.top + 8,
             borderRadius: 12,
             backgroundColor: '#FFFFFF',
             padding: 12,
@@ -2778,6 +2841,12 @@ export default function NavigationPage() {
                   {(() => {
                     // Combine consecutive walking steps
                     const steps = routes[0].legs[0].steps;
+                    
+                    // Safety check: ensure steps is an array
+                    if (!Array.isArray(steps) || steps.length === 0) {
+                      return null;
+                    }
+                    
                     const combinedSteps: Array<{
                       type: 'WALK' | 'TRANSIT';
                       duration: number;
@@ -2788,12 +2857,18 @@ export default function NavigationPage() {
                     while (i < steps.length) {
                       const step = steps[i];
                       
+                      // Safety check: ensure step exists and has required properties
+                      if (!step) {
+                        i++;
+                        continue;
+                      }
+                      
                       if (step.travelMode === 'WALK') {
                         // Collect all consecutive walk steps
                         let totalDuration = step.staticDuration ? durationToMinutes(step.staticDuration) : 0;
                         
                         let j = i + 1;
-                        while (j < steps.length && steps[j].travelMode === 'WALK') {
+                        while (j < steps.length && steps[j] && steps[j].travelMode === 'WALK') {
                           totalDuration += steps[j].staticDuration ? durationToMinutes(steps[j].staticDuration) : 0;
                           j++;
                         }
@@ -2815,7 +2890,10 @@ export default function NavigationPage() {
                     }
 
                     return combinedSteps.map((combinedStep, stepIndex) => {
-                      if (combinedStep.type === 'WALK') {
+                      try {
+                        console.log(`[NAV RENDER] Step ${stepIndex + 1}/${combinedSteps.length} - Type: ${combinedStep.type}`);
+                        
+                        if (combinedStep.type === 'WALK') {
                         return (
                           <React.Fragment key={`step-${stepIndex}`}>
                             <View
@@ -2869,7 +2947,14 @@ export default function NavigationPage() {
                       }
 
                       // Transit step
-                      const step = combinedStep.step!;
+                      const step = combinedStep.step;
+                      
+                      // Safety check: ensure step exists for transit
+                      if (!step) {
+                        console.warn('[NAV] ⚠️ Transit step missing data, skipping');
+                        return null;
+                      }
+                      
                       const lineName = step.transitDetails?.transitLine?.name || 'Bus';
                       const boardingStop = step.transitDetails?.stopDetails?.departureStop?.name || 'Unknown';
                       const alightingStop = step.transitDetails?.stopDetails?.arrivalStop?.name || currentDestination;
@@ -3098,6 +3183,10 @@ export default function NavigationPage() {
                           )}
                         </React.Fragment>
                       );
+                      } catch (err) {
+                        console.error(`[NAV] ❌ ERROR rendering step ${stepIndex}:`, err);
+                        return null;
+                      }
                     });
                   })()}
                 </>
