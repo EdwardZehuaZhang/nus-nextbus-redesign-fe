@@ -3109,7 +3109,9 @@ export default function NavigationPage() {
                                     width: 18,
                                     height: 18,
                                     borderRadius: 9,
-                                    backgroundColor: '#9CA3AF',
+                                    borderWidth: 2,
+                                    borderColor: '#737373',
+                                    backgroundColor: 'transparent',
                                   }}
                                 />
                                 <Text
