@@ -32,25 +32,8 @@ SplashScreen.setOptions({
 });
 
 export default function RootLayout() {
-  return (
-    <Providers>
-      <Stack>
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="search"
-          options={{ headerShown: false, presentation: 'modal' }}
-        />
-        <Stack.Screen name="demo" options={{ headerShown: false }} />
-        <Stack.Screen name="investor" options={{ headerShown: false }} />
-      </Stack>
-    </Providers>
-  );
-}
-
-function Providers({ children }: { children: React.ReactNode }) {
   const theme = useThemeConfig();
+  
   return (
     <GestureHandlerRootView
       style={styles.container}
@@ -60,7 +43,17 @@ function Providers({ children }: { children: React.ReactNode }) {
         <ThemeProvider value={theme}>
           <APIProvider>
             <BottomSheetModalProvider>
-              {children}
+              <Stack>
+                <Stack.Screen name="(app)" options={{ headerShown: false }} />
+                <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="search"
+                  options={{ headerShown: false, presentation: 'modal' }}
+                />
+                <Stack.Screen name="demo" options={{ headerShown: false }} />
+                <Stack.Screen name="investor" options={{ headerShown: false }} />
+              </Stack>
               <FlashMessage position="top" />
             </BottomSheetModalProvider>
           </APIProvider>

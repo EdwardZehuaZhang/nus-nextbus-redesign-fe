@@ -139,10 +139,10 @@ export async function findNearbyBusStops(
   maxDistance: number = 1000
 ): Promise<BusStop[]> {
   try {
-    // console.log(`🔍 [findNearbyBusStops] Searching for stops near:`, location, `within ${maxDistance}m`);
+    console.log(`🔍 [findNearbyBusStops] Searching for stops near:`, location, `within ${maxDistance}m`);
     const busStopsData = await getBusStops();
     const stops = busStopsData.BusStopsResult.busstops;
-    // console.log(`📊 [findNearbyBusStops] Total bus stops in database: ${stops.length}`);
+    console.log(`📊 [findNearbyBusStops] Total bus stops in database: ${stops.length}`);
 
     const nearbyStops: BusStop[] = [];
 
@@ -155,7 +155,7 @@ export async function findNearbyBusStops(
       const distance = calculateDistance(location, stopLocation);
 
       if (distance <= maxDistance) {
-        // console.log(`✓ Stop ${stop.ShortName} (${stop.name}) is ${Math.round(distance)}m away`);
+        console.log(`✓ Stop ${stop.ShortName} (${stop.name}) is ${Math.round(distance)}m away`);
         nearbyStops.push({
           name: stop.name,
           caption: stop.caption,
@@ -165,7 +165,7 @@ export async function findNearbyBusStops(
       }
     }
     
-    // console.log(`✅ [findNearbyBusStops] Found ${nearbyStops.length} stops within ${maxDistance}m`);
+    console.log(`✅ [findNearbyBusStops] Found ${nearbyStops.length} stops within ${maxDistance}m`);
 
     // Sort by distance
     nearbyStops.sort((a, b) => {
@@ -297,14 +297,14 @@ export async function findInternalBusRoutes(
 
   try {
     // Find nearby bus stops from origin (within 800m)
-    // console.log('🔍 Finding nearby bus stops from origin (within 800m)...');
+    console.log('🔍 Finding nearby bus stops from origin (within 800m)...');
     const nearbyOriginStops = await findNearbyBusStops(origin, 800);
-    // console.log(`✅ Found ${nearbyOriginStops.length} bus stops near origin:`, nearbyOriginStops.map(s => s.code).join(', '));
+    console.log(`✅ Found ${nearbyOriginStops.length} bus stops near origin:`, nearbyOriginStops.map(s => s.code).join(', '));
     
     // Find nearby bus stops from destination (within 500m)
-    // console.log('🔍 Finding nearby bus stops from destination (within 500m)...');
+    console.log('🔍 Finding nearby bus stops from destination (within 500m)...');
     const nearbyDestinationStops = await findNearbyBusStops(destination, 500);
-    // console.log(`✅ Found ${nearbyDestinationStops.length} bus stops near destination:`, nearbyDestinationStops.map(s => s.code).join(', '));
+    console.log(`✅ Found ${nearbyDestinationStops.length} bus stops near destination:`, nearbyDestinationStops.map(s => s.code).join(', '));
 
     if (nearbyOriginStops.length === 0 || nearbyDestinationStops.length === 0) {
       console.warn('⚠️ No nearby bus stops found!');
@@ -314,10 +314,10 @@ export async function findInternalBusRoutes(
     // Check all combinations of routes and stops
     // OPTIMIZATION: Only check the nearest 3 stops from origin to reduce API calls
     const nearestOriginStops = nearbyOriginStops.slice(0, 3);
-    // console.log(`🎯 Checking only ${nearestOriginStops.length} nearest origin stops:`, nearestOriginStops.map(s => s.code).join(', '));
+    console.log(`🎯 Checking only ${nearestOriginStops.length} nearest origin stops:`, nearestOriginStops.map(s => s.code).join(', '));
     
     const nearestDestStops = nearbyDestinationStops.slice(0, 3);
-    // console.log(`🎯 Checking only ${nearestDestStops.length} nearest destination stops:`, nearestDestStops.map(s => s.code).join(', '));
+    console.log(`🎯 Checking only ${nearestDestStops.length} nearest destination stops:`, nearestDestStops.map(s => s.code).join(', '));
     
     for (const routeCode of SHUTTLE_ROUTES) {
       for (const departureStop of nearestOriginStops) {

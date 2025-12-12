@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Animated, TextInput, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
@@ -599,7 +599,9 @@ const IntermediateStops = React.memo(({
                 width: 6,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: isFirst || isLast ? '#211F26' : '#A3A3A3',
+                borderWidth: 1,
+                borderColor: isFirst || isLast ? '#211F26' : '#A3A3A3',
+                backgroundColor: 'transparent',
               }}
             />
             <Text
@@ -627,6 +629,7 @@ export default function NavigationPage() {
   const router = useRouter();
   const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng, destinationLat, destinationLng, destinationAddress, stops } = useLocalSearchParams();
   console.log('[NAV] 🔍 URL params V2 - stops:', stops, 'destination:', destination);
+  const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -637,6 +640,14 @@ export default function NavigationPage() {
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
   const [selectedInternalRoute, setSelectedInternalRoute] = useState<InternalBusRoute | null>(null);
   const [showIntermediateStops, setShowIntermediateStops] = useState(false); // State for expanding bus stops
+  
+  // Wait for navigation to be ready before using router.setParams
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsNavigationReady(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
   
   // Arrival time selector state
   const [showArrivalTimeDropdown, setShowArrivalTimeDropdown] = useState(false);
@@ -1365,6 +1376,11 @@ export default function NavigationPage() {
 
   // Sync intermediate stops to URL
   useEffect(() => {
+    if (!isNavigationReady) {
+      console.log('[URL SYNC] Navigation not ready yet, skipping setParams');
+      return;
+    }
+    
     const intermediateStops = locations
       .filter((l) => l.type === 'stop' && l.text && l.text.trim().length > 0)
       .map((l) => l.text.trim());
@@ -1376,7 +1392,7 @@ export default function NavigationPage() {
     } else {
       router.setParams({ stops: undefined });
     }
-  }, [locations, router]);
+  }, [locations, router, isNavigationReady]);
 
   const handleAddStop = () => {
     const newStop: LocationItem = {
@@ -2825,7 +2841,9 @@ export default function NavigationPage() {
                                           width: 6,
                                           height: 6,
                                           borderRadius: 3,
-                                          backgroundColor: '#A3A3A3',
+                                          borderWidth: 1,
+                                          borderColor: '#A3A3A3',
+                                          backgroundColor: 'transparent',
                                         }}
                                       />
                                       <Text
