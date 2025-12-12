@@ -622,10 +622,11 @@ const IntermediateStops = React.memo(({
 IntermediateStops.displayName = 'IntermediateStops';
 
 export default function NavigationPage() {
-  console.log('[COMPONENT] 🔄 NavigationPage rendered');
+  console.log('[COMPONENT] 🔄 NavigationPage rendered - UPDATED V2');
   
   const router = useRouter();
-  const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng, destinationLat, destinationLng, destinationAddress } = useLocalSearchParams();
+  const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng, destinationLat, destinationLng, destinationAddress, stops } = useLocalSearchParams();
+  console.log('[NAV] 🔍 URL params V2 - stops:', stops, 'destination:', destination);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -1257,28 +1258,125 @@ export default function NavigationPage() {
     coords?: { lat: number; lng: number };
   };
 
-  const [locations, setLocations] = useState<LocationItem[]>([
-    { id: '1', text: originName, type: 'origin', isEditable: false },
-    {
+  const [locations, setLocations] = useState<LocationItem[]>(() => {
+    // Load intermediate stops from URL parameter
+    const stopsParam = typeof stops === 'string' ? stops : '';
+    const intermediateStops = stopsParam ? stopsParam.split('|').filter(s => s.trim()) : [];
+    console.log('[LOCATIONS INIT] stops param:', stops, 'parsed:', intermediateStops);
+    
+    const initialLocations: LocationItem[] = [
+      { id: '1', text: originName, type: 'origin', isEditable: false },
+    ];
+    
+    // Add intermediate stops from URL with coordinates lookup
+    intermediateStops.forEach((stopName, index) => {
+      const stopData = getBusStationByName(stopName);
+      const coords = stopData?.coordinates 
+        ? { lat: stopData.coordinates.latitude, lng: stopData.coordinates.longitude }
+        : undefined;
+      
+      console.log('[LOCATIONS INIT] Adding stop:', stopName, 'coords:', coords);
+      initialLocations.push({ 
+        id: `stop-${index + 1}`, 
+        text: stopName, 
+        type: 'stop', 
+        isEditable: true,
+        coords
+      });
+    });
+    
+    initialLocations.push({
       id: '2',
       text: currentDestination,
       type: 'destination',
       isEditable: false,
-    },
-  ]);
+    });
+    
+    return initialLocations;
+  });
 
-  // Update locations when originName changes
+  // Track if this is the first render to avoid overwriting URL-loaded stops
+  const isFirstRender = React.useRef(true);
+
+  // Update locations when originName changes (preserve intermediate stops)
   useEffect(() => {
-    setLocations([
-      { id: '1', text: originName, type: 'origin', isEditable: false },
-      {
-        id: '2',
-        text: currentDestination,
-        type: 'destination',
-        isEditable: false,
-      },
-    ]);
+    // Skip on first render to allow URL params to load
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    setLocations((prevLocations) => {
+      const intermediateStops = prevLocations.filter(loc => loc.type === 'stop');
+      return [
+        { id: '1', text: originName, type: 'origin', isEditable: false },
+        ...intermediateStops,
+        {
+          id: '2',
+          text: currentDestination,
+          type: 'destination',
+          isEditable: false,
+        },
+      ];
+    });
   }, [originName, currentDestination]);
+
+  // Load intermediate stops from URL parameter
+  useEffect(() => {
+    const stopsParam = typeof stops === 'string' ? stops : '';
+    if (!stopsParam) return;
+    
+    const stopNames = stopsParam.split('|').filter(s => s.trim());
+    console.log('[URL LOAD] Loading stops from URL:', stopNames);
+    
+    setLocations((prevLocations) => {
+      // Get current intermediate stops
+      const currentStops = prevLocations.filter(loc => loc.type === 'stop').map(l => l.text);
+      
+      // Check if stops have changed
+      if (JSON.stringify(currentStops) === JSON.stringify(stopNames)) {
+        console.log('[URL LOAD] Stops unchanged, skipping');
+        return prevLocations;
+      }
+      
+      console.log('[URL LOAD] Updating locations with stops:', stopNames);
+      const newStops: LocationItem[] = stopNames.map((stopName, index) => {
+        const stopData = getBusStationByName(stopName);
+        const coords = stopData?.coordinates 
+          ? { lat: stopData.coordinates.latitude, lng: stopData.coordinates.longitude }
+          : undefined;
+        
+        return { 
+          id: `stop-${index + 1}`, 
+          text: stopName, 
+          type: 'stop', 
+          isEditable: true,
+          coords
+        };
+      });
+      
+      return [
+        prevLocations[0], // origin
+        ...newStops,
+        prevLocations[prevLocations.length - 1] // destination
+      ];
+    });
+  }, [stops]);
+
+  // Sync intermediate stops to URL
+  useEffect(() => {
+    const intermediateStops = locations
+      .filter((l) => l.type === 'stop' && l.text && l.text.trim().length > 0)
+      .map((l) => l.text.trim());
+    
+    console.log('[URL SYNC] Locations:', locations.length, 'Intermediate stops:', intermediateStops);
+    
+    if (intermediateStops.length > 0) {
+      router.setParams({ stops: intermediateStops.join('|') });
+    } else {
+      router.setParams({ stops: undefined });
+    }
+  }, [locations, router]);
 
   const handleAddStop = () => {
     const newStop: LocationItem = {
@@ -1376,12 +1474,21 @@ export default function NavigationPage() {
   // Recompute Google routing when intermediate stops are present
   useEffect(() => {
     const recomputeWithStops = async () => {
+      console.log('🚨🚨🚨 RECOMPUTE STARTS HERE 🚨🚨🚨');
       const rawStopKeys = JSON.parse(stopsKey) as string[];
-      if (!rawStopKeys || rawStopKeys.length === 0) return;
+      console.log('[NAV] 🔍 recomputeWithStops triggered - rawStopKeys:', rawStopKeys);
+      if (!rawStopKeys || rawStopKeys.length === 0) {
+        console.log('[NAV] ⏭️ No stops to process, skipping recompute');
+        return;
+      }
 
       const destCoords = getDestinationCoordinates(currentDestination);
-      if (!effectiveOrigin || !destCoords) return;
+      if (!effectiveOrigin || !destCoords) {
+        console.log('[NAV] ⚠️ Missing origin or destination coords');
+        return;
+      }
       // Build stops from location entries directly (prefer stored coords; fallback to name lookup)
+      console.log('[NAV] 📍 All locations:', locations);
       const stops = locations
         .filter((l) => l.type === 'stop' && l.text.trim().length > 0)
         .map((l) => ({
@@ -1390,7 +1497,11 @@ export default function NavigationPage() {
         }))
         .filter((s) => !!s.coords) as Array<{ name: string; coords: { lat: number; lng: number } }>;
 
-      if (stops.length === 0) return;
+      console.log('[NAV] 🎯 Filtered stops with coords:', stops);
+      if (stops.length === 0) {
+        console.log('[NAV] ❌ No valid stops found after filtering');
+        return;
+      }
 
       setIsLoadingRoutes(true);
       setRouteError(null);
@@ -1403,7 +1514,11 @@ export default function NavigationPage() {
         const segmentTargets = [...stops.map((s) => s.coords), destCoords];
         let currentPoint = { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude };
 
+        console.log('[NAV LOOP] 🔁 Starting segment loop, segmentTargets:', segmentTargets.length);
+        
         for (const target of segmentTargets) {
+          console.log('[NAV LOOP] 📍 Processing segment to target:', target);
+          
           // Safety check for target
           if (!target || typeof target.lat !== 'number' || typeof target.lng !== 'number') {
             console.warn('[NAV] ⚠️ Invalid target coordinates, skipping segment');
@@ -1428,13 +1543,57 @@ export default function NavigationPage() {
             }
           }
           const firstLeg = firstRoute?.legs?.[0];
+          console.log('[NAV LOOP] 🛣️ Got route leg, steps count:', firstLeg?.steps?.length || 0);
+          
           if (firstLeg?.steps && Array.isArray(firstLeg.steps)) {
+            console.log('[NAV LOOP] ✅ Adding steps to combinedSteps');
             combinedSteps.push(...firstLeg.steps);
             // Prefer leg duration/distance; fallback to route-level if leg is missing in field mask
             const segDuration = parseDurationSeconds(firstLeg.duration) || parseDurationSeconds(firstRoute?.duration) || 0;
             const segDistance = (firstLeg.distanceMeters ?? firstRoute?.distanceMeters ?? 0) as number;
             totalDurationSeconds += segDuration;
             totalDistanceMeters += segDistance;
+
+            console.log('[NAV LOOP] 📊 Combined steps length now:', combinedSteps.length);
+            
+            // Insert gray circle marker at intermediate stops (not at final destination)
+            console.log('🟢🟢🟢 BEFORE MARKER CHECK 🟢🟢🟢');
+            const isLastSegment = target === segmentTargets[segmentTargets.length - 1];
+            console.log('🟡🟡🟡 isLastSegment:', isLastSegment);
+            console.log('[NAV MARKER] 🎯 Checking marker insertion:', {
+              target,
+              isLastSegment,
+              segmentTargetsLength: segmentTargets.length,
+              lastTarget: segmentTargets[segmentTargets.length - 1]
+            });
+            
+            if (!isLastSegment) {
+              const stopIndex = segmentTargets.indexOf(target);
+              const stopName = stops[stopIndex]?.name || `Stop ${stopIndex + 1}`;
+              
+              console.log('🔴🔴🔴 MARKER CODE RUNNING 🔴🔴🔴');
+              console.log('[NAV MARKER] ✅ Inserting marker:', {
+                stopIndex,
+                stopName,
+                stopsArray: stops,
+                combinedStepsLength: combinedSteps.length
+              });
+              
+              combinedSteps.push({
+                distanceMeters: 0,
+                staticDuration: '0s',
+                polyline: { encodedPolyline: '' },
+                startLocation: { latLng: { latitude: target.lat, longitude: target.lng } },
+                endLocation: { latLng: { latitude: target.lat, longitude: target.lng } },
+                navigationInstruction: { instructions: stopName },
+                travelMode: 'TRANSIT',
+              } as RouteStep);
+              console.log('🔴🔴🔴 MARKER INSERTED 🔴🔴🔴');
+              
+              console.log('[NAV MARKER] 📍 Marker inserted, new combined steps length:', combinedSteps.length);
+            } else {
+              console.log('[NAV MARKER] ⏭️ Skipping marker (last segment - destination)');
+            }
           } else {
             console.warn('[NAV] ⚠️ No steps found for segment, using default values');
           }
@@ -2841,6 +3000,8 @@ export default function NavigationPage() {
                   {(() => {
                     // Combine consecutive walking steps
                     const steps = routes[0].legs[0].steps;
+                    console.log('====== COMBINING LOGIC RUNNING ======', steps.length, 'steps');
+
                     
                     // Safety check: ensure steps is an array
                     if (!Array.isArray(steps) || steps.length === 0) {
@@ -2848,10 +3009,16 @@ export default function NavigationPage() {
                     }
                     
                     const combinedSteps: Array<{
-                      type: 'WALK' | 'TRANSIT';
+                      type: 'WALK' | 'TRANSIT' | 'WAYPOINT';
                       duration: number;
                       step?: RouteStep;
                     }> = [];
+
+                    // Log raw steps before processing
+                    console.log('[NAV COMBINE] 🔍 Raw steps count:', steps.length);
+                    steps.forEach((step, idx) => {
+                      console.log(`[NAV COMBINE] Step ${idx + 1}: travelMode=${step.travelMode}, distance=${step.distanceMeters}, transitDetails=${!!step.transitDetails}, instruction=${step.navigationInstruction?.instructions || 'N/A'}`);
+                    });
 
                     let i = 0;
                     while (i < steps.length) {
@@ -2863,8 +3030,20 @@ export default function NavigationPage() {
                         continue;
                       }
                       
-                      if (step.travelMode === 'WALK') {
-                        // Collect all consecutive walk steps
+                      // Check if this is a waypoint marker (no transitDetails, zero distance, TRANSIT mode)
+                      const isWaypointMarker = step.travelMode === 'TRANSIT' && !step.transitDetails && step.distanceMeters === 0;
+                      
+                      if (isWaypointMarker) {
+                        console.log('[NAV COMBINE] 🎯 Found waypoint marker at step', i + 1);
+                        // Add waypoint marker as separate step
+                        combinedSteps.push({
+                          type: 'WAYPOINT',
+                          duration: 0,
+                          step,
+                        });
+                        i++;
+                      } else if (step.travelMode === 'WALK') {
+                        // Collect all consecutive walk steps (but stop at waypoint markers)
                         let totalDuration = step.staticDuration ? durationToMinutes(step.staticDuration) : 0;
                         
                         let j = i + 1;
@@ -2892,6 +3071,61 @@ export default function NavigationPage() {
                     return combinedSteps.map((combinedStep, stepIndex) => {
                       try {
                         console.log(`[NAV RENDER] Step ${stepIndex + 1}/${combinedSteps.length} - Type: ${combinedStep.type}`);
+                        
+                        // Handle WAYPOINT type
+                        if (combinedStep.type === 'WAYPOINT') {
+                          const step = combinedStep.step;
+                          const stopName = step?.navigationInstruction?.instructions || 'Stop';
+                          
+                          return (
+                            <React.Fragment key={`step-${stepIndex}`}>
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 12,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 18,
+                                    height: 18,
+                                    borderRadius: 9,
+                                    backgroundColor: '#9CA3AF',
+                                  }}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 16,
+                                    fontWeight: '500',
+                                    color: '#211F26',
+                                  }}
+                                >
+                                  {stopName}
+                                </Text>
+                              </View>
+                              
+                              {stepIndex < combinedSteps.length - 1 && (
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 20,
+                                    paddingLeft: 9,
+                                    height: 16,
+                                    justifyContent: 'center',
+                                    marginVertical: 8,
+                                  }}
+                                >
+                                  <DotDivider />
+                                  <View
+                                    style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }}
+                                  />
+                                </View>
+                              )}
+                            </React.Fragment>
+                          );
+                        }
                         
                         if (combinedStep.type === 'WALK') {
                         return (
