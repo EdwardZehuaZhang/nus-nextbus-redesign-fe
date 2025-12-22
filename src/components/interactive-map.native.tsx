@@ -530,6 +530,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         .map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
     : [];
 
+  // Safe-decode helper: wrap decode in try/catch but don't filter coordinates
+  const tryDecodePolyline = (encoded?: string) => {
+    if (!encoded) return [];
+    try {
+      const pts = polyline.decode(encoded);
+      return Array.isArray(pts) && pts.length > 0
+        ? pts.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
+        : [];
+    } catch (err) {
+      console.warn('[Map] Decode failed for polyline', err);
+      return [];
+    }
+  };
+
   // Build segment polylines for transit routes (Google steps) or internal routes
   const transitSegments = React.useMemo(() => {
     if (internalRoutePolylines) {
@@ -589,9 +603,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return routeSteps
         .map((step: any, idx: number) => {
           if (!step?.polyline?.encodedPolyline) return null;
-          const coordinates = polyline
-            .decode(step.polyline.encodedPolyline)
-            .map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+          const coordinates = tryDecodePolyline(step.polyline.encodedPolyline);
+          if (coordinates.length < 2) return null;
 
           let strokeColor = '#9CA3AF';
           let lineDashPattern: number[] | undefined;
@@ -632,6 +645,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     return [];
   }, [internalRoutePolylines, routeSteps]);
+
+  // Generate stable MapView key to force remount when route structure changes
+  // This prevents iOS AIRGoogleMap crash from child count changes during render
+  const mapViewKey = React.useMemo(() => {
+    // If no route data exists, use stable "no-route" key
+    if (!internalRoutePolylines && (!routeSteps || routeSteps.length === 0)) {
+      return 'map-no-route';
+    }
+    
+    // Generate key based on route structure (not content)
+    const segmentCount = transitSegments.length;
+    const routeHash = internalRoutePolylines 
+      ? `internal-${segmentCount}`
+      : `steps-${routeSteps?.length || 0}-${segmentCount}`;
+    
+    return `map-${routeHash}`;
+  }, [internalRoutePolylines, routeSteps, transitSegments.length]);
 
   // Static route colors (no API dependency)
   const routeColors: Record<string, string> = React.useMemo(
@@ -915,6 +945,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   return (
     <View style={[styles.container, style]}>
       <MapView
+        key={mapViewKey}
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}

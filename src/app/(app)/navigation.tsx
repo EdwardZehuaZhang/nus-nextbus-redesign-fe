@@ -1,3 +1,4 @@
+import polyline from '@mapbox/polyline';
 import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Animated, TextInput, Platform, ActivityIndicator, Dimensions } from 'react-native';
@@ -1526,6 +1527,7 @@ export default function NavigationPage() {
         const combinedSteps: RouteStep[] = [];
         let totalDurationSeconds = 0;
         let totalDistanceMeters = 0;
+        let combinedPolyline = '';
 
         const segmentTargets = [...stops.map((s) => s.coords), destCoords];
         let currentPoint = { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude };
@@ -1617,9 +1619,43 @@ export default function NavigationPage() {
           currentPoint = { latitude: target.lat, longitude: target.lng };
         }
 
-        // Safety check: ensure we have at least some steps
-        if (combinedSteps.length === 0) {
-          console.warn('[NAV] ⚠️ No route steps found after combining segments');
+        // Build a single encoded polyline from all step segments for fallback rendering
+        try {
+          const decodedPoints: [number, number][] = [];
+          combinedSteps.forEach((step) => {
+            if (step?.polyline?.encodedPolyline) {
+              try {
+                const pts = polyline.decode(step.polyline.encodedPolyline);
+                if (Array.isArray(pts) && pts.length > 0) {
+                  decodedPoints.push(...pts);
+                }
+              } catch (decodeErr) {
+                console.warn('[NAV] Step polyline decode failed', decodeErr);
+              }
+            }
+          });
+          if (decodedPoints.length >= 2) {
+            combinedPolyline = polyline.encode(decodedPoints);
+          } else if (decodedPoints.length === 1) {
+            // Fallback: repeat the single point to create a valid polyline
+            combinedPolyline = polyline.encode([decodedPoints[0], decodedPoints[0]]);
+          }
+        } catch (encodeErr) {
+          console.warn('[NAV] ⚠️ Failed to encode combined polyline', encodeErr);
+        }
+
+        // Filter out empty placeholder steps before passing to map to prevent child reordering crash
+        const validSteps = combinedSteps.filter(step => step?.polyline?.encodedPolyline && step.polyline.encodedPolyline.length > 0);
+        
+        console.log('[NAV] 📊 Steps summary:', {
+          total: combinedSteps.length,
+          valid: validSteps.length,
+          filtered: combinedSteps.length - validSteps.length
+        });
+
+        // Safety check: ensure we have at least some valid steps
+        if (validSteps.length === 0) {
+          console.warn('[NAV] ⚠️ No valid route steps found after combining segments');
           setRouteError('No route found with the selected stops');
           setIsLoadingRoutes(false);
           return;
@@ -1631,16 +1667,16 @@ export default function NavigationPage() {
               distanceMeters: totalDistanceMeters,
               duration: `${totalDurationSeconds}s`,
               staticDuration: `${totalDurationSeconds}s`,
-              polyline: { encodedPolyline: '' },
+              polyline: { encodedPolyline: combinedPolyline },
               startLocation: { latLng: { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude } },
               endLocation: { latLng: { latitude: destCoords.lat, longitude: destCoords.lng } },
-              steps: combinedSteps,
+              steps: validSteps,
             },
           ],
           distanceMeters: totalDistanceMeters,
           duration: `${totalDurationSeconds}s`,
           staticDuration: `${totalDurationSeconds}s`,
-          polyline: { encodedPolyline: '' },
+          polyline: { encodedPolyline: combinedPolyline },
         };
 
         console.log('[NAV] ✅ Combined route created with', combinedSteps.length, 'steps');
@@ -1773,8 +1809,14 @@ export default function NavigationPage() {
     ];
   }, [showInternal, bestInternalRoute]);
 
+  // Memoize route steps to prevent MapView child reordering on every render
+  const stableRouteSteps = useMemo(() => {
+    if (isLoadingRoutes || isLoadingInternalRoutes || showInternal) return undefined;
+    return routes[0]?.legs?.[0]?.steps;
+  }, [isLoadingRoutes, isLoadingInternalRoutes, showInternal, routes]);
+
   // 🔧 TEMPORARY: Completely disable InteractiveMap on navigation page for crash debugging
-  const DISABLE_MAP_ENTIRELY = true;
+  const DISABLE_MAP_ENTIRELY = false;
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
@@ -1786,7 +1828,7 @@ export default function NavigationPage() {
           <InteractiveMap
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
             routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
-            routeSteps={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.legs?.[0]?.steps : undefined}
+            routeSteps={stableRouteSteps}
             internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
             origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
             destination={destinationCoords || undefined}
