@@ -1,4 +1,5 @@
 import { Env } from '@env';
+import * as Linking from 'expo-linking';
 import { useColorScheme } from 'nativewind';
 
 import { Item } from '@/components/settings/item';
@@ -20,6 +21,12 @@ export default function Settings() {
   const { colorScheme } = useColorScheme();
   const iconColor =
     colorScheme === 'dark' ? colors.neutral[400] : colors.neutral[500];
+
+  const handleOpen = (url: string) => {
+    Linking.openURL(url).catch(() => {
+      // Silent catch; consider surfacing a toast/snackbar if available
+    });
+  };
   return (
     <>
       <FocusAwareStatusBar />
@@ -58,17 +65,23 @@ export default function Settings() {
           </ItemsContainer>
 
           <ItemsContainer title="settings.links">
-            <Item text="settings.privacy" onPress={() => {}} />
-            <Item text="settings.terms" onPress={() => {}} />
+            <Item
+              text="settings.privacy"
+              onPress={() => handleOpen('https://nus-nextbus-redesign-be.onrender.com/privacy')}
+            />
+            <Item
+              text="settings.terms"
+              onPress={() => handleOpen('https://nus-nextbus-redesign-be.onrender.com/terms')}
+            />
             <Item
               text="settings.github"
               icon={<Github color={iconColor} />}
-              onPress={() => {}}
+              onPress={() => handleOpen('https://github.com/gelusf/nus-nextbus-redesign')}
             />
             <Item
               text="settings.website"
               icon={<Website color={iconColor} />}
-              onPress={() => {}}
+              onPress={() => handleOpen('https://nus-nextbus-redesign-be.onrender.com')}
             />
           </ItemsContainer>
 

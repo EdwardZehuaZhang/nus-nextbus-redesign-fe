@@ -37,7 +37,7 @@ require('dotenv').config({
 
 const BUNDLE_ID = 'com.edwardzhang.nusnextbus'; // ios bundle id
 const PACKAGE = 'com.edwardzhang.nusnextbus'; // android package name
-const NAME = 'NUS NextBus'; // app name
+const NAME = 'NUS Maps'; // app name
 const EXPO_ACCOUNT_OWNER = 'edwardzehuazhang'; // expo account owner
 const EAS_PROJECT_ID = '52efcc10-65b2-4756-92c9-b44bcacf373e'; // eas project id
 const SCHEME = 'nusnextbus'; // app scheme
@@ -86,7 +86,8 @@ const client = z.object({
   // Google Maps API Key - ONLY for map display (Maps SDK)
   // SECURITY: This key should be restricted in Google Cloud Console by platform
   // Backend handles all Google Maps API calls (Routes, Places, Directions)
-  GOOGLE_MAPS_API_KEY: z.string().min(1), // Required for map rendering
+  GOOGLE_MAPS_API_KEY: z.string().optional(), // Optional in build to allow CI without secrets
+  SENTRY_DSN: z.string().optional(),
 });
 
 const buildTime = z.object({
@@ -110,11 +111,12 @@ const _clientEnv = {
 
   // ADD YOUR ENV VARS HERE TOO
   BACKEND_API_URL: process.env.EXPO_PUBLIC_BACKEND_API_URL || 'https://nus-nextbus-redesign-be.onrender.com',
-  VAR_NUMBER: Number(process.env.VAR_NUMBER),
+  VAR_NUMBER: Number(process.env.VAR_NUMBER ?? 0),
   VAR_BOOL: process.env.VAR_BOOL === 'true',
   // SECURITY: Google Maps API key for map rendering only (not for API calls)
   // Backend handles all Google Maps API requests (Routes, Places, Directions)
   GOOGLE_MAPS_API_KEY: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+  SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
 };
 
 /**

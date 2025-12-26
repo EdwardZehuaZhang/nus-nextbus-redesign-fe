@@ -167,7 +167,7 @@ BACKEND_API_URL=https://nus-nextbus-redesign-be.onrender.com
 Switch environments using:
 
 ```bash
-pnpm start                    # Development
+pnpm start                 1   # Development
 pnpm run start:production     # Production
 pnpm run start:staging        # Staging
 ```
@@ -181,6 +181,39 @@ Add your Google Maps API key to environment files:
 ```bash
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
 ```
+
+### Privacy Policy & Terms
+
+Host public pages (e.g., on your Render backend) at:
+- Privacy: `https://nus-nextbus-redesign-be.onrender.com/privacy`
+- Terms: `https://nus-nextbus-redesign-be.onrender.com/terms`
+
+Suggested privacy content:
+
+```
+NUS NextBus Privacy Policy
+
+Information We Collect
+- Location (foreground only) to show nearby bus stops and navigation.
+- Diagnostics, performance, and crash data (Sentry).
+
+How We Use Information
+- Provide proximity-based bus stop suggestions, navigation, and improve reliability/performance.
+
+Data Sharing
+- No selling or sharing of personal data. Crash/analytics processed by Sentry as a processor.
+
+Retention
+- Diagnostic data kept only as needed for troubleshooting and performance improvements.
+
+Your Choices
+- Disable location in device settings (some features degrade).
+- Contact: support@nus-nextbus.example
+
+Last updated: 2025-12-24
+```
+
+If you host at a different domain, update the links in Settings accordingly.
 
 ---
 

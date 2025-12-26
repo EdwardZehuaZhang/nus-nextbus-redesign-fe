@@ -44,8 +44,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: Env.BUNDLE_ID,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
-      NSLocationWhenInUseUsageDescription: 'This app needs your location to show nearby bus stops and help you navigate to them.',
-      NSLocationAlwaysAndWhenInUseUsageDescription: 'This app needs your location to show nearby bus stops and help you navigate to them.',
+      NSLocationWhenInUseUsageDescription:
+        'This app needs your location to show nearby bus stops and help you navigate to them.',
     },
     config: {
       googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -75,6 +75,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
   },
   plugins: [
+    'sentry-expo',
+    '@sentry/react-native',
     [
       'expo-splash-screen',
       {
@@ -92,7 +94,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationAlwaysAndWhenInUsePermission: 'This app needs your location to show nearby bus stops and help you navigate to them.',
+        locationWhenInUsePermission:
+          'This app needs your location to show nearby bus stops and help you navigate to them.',
       },
     ],
     'expo-localization',
