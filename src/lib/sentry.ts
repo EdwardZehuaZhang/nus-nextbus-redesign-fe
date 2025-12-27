@@ -12,5 +12,15 @@ if (dsn) {
   });
 }
 
-export const captureException = Sentry.Native.captureException;
-export const captureMessage = Sentry.Native.captureMessage;
+// Safely export Sentry functions with fallbacks for platforms where Sentry.Native is undefined (e.g., web)
+export const captureException = Sentry.Native?.captureException || ((error: any) => {
+  if (__DEV__) {
+    console.error('[Sentry] captureException called but Sentry.Native is not available:', error);
+  }
+});
+
+export const captureMessage = Sentry.Native?.captureMessage || ((message: string) => {
+  if (__DEV__) {
+    console.warn('[Sentry] captureMessage called but Sentry.Native is not available:', message);
+  }
+});
