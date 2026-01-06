@@ -30,11 +30,17 @@ export const usePublicity = () => {
  * Hook to fetch all bus stops
  */
 export const useBusStops = () => {
-  return useQuery({
-    queryKey: ['busStops'],
-    queryFn: getBusStops,
-    staleTime: 10 * 60 * 1000, // 10 minutes - bus stops rarely change
-  });
+  try {
+    return useQuery({
+      queryKey: ['busStops'],
+      queryFn: getBusStops,
+      staleTime: 10 * 60 * 1000, // 10 minutes - bus stops rarely change
+    });
+  } catch (error) {
+    console.error('[useBusStops] Error initializing query:', error);
+    // Return a default empty result to prevent crashes
+    return { data: undefined, error, isLoading: false, isError: true };
+  }
 };
 
 /**

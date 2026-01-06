@@ -15,9 +15,13 @@ import type { RouteStep } from '@/api/google-routes';
 import { createBusMarkerSVG, svgToDataURL } from '@/components/bus-marker-icon';
 import {
   getLandmarkMarkerSVG,
+  getLandmarkColor,
   NUS_LANDMARKS,
 } from '@/components/landmark-marker-icons';
 import { MapTypeSelector } from '@/components/map-type-selector';
+import { NUS_PRINTERS, type Printer } from '@/data/printer-locations';
+import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
+import { createCircularMarkerSVG, svgToDataURL as circularSvgToDataURL } from '@/components/circular-marker-icon';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 import { Env } from '@/lib/env';
 import { useLocation } from '@/lib/hooks/use-location';
@@ -4657,6 +4661,230 @@ const useLandmarkMarkers = (
   return landmarkMarkersRef;
 };
 
+/**
+ * Custom hook to render printer markers
+ */
+const usePrinterMarkers = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
+  activeRoute?: RouteCode | null,
+  onPrinterSelected?: (printer: Printer) => void
+) => {
+  const printerMarkersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      return;
+    }
+
+    // Remove existing printer markers
+    printerMarkersRef.current.forEach((marker) => marker.setMap(null));
+    printerMarkersRef.current = [];
+
+    // Don't create printer markers if a route is selected
+    if (activeRoute) {
+      return;
+    }
+
+    // Function to calculate scale based on zoom level (smaller than landmarks)
+    const getScaleForZoom = (zoom: number): number => {
+      if (zoom <= 14) {
+        return 0.6;
+      } else if (zoom <= 15) {
+        return 0.75;
+      } else if (zoom === 16) {
+        return 0.9;
+      } else if (zoom === 17) {
+        return 1.0;
+      } else if (zoom === 18) {
+        return 1.15;
+      } else {
+        return 1.3;
+      }
+    };
+
+    // Function to update printer marker sizes based on zoom
+    const updatePrinterSizes = () => {
+      const zoom = map.getZoom() || 16;
+      const scale = getScaleForZoom(zoom);
+      const baseSize = 30; // Circular markers are 30x30px
+
+      printerMarkersRef.current.forEach((marker, index) => {
+        const printer = NUS_PRINTERS[index];
+        if (!printer) return;
+
+        const scaledSize = baseSize * scale;
+        const color = '#FF8C00'; // Orange
+
+        marker.setIcon({
+          url: circularSvgToDataURL(createCircularMarkerSVG('printer', color)),
+          scaledSize: new google.maps.Size(scaledSize, scaledSize),
+          anchor: new google.maps.Point(scaledSize / 2, scaledSize / 2), // Center anchor for circular
+        });
+      });
+    };
+
+    // Create markers for each printer
+    NUS_PRINTERS.forEach((printer) => {
+      const initialZoom = map.getZoom() || 16;
+      const initialScale = getScaleForZoom(initialZoom);
+      const initialSize = 30 * initialScale;
+      const color = '#FF8C00'; // Orange
+
+      const marker = new google.maps.Marker({
+        position: printer.coordinates,
+        map,
+        icon: {
+          url: circularSvgToDataURL(createCircularMarkerSVG('printer', color)),
+          scaledSize: new google.maps.Size(initialSize, initialSize),
+          anchor: new google.maps.Point(initialSize / 2, initialSize / 2),
+        },
+        title: `${printer.building} Printer`,
+        zIndex: 500,
+      });
+
+      marker.addListener('click', () => {
+        console.log('[PrinterMarker] Clicked on:', printer.building);
+        if (onPrinterSelected) {
+          onPrinterSelected(printer);
+        }
+      });
+
+      printerMarkersRef.current.push(marker);
+    });
+
+    // Add zoom change listener to update sizes
+    const zoomListener = map.addListener('zoom_changed', updatePrinterSizes);
+
+    // Cleanup
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+      printerMarkersRef.current.forEach((marker) => marker.setMap(null));
+    };
+  }, [mapRef, isMapCreated, activeRoute, onPrinterSelected]);
+
+  return printerMarkersRef;
+};
+
+// Hook to manage and display sports facility markers (gyms, pools, badminton courts)
+const useSportsFacilityMarkers = (
+  mapRef: React.RefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
+  activeRoute?: RouteCode | null,
+  onFacilitySelected?: (facility: SportsFacility) => void
+) => {
+  const facilityMarkersRef = useRef<google.maps.Marker[]>([]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (
+      !map ||
+      !isMapCreated ||
+      typeof window === 'undefined' ||
+      !window.google
+    ) {
+      return;
+    }
+
+    // Remove existing facility markers
+    facilityMarkersRef.current.forEach((marker) => marker.setMap(null));
+    facilityMarkersRef.current = [];
+
+    // Don't create facility markers if a route is selected
+    if (activeRoute) {
+      return;
+    }
+
+    // Function to calculate scale based on zoom level (smaller than landmarks)
+    const getScaleForZoom = (zoom: number): number => {
+      if (zoom <= 14) {
+        return 0.6;
+      } else if (zoom <= 15) {
+        return 0.75;
+      } else if (zoom === 16) {
+        return 0.9;
+      } else if (zoom === 17) {
+        return 1.0;
+      } else if (zoom === 18) {
+        return 1.15;
+      } else {
+        return 1.3;
+      }
+    };
+
+    // Function to update facility marker sizes based on zoom
+    const updateFacilitySizes = () => {
+      const zoom = map.getZoom() || 16;
+      const scale = getScaleForZoom(zoom);
+      const baseSize = 30; // Circular markers are 30x30px
+
+      facilityMarkersRef.current.forEach((marker, index) => {
+        const facility = NUS_SPORTS_FACILITIES[index];
+        if (!facility) return;
+
+        const scaledSize = baseSize * scale;
+        const color = getSportsFacilityColor(facility.type);
+
+        marker.setIcon({
+          url: circularSvgToDataURL(createCircularMarkerSVG(facility.type, color)),
+          scaledSize: new google.maps.Size(scaledSize, scaledSize),
+          anchor: new google.maps.Point(scaledSize / 2, scaledSize / 2), // Center anchor for circular
+        });
+      });
+    };
+
+    // Create markers for each sports facility
+    NUS_SPORTS_FACILITIES.forEach((facility) => {
+      const initialZoom = map.getZoom() || 16;
+      const initialScale = getScaleForZoom(initialZoom);
+      const initialSize = 30 * initialScale;
+      const color = getSportsFacilityColor(facility.type);
+
+      const marker = new google.maps.Marker({
+        position: facility.coordinates,
+        map,
+        icon: {
+          url: circularSvgToDataURL(createCircularMarkerSVG(facility.type, color)),
+          scaledSize: new google.maps.Size(initialSize, initialSize),
+          anchor: new google.maps.Point(initialSize / 2, initialSize / 2),
+        },
+        title: facility.name,
+        zIndex: 500,
+      });
+
+      marker.addListener('click', () => {
+        console.log('[SportsFacilityMarker] Clicked on:', facility.name);
+        if (onFacilitySelected) {
+          onFacilitySelected(facility);
+        }
+      });
+
+      facilityMarkersRef.current.push(marker);
+    });
+
+    // Add zoom change listener to update sizes
+    const zoomListener = map.addListener('zoom_changed', updateFacilitySizes);
+
+    // Cleanup
+    return () => {
+      if (zoomListener) {
+        google.maps.event.removeListener(zoomListener);
+      }
+      facilityMarkersRef.current.forEach((marker) => marker.setMap(null));
+    };
+  }, [mapRef, isMapCreated, activeRoute, onFacilitySelected]);
+
+  return facilityMarkersRef;
+};
+
 // Hook to track and display user location with heading
 const useUserLocationMarker = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
@@ -5252,6 +5480,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [isPlaceLoading, setIsPlaceLoading] = useState<boolean>(false);
+  const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
+  const [selectedSportsFacility, setSelectedSportsFacility] = useState<SportsFacility | null>(null);
   const [currentMapType, setCurrentMapType] = useState<'light' | 'dark' | google.maps.MapTypeId>('light'); // Track map type for styling
   
   // Get user location for directions
@@ -5286,6 +5516,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       'bus-stops': true,
       academic: false, // Always default to false
       residences: false,
+      sports: false,
       'bus-route-a1': false,
       'bus-route-a2': false,
       'bus-route-d1': false,
@@ -5332,6 +5563,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Determine if landmarks should be shown based on filters
   const shouldShowLandmarks = mapFilters.important && showLandmarks;
+  const shouldShowPrinters = mapFilters.printers;
+  const shouldShowSports = mapFilters.sports;
 
   // Determine which bus route is selected from filters (radio button selection)
   const selectedFilterRoute = React.useMemo(() => {
@@ -5655,6 +5888,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     effectiveActiveRoute,
     setSelectedPlaceIdWithLogging // Pass the callback to show Place UI Kit
   ); // Control landmarks with filter
+  usePrinterMarkers(
+    mapRef,
+    isMapCreated && shouldShowPrinters,
+    effectiveActiveRoute,
+    setSelectedPrinter
+  ); // Control printers with filter
+  useSportsFacilityMarkers(
+    mapRef,
+    isMapCreated && shouldShowSports,
+    effectiveActiveRoute,
+    setSelectedSportsFacility
+  ); // Control sports facilities with filter
   useBusStopMarkers(
     mapRef,
     isMapCreated,
@@ -5945,6 +6190,250 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               }
             }}
           />
+        </div>
+      )}
+
+      {/* Printer Details Modal */}
+      {selectedPrinter && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '84px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: currentMapType === 'dark' ? '#1e1e1e' : 'white',
+            borderRadius: '12px',
+            boxShadow: currentMapType === 'dark' 
+              ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden',
+            pointerEvents: 'auto',
+            color: currentMapType === 'dark' ? '#ffffff' : '#000000',
+          }}
+        >
+          {/* Header with close button */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px',
+              borderBottom: currentMapType === 'dark' ? '1px solid #333' : '1px solid #e5e7eb',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+              {selectedPrinter.building} Printer
+            </h3>
+            <button
+              onClick={() => setSelectedPrinter(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: currentMapType === 'dark' ? '#999' : '#666',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '16px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                fontWeight: '600', 
+                color: currentMapType === 'dark' ? '#999' : '#666',
+                marginBottom: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Location
+              </div>
+              <div style={{ fontSize: '15px', lineHeight: '1.5' }}>
+                {selectedPrinter.location}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                fontWeight: '600', 
+                color: currentMapType === 'dark' ? '#999' : '#666',
+                marginBottom: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Operating Hours
+              </div>
+              <div style={{ fontSize: '15px' }}>
+                {selectedPrinter.hours}
+              </div>
+            </div>
+
+            {/* Directions button */}
+            <a
+              href={selectedPrinter.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#FF8C00',
+                color: 'white',
+                textAlign: 'center',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '15px',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#E67E00';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#FF8C00';
+              }}
+            >
+              Open in Google Maps
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Sports Facility Details Modal */}
+      {selectedSportsFacility && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '84px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+            width: '90%',
+            maxWidth: '400px',
+            backgroundColor: currentMapType === 'dark' ? '#1e1e1e' : 'white',
+            borderRadius: '12px',
+            boxShadow: currentMapType === 'dark' 
+              ? '0 4px 12px rgba(0, 0, 0, 0.5)' 
+              : '0 4px 12px rgba(0, 0, 0, 0.15)',
+            overflow: 'hidden',
+            pointerEvents: 'auto',
+            color: currentMapType === 'dark' ? '#ffffff' : '#000000',
+          }}
+        >
+          {/* Header with close button */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px',
+              borderBottom: currentMapType === 'dark' ? '1px solid #333' : '1px solid #e5e7eb',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+              {selectedSportsFacility.name}
+            </h3>
+            <button
+              onClick={() => setSelectedSportsFacility(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                padding: '0',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: currentMapType === 'dark' ? '#999' : '#666',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ padding: '16px' }}>
+            {selectedSportsFacility.address && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '600', 
+                  color: currentMapType === 'dark' ? '#999' : '#666',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Location
+                </div>
+                <div style={{ fontSize: '15px', lineHeight: '1.5' }}>
+                  {selectedSportsFacility.address}
+                </div>
+              </div>
+            )}
+
+            {selectedSportsFacility.hours && (
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ 
+                  fontSize: '12px', 
+                  fontWeight: '600', 
+                  color: currentMapType === 'dark' ? '#999' : '#666',
+                  marginBottom: '4px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Operating Hours
+                </div>
+                <div style={{ fontSize: '15px' }}>
+                  {selectedSportsFacility.hours}
+                </div>
+              </div>
+            )}
+
+            {/* Directions button */}
+            <a
+              href={selectedSportsFacility.googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '12px',
+                backgroundColor: getSportsFacilityColor(selectedSportsFacility.type),
+                color: 'white',
+                textAlign: 'center',
+                textDecoration: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '15px',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                const baseColor = getSportsFacilityColor(selectedSportsFacility.type);
+                // Darken the color on hover
+                e.currentTarget.style.backgroundColor = baseColor.replace(/^#/, '#') + 'dd';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = getSportsFacilityColor(selectedSportsFacility.type);
+              }}
+            >
+              Open in Google Maps
+            </a>
+          </div>
         </div>
       )}
     </div>

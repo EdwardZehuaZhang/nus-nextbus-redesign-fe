@@ -1,7 +1,7 @@
 import polyline from '@mapbox/polyline';
-import { BookOpen, Bus, FirstAid, Subway } from 'phosphor-react-native';
+import { Barbell, BookOpen, Bus, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -20,6 +20,8 @@ import { useLocation } from '@/lib/hooks/use-location';
 import { getTransitLineColor } from '@/lib/transit-colors';
 import { getPlaceDetails } from '@/api/google-maps/places';
 import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
+import { NUS_PRINTERS, type Printer as PrinterLocation } from '@/data/printer-locations';
+import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 import {
   BLUE_AREA_BOUNDARY,
@@ -118,6 +120,8 @@ const getLandmarkColor = (type: string) => {
       return '#FF8C00'; // Orange
     case 'bus-terminal':
       return '#00B050'; // Green
+    case 'printer':
+      return '#FF8C00'; // Orange
     default:
       return '#274F9C';
   }
@@ -184,7 +188,7 @@ const UserLocationMarker: React.FC<{
  * Pin marker component with icon inside - matches web version exactly
  */
 const PinMarker: React.FC<{
-  type: 'hospital' | 'mrt' | 'library' | 'bus-terminal';
+  type: 'hospital' | 'mrt' | 'library' | 'bus-terminal' | 'printer';
   scale: number;
 }> = ({ type, scale }) => {
   const color = getLandmarkColor(type);
@@ -199,6 +203,7 @@ const PinMarker: React.FC<{
     mrt: Subway,
     library: BookOpen,
     'bus-terminal': Bus,
+    printer: Printer,
   }[type];
 
   return (
@@ -236,6 +241,70 @@ const getLandmarkScale = (zoom: number): number => {
   else if (zoom === 17) return 1.15;
   else if (zoom === 18) return 1.3;
   else return 1.5;
+};
+
+/**
+ * Circular marker for sports facilities and printers (smaller than landmarks)
+ * 30x30px base size with colored circle and white icon
+ */
+const CircularMarker: React.FC<{
+  type: 'gym' | 'swimming' | 'badminton' | 'printer';
+  scale: number;
+}> = ({ type, scale }) => {
+  const color = type === 'printer' ? '#FF8C00' : getSportsFacilityColor(type);
+  const size = 30 * scale;
+  
+  // Darker border color (30% darker)
+  const darkerColor = color.replace(/^#/, '');
+  const r = parseInt(darkerColor.substring(0, 2), 16);
+  const g = parseInt(darkerColor.substring(2, 4), 16);
+  const b = parseInt(darkerColor.substring(4, 6), 16);
+  const borderColor = `#${Math.round(r * 0.7).toString(16).padStart(2, '0')}${Math.round(g * 0.7).toString(16).padStart(2, '0')}${Math.round(b * 0.7).toString(16).padStart(2, '0')}`;
+
+  // Select the appropriate icon component
+  const IconComponent = {
+    gym: Barbell,
+    swimming: Waves,
+    badminton: Racquet,
+    printer: Printer,
+  }[type];
+
+  const iconSize = 16 * scale;
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Svg width={size} height={size} viewBox="0 0 30 30">
+        {/* White background circle */}
+        <Circle cx="15" cy="15" r="13" fill="white" stroke={borderColor} strokeWidth="2.5" />
+        {/* Colored circle */}
+        <Circle cx="15" cy="15" r="10.5" fill={color} />
+        {/* Icon */}
+        <G transform={`translate(${15 - iconSize / 2}, ${15 - iconSize / 2})`}>
+          <IconComponent size={iconSize} color="white" weight="fill" />
+        </G>
+      </Svg>
+    </View>
+  );
+};
+
+/**
+ * Calculate scale for circular markers (sports and printers) based on zoom level
+ * Smaller than landmarks
+ */
+const getCircularMarkerScale = (zoom: number): number => {
+  if (zoom <= 14) return 0.6;
+  else if (zoom <= 15) return 0.75;
+  else if (zoom === 16) return 0.9;
+  else if (zoom === 17) return 1.0;
+  else if (zoom === 18) return 1.15;
+  else return 1.3;
 };
 
 // Debug logging for route rendering
@@ -295,8 +364,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     priceLevel?: number;
     openNow?: boolean;
   } | null>(null);
-
-  const mapType = externalMapType ?? internalMapType;
+  const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
+  const [selectedSportsFacility, setSelectedSportsFacility] = useState<SportsFacility | null>(null);
 
   // Get user's current location from hook
   const { coords: userLocation } = useLocation();
@@ -764,12 +833,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Determine what to show based on filters
   const shouldShowLandmarks = showLandmarks && filterImportant;
+  const shouldShowPrinters = mapFilters?.printers ?? false;
+  const shouldShowSports = mapFilters?.sports ?? false;
   const shouldShowBusStops = showBusStops || filterBusStops;
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
 
   console.log('[Map] Display states:', {
     landmarks: shouldShowLandmarks,
+    printers: shouldShowPrinters,
     busStops: shouldShowBusStops,
     academic: shouldShowAcademic,
     residences: shouldShowResidences,
@@ -873,6 +945,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       });
     };
 
+  const handlePrinterPress = (printer: PrinterLocation) => (e: MarkerPressEvent) => {
+    e.stopPropagation();
+    setSelectedPrinter(printer);
+  };
+
+  const handleSportsFacilityPress = (facility: SportsFacility) => (e: MarkerPressEvent) => {
+    e.stopPropagation();
+    setSelectedSportsFacility(facility);
+  };
+
   const handleBusStopPress = (stop: any) => (e: MarkerPressEvent) => {
     e.stopPropagation();
     const stopName = stop.ShortName || stop.caption || stop.name;
@@ -957,7 +1039,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         showsMyLocationButton
         showsCompass
         showsScale
-        mapType={mapType}
+        mapType={externalMapType ?? internalMapType}
         onRegionChangeComplete={handleRegionChange}
         onMapReady={() => setMapReady(true)}
         onPoiClick={handlePoiClick}
@@ -1255,6 +1337,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               onPress={handleLandmarkPress(landmark)}
             >
               <PinMarker type={landmark.type} scale={scale} />
+            </Marker>
+          );
+        })}
+        {/* Printer Markers - Pre-rendered, visibility controlled by opacity */}
+        {NUS_PRINTERS.map((printer, index) => {
+          const scale = getCircularMarkerScale(currentZoom);
+
+          return (
+            <Marker
+              key={`printer-${index}`}
+              coordinate={{
+                latitude: printer.coordinates.lat,
+                longitude: printer.coordinates.lng,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={shouldShowPrinters ? 1 : 0}
+              onPress={handlePrinterPress(printer)}
+            >
+              <CircularMarker type="printer" scale={scale} />
+            </Marker>
+          );
+        })}
+        {/* Sports Facility Markers - Pre-rendered, visibility controlled by opacity */}
+        {NUS_SPORTS_FACILITIES.map((facility, index) => {
+          const scale = getCircularMarkerScale(currentZoom);
+
+          return (
+            <Marker
+              key={`sports-${index}`}
+              coordinate={{
+                latitude: facility.coordinates.lat,
+                longitude: facility.coordinates.lng,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={shouldShowSports ? 1 : 0}
+              onPress={handleSportsFacilityPress(facility)}
+            >
+              <CircularMarker type={facility.type} scale={scale} />
             </Marker>
           );
         })}
@@ -1600,6 +1722,101 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </View>
         </View>
       )}
+
+      {/* Printer Details Popup */}
+      {selectedPrinter && (
+        <View style={styles.placePopupContainer}>
+          <View style={styles.placeCard}>
+            {/* Header */}
+            <View style={styles.printerHeader}>
+              <Text style={styles.placeTitle}>{selectedPrinter.building} Printer</Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.printerContent}>
+              <View style={styles.printerSection}>
+                <Text style={styles.printerLabel}>LOCATION</Text>
+                <Text style={styles.printerValue}>{selectedPrinter.location}</Text>
+              </View>
+
+              <View style={styles.printerSection}>
+                <Text style={styles.printerLabel}>OPERATING HOURS</Text>
+                <Text style={styles.printerValue}>{selectedPrinter.hours}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.printerMapButton}
+                onPress={() => {
+                  if (selectedPrinter.googleMapsUrl) {
+                    Linking.openURL(selectedPrinter.googleMapsUrl);
+                  }
+                }}
+              >
+                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.placeCloseBtn}
+              onPress={() => setSelectedPrinter(null)}
+            >
+              <Text style={styles.placeCloseBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Sports Facility Details Popup */}
+      {selectedSportsFacility && (
+        <View style={styles.placePopupContainer}>
+          <View style={styles.placeCard}>
+            {/* Header */}
+            <View style={styles.printerHeader}>
+              <Text style={styles.placeTitle}>{selectedSportsFacility.name}</Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.printerContent}>
+              {selectedSportsFacility.address && (
+                <View style={styles.printerSection}>
+                  <Text style={styles.printerLabel}>LOCATION</Text>
+                  <Text style={styles.printerValue}>{selectedSportsFacility.address}</Text>
+                </View>
+              )}
+
+              {selectedSportsFacility.hours && (
+                <View style={styles.printerSection}>
+                  <Text style={styles.printerLabel}>OPERATING HOURS</Text>
+                  <Text style={styles.printerValue}>{selectedSportsFacility.hours}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.printerMapButton,
+                  { backgroundColor: getSportsFacilityColor(selectedSportsFacility.type) }
+                ]}
+                onPress={() => {
+                  if (selectedSportsFacility.googleMapsUrl) {
+                    Linking.openURL(selectedSportsFacility.googleMapsUrl);
+                  }
+                }}
+              >
+                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.placeCloseBtn}
+              onPress={() => setSelectedSportsFacility(null)}
+            >
+              <Text style={styles.placeCloseBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -1749,5 +1966,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#ffffff',
+  },
+  printerHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  printerContent: {
+    padding: 16,
+  },
+  printerSection: {
+    marginBottom: 16,
+  },
+  printerLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  printerValue: {
+    fontSize: 15,
+    color: '#000',
+    lineHeight: 22,
+  },
+  printerMapButton: {
+    backgroundColor: '#FF8C00',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  printerMapButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

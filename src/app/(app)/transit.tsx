@@ -22,6 +22,7 @@ import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
 import { InteractiveMap } from '@/components/interactive-map';
 import { MapTypeSelector } from '@/components/map-type-selector';
+import { SportsAndPrintersBubbles } from '@/components/sports-printers-bubbles';
 import {
   FocusAwareStatusBar,
   Image,
@@ -1621,6 +1622,7 @@ export default function TransitPage() {
         residences: false,
         'bus-stops': true,
         'bus-route-d2': false,
+        printers: false,
       };
 
       // Load from storage (works on both web and native)
@@ -1723,6 +1725,12 @@ export default function TransitPage() {
           opacity: backdropOpacity,
           pointerEvents: 'none',
         }}
+      />
+
+      {/* Sports and Printers Toggle Bubbles */}
+      <SportsAndPrintersBubbles
+        filters={mapFilters}
+        onFilterChange={handleFilterChange}
       />
 
       <Animated.View
