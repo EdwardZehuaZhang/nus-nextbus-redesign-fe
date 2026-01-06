@@ -1,6 +1,5 @@
 import React from 'react';
-
-import { Pressable, Text, View } from 'react-native';
+import { Animated, Pressable, Text } from 'react-native';
 
 interface BubbleProps {
   active: boolean;
@@ -37,11 +36,19 @@ const BubbleButton: React.FC<BubbleProps> = ({ active, label, onPress }) => (
 interface SportsAndPrintersBubblesProps {
   filters: Record<string, boolean>;
   onFilterChange: (filters: Record<string, boolean>) => void;
+  heightAnimation?: Animated.Value;
+  MIN_HEIGHT?: number;
+  MAX_HEIGHT?: number;
 }
 
-export const SportsAndPrintersBubbles: React.FC<SportsAndPrintersBubblesProps> = ({
+export const SportsAndPrintersBubbles: React.FC<
+  SportsAndPrintersBubblesProps
+> = ({
   filters,
   onFilterChange,
+  heightAnimation,
+  MIN_HEIGHT = 10,
+  MAX_HEIGHT = 92,
 }) => {
   const handleToggle = (filterId: string) => {
     onFilterChange({
@@ -50,16 +57,34 @@ export const SportsAndPrintersBubbles: React.FC<SportsAndPrintersBubblesProps> =
     });
   };
 
+  // Create animated opacity that hides bubbles at MAX_HEIGHT
+  const animatedOpacity = heightAnimation
+    ? heightAnimation.interpolate({
+        inputRange: [MIN_HEIGHT, 70, MAX_HEIGHT],
+        outputRange: [1, 1, 0], // Visible at MIN and normal heights, hidden at MAX
+      })
+    : 1;
+
+  // Calculate dynamic bottom position - position bubbles above the panel
+  // Panel height is a percentage, so we position bubbles just above it
+  const animatedBottom = heightAnimation
+    ? heightAnimation.interpolate({
+        inputRange: [MIN_HEIGHT, MAX_HEIGHT],
+        outputRange: [`${MIN_HEIGHT + 1}%`, `${MAX_HEIGHT + 2}%`], // 2% above panel at all times
+      })
+    : '12%';
+
   return (
-    <View
+    <Animated.View
       style={{
         position: 'absolute',
-        bottom: 50,
-        left: 20,
+        bottom: animatedBottom,
+        left: 8,
         flexDirection: 'row',
         gap: 8,
         zIndex: 10,
         pointerEvents: 'box-none',
+        opacity: animatedOpacity,
       }}
     >
       <BubbleButton
@@ -72,6 +97,6 @@ export const SportsAndPrintersBubbles: React.FC<SportsAndPrintersBubblesProps> =
         label="Printers"
         onPress={() => handleToggle('printers')}
       />
-    </View>
+    </Animated.View>
   );
 };

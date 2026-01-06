@@ -440,11 +440,34 @@ const useDragHandlers = () => {
     // We don't want to override the snap decision made in handleDrag
   };
 
+  const handleTap = () => {
+    // Get the current animation value
+    const currentHeight = (heightAnimation as any)._value;
+    console.log('[NAV TAP] 👆 Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT, 'MAX:', MAX_HEIGHT);
+
+    // Only snap to DEFAULT if at MIN or MAX
+    if (Math.abs(currentHeight - MIN_HEIGHT) < 1) {
+      // At MIN_HEIGHT - snap to DEFAULT
+      console.log('[NAV TAP] 📍 At MIN - Snapping to DEFAULT');
+      setTempHeight(null);
+      animateToHeight(DEFAULT_HEIGHT);
+    } else if (Math.abs(currentHeight - MAX_HEIGHT) < 1) {
+      // At MAX_HEIGHT - snap to DEFAULT
+      console.log('[NAV TAP] 📍 At MAX - Snapping to DEFAULT');
+      setTempHeight(null);
+      animateToHeight(DEFAULT_HEIGHT);
+    } else {
+      // In between - do nothing
+      console.log('[NAV TAP] 🔇 At intermediate height - Ignoring tap');
+    }
+  };
+
   return {
     containerHeight,
     handleDrag,
     handleDragMove,
     handleDragEnd,
+    handleTap,
     dragStartY,
     dragStartTime,
     isDragging,
@@ -2137,6 +2160,7 @@ export default function NavigationPage() {
             onDrag={handleDrag}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
+            onTap={handleTap}
           />
           <ScrollView
             scrollEnabled={containerHeight > 50}

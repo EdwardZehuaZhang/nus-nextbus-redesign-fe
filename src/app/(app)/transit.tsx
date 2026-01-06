@@ -1499,6 +1499,42 @@ const useDragHandlers = () => {
     // We don't want to override the snap decision made in handleDrag
   };
 
+  const handleTap = () => {
+    // Get the current animation value
+    const currentHeight = (heightAnimation as any)._value;
+    console.log('[TAP] 👆 Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT, 'MAX:', MAX_HEIGHT);
+
+    // Only snap to DEFAULT if at MIN or MAX
+    if (Math.abs(currentHeight - MIN_HEIGHT) < 1) {
+      // At MIN_HEIGHT - snap to DEFAULT
+      console.log('[TAP] 📍 At MIN - Snapping to DEFAULT');
+      setContainerHeight(DEFAULT_HEIGHT);
+      setIsCollapsed(false);
+      setTempHeight(null);
+      Animated.spring(heightAnimation, {
+        toValue: DEFAULT_HEIGHT,
+        useNativeDriver: false,
+        tension: 50,
+        friction: 8,
+      }).start();
+    } else if (Math.abs(currentHeight - MAX_HEIGHT) < 1) {
+      // At MAX_HEIGHT - snap to DEFAULT
+      console.log('[TAP] 📍 At MAX - Snapping to DEFAULT');
+      setContainerHeight(DEFAULT_HEIGHT);
+      setIsCollapsed(false);
+      setTempHeight(null);
+      Animated.spring(heightAnimation, {
+        toValue: DEFAULT_HEIGHT,
+        useNativeDriver: false,
+        tension: 50,
+        friction: 8,
+      }).start();
+    } else {
+      // In between - do nothing
+      console.log('[TAP] 🔇 At intermediate height - Ignoring tap');
+    }
+  };
+
   const handleExpandSheet = () => {
     setIsCollapsed(false);
     setContainerHeight(45); // Default expanded state
@@ -1597,6 +1633,7 @@ const useDragHandlers = () => {
     handleDrag,
     handleDragMove,
     handleDragEnd,
+    handleTap,
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
@@ -1605,6 +1642,9 @@ const useDragHandlers = () => {
     dragStartTime,
     isDragging,
     backdropOpacity,
+    heightAnimation,
+    MIN_HEIGHT,
+    MAX_HEIGHT,
   };
 };
 
@@ -1647,6 +1687,7 @@ export default function TransitPage() {
     handleDrag,
     handleDragMove,
     handleDragEnd,
+    handleTap,
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
@@ -1655,6 +1696,9 @@ export default function TransitPage() {
     dragStartTime,
     isDragging,
     backdropOpacity,
+    heightAnimation,
+    MIN_HEIGHT,
+    MAX_HEIGHT,
   } = useDragHandlers();
 
   const handleRouteClick = (routeName: string) => {
@@ -1731,6 +1775,9 @@ export default function TransitPage() {
       <SportsAndPrintersBubbles
         filters={mapFilters}
         onFilterChange={handleFilterChange}
+        heightAnimation={heightAnimation}
+        MIN_HEIGHT={MIN_HEIGHT}
+        MAX_HEIGHT={MAX_HEIGHT}
       />
 
       <Animated.View
@@ -1757,6 +1804,7 @@ export default function TransitPage() {
             onDrag={handleDrag}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
+            onTap={handleTap}
           />
         </View>
 

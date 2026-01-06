@@ -7,6 +7,7 @@ interface FrameProps {
   onDrag?: (gestureState: { dy: number; vy: number }) => void;
   onDragMove?: (dy: number) => void;
   onDragEnd?: () => void;
+  onTap?: () => void;
 }
 
 interface DragState {
@@ -76,7 +77,9 @@ function useMouseHandlers(state: DragState, callbacks: FrameProps) {
 // Touch handlers for mobile
 function useTouchHandlers(state: DragState, callbacks: FrameProps) {
   const { startY, startTime, isDragging, setCursor } = state;
-  const { onDrag, onDragMove, onDragEnd } = callbacks;
+  const { onDrag, onDragMove, onDragEnd, onTap } = callbacks;
+  const touchMovementThreshold = React.useRef(10); // 10px threshold for tap detection
+  const hasMoved = React.useRef(false);
 
   const handleTouchStart = React.useCallback(
     (e: any) => {
@@ -85,6 +88,7 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
       startY.current = touch.clientY || touch.pageY;
       startTime.current = Date.now();
       isDragging.current = true;
+      hasMoved.current = false;
       setCursor('grabbing');
     },
     [startY, startTime, isDragging, setCursor]
@@ -94,7 +98,16 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
     (e: any) => {
       if (!isDragging.current) return;
       const touch = e.touches?.[0] || e;
-      onDragMove?.((touch.clientY || touch.pageY) - startY.current);
+      const dy = (touch.clientY || touch.pageY) - startY.current;
+      
+      // Mark as moved if movement exceeds threshold
+      if (Math.abs(dy) > touchMovementThreshold.current) {
+        hasMoved.current = true;
+      }
+      
+      if (hasMoved.current) {
+        onDragMove?.(dy);
+      }
     },
     [isDragging, startY, onDragMove]
   );
@@ -106,10 +119,18 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
       const dy = (touch.clientY || touch.pageY) - startY.current;
       isDragging.current = false;
       setCursor('grab');
-      onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+      
+      // If movement is below threshold, treat as tap
+      if (!hasMoved.current && Math.abs(dy) <= touchMovementThreshold.current) {
+        onTap?.();
+      } else {
+        // Treat as drag
+        onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+      }
+      
       onDragEnd?.();
     },
-    [isDragging, startY, startTime, setCursor, onDrag, onDragEnd]
+    [isDragging, startY, startTime, setCursor, onDrag, onDragEnd, onTap]
   );
 
   return { handleTouchStart, handleTouchMove, handleTouchEnd };
@@ -176,8 +197,8 @@ const WebFrame = ({
   );
 };
 
-export const Frame = ({ onDrag, onDragMove, onDragEnd }: FrameProps) => {
-  const handlers = useDragHandlers({ onDrag, onDragMove, onDragEnd });
+export const Frame = ({ onDrag, onDragMove, onDragEnd, onTap }: FrameProps) => {
+  const handlers = useDragHandlers({ onDrag, onDragMove, onDragEnd, onTap });
 
   // Use native div for web to ensure mouse events work
   if (Platform.OS === 'web') {
