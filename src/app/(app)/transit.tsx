@@ -1,6 +1,6 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
-import { Animated, TextInput, Keyboard, Platform } from 'react-native';
+import { Animated, TextInput, Keyboard, Platform, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { storage } from '@/lib/storage';
@@ -1396,12 +1396,15 @@ const useDragHandlers = () => {
 
     // Convert dy (pixels) to percentage of screen height
     // Assuming average screen height ~800px, so 1% = 8px
-    const screenHeight =
-      typeof window !== 'undefined' ? window.innerHeight : 800;
+    const screenHeight = Platform.OS === 'web' 
+      ? (typeof window !== 'undefined' ? window.innerHeight : 800)
+      : Dimensions.get('window').height;
     const heightChange = (dy / screenHeight) * 100;
 
     // Calculate new height (dragging down increases dy, so we subtract)
     let newHeight = startHeight.current - heightChange;
+
+    console.log('[DRAG MOVE] screenHeight:', screenHeight, 'dy:', dy, 'heightChange:', heightChange, 'newHeight:', newHeight);
 
     // Clamp between MIN and MAX
     newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
@@ -1610,6 +1613,37 @@ const useDragHandlers = () => {
     }).start();
   };
 
+  const handleDragStart = (e: any) => {
+    const touch = e.nativeEvent?.touches?.[0];
+    if (touch) {
+      dragStartY.current = touch.pageY;
+      dragStartTime.current = Date.now();
+      isDragging.current = true;
+    }
+  };
+
+  const handleDragMoveWrapper = (e: any) => {
+    if (!isDragging.current) return;
+    const touch = e.nativeEvent?.touches?.[0];
+    if (touch) {
+      const dy = touch.pageY - dragStartY.current;
+      handleDragMove(dy);
+    }
+  };
+
+  const handleDragEndWrapper = (e: any) => {
+    if (!isDragging.current) return;
+    const touch = e.nativeEvent?.changedTouches?.[0];
+    if (touch) {
+      const dy = touch.pageY - dragStartY.current;
+      const duration = Date.now() - dragStartTime.current;
+      const velocity = dy / Math.max(duration, 16); // Prevent division by zero
+      isDragging.current = false;
+      handleDrag({ dy, vy: velocity });
+      handleDragEnd();
+    }
+  };
+
   const animatedStyle = {
     height: heightAnimation.interpolate({
       inputRange: [MIN_HEIGHT, DEFAULT_HEIGHT, MAX_HEIGHT],
@@ -1637,6 +1671,9 @@ const useDragHandlers = () => {
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
+    handleDragStart,
+    handleDragMoveWrapper,
+    handleDragEndWrapper,
     animatedStyle,
     dragStartY,
     dragStartTime,
@@ -1691,6 +1728,9 @@ export default function TransitPage() {
     handleExpandSheet,
     handleEnterSearchMode,
     handleExitSearchMode,
+    handleDragStart,
+    handleDragMoveWrapper,
+    handleDragEndWrapper,
     animatedStyle,
     dragStartY,
     dragStartTime,
@@ -1796,8 +1836,9 @@ export default function TransitPage() {
           },
           animatedStyle,
         ]}
-        onStartShouldSetResponder={() => false}
-        onMoveShouldSetResponder={() => false}
+        onTouchStart={handleDragStart}
+        onTouchMove={handleDragMoveWrapper}
+        onTouchEnd={handleDragEndWrapper}
       >
         <View className="mb-3 items-center">
           <Frame 

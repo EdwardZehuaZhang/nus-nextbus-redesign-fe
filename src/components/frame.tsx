@@ -35,10 +35,11 @@ function useMouseHandlers(state: DragState, callbacks: FrameProps) {
     (e: MouseEvent) => {
       if (!isDragging.current) return;
       const dy = e.clientY - startY.current;
+      const duration = Date.now() - startTime.current;
       // eslint-disable-next-line react-compiler/react-compiler
       isDragging.current = false;
       setCursor('grab');
-      onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+      onDrag?.({ dy, vy: dy / duration });
       onDragEnd?.();
 
       // Remove global listeners
@@ -83,9 +84,11 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
 
   const handleTouchStart = React.useCallback(
     (e: any) => {
-      const touch = e.touches?.[0] || e;
+      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent || e;
+      const touchY = touch.pageY || touch.clientY || touch.locationY || 0;
+      
       // eslint-disable-next-line react-compiler/react-compiler
-      startY.current = touch.clientY || touch.pageY;
+      startY.current = touchY;
       startTime.current = Date.now();
       isDragging.current = true;
       hasMoved.current = false;
@@ -96,9 +99,13 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
 
   const handleTouchMove = React.useCallback(
     (e: any) => {
-      if (!isDragging.current) return;
-      const touch = e.touches?.[0] || e;
-      const dy = (touch.clientY || touch.pageY) - startY.current;
+      if (!isDragging.current) {
+        return;
+      }
+      
+      const touch = e.nativeEvent?.touches?.[0] || e.touches?.[0] || e.nativeEvent || e;
+      const touchY = touch.pageY || touch.clientY || touch.locationY || 0;
+      const dy = touchY - startY.current;
       
       // Mark as moved if movement exceeds threshold
       if (Math.abs(dy) > touchMovementThreshold.current) {
@@ -114,9 +121,15 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
 
   const handleTouchEnd = React.useCallback(
     (e: any) => {
-      if (!isDragging.current) return;
-      const touch = e.changedTouches?.[0] || e;
-      const dy = (touch.clientY || touch.pageY) - startY.current;
+      if (!isDragging.current) {
+        return;
+      }
+      
+      const touch = e.nativeEvent?.changedTouches?.[0] || e.changedTouches?.[0] || e.nativeEvent || e;
+      const touchY = touch.pageY || touch.clientY || touch.locationY || 0;
+      const dy = touchY - startY.current;
+      const duration = Date.now() - startTime.current;
+      
       isDragging.current = false;
       setCursor('grab');
       
@@ -125,7 +138,8 @@ function useTouchHandlers(state: DragState, callbacks: FrameProps) {
         onTap?.();
       } else {
         // Treat as drag
-        onDrag?.({ dy, vy: dy / (Date.now() - startTime.current) });
+        const velocity = dy / duration;
+        onDrag?.({ dy, vy: velocity });
       }
       
       onDragEnd?.();

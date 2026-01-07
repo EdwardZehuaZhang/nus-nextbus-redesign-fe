@@ -1,3 +1,6 @@
+pnpm exec cross-env EXPO_NO_DOTENV=1 expo start --tunnel
+
+
 <h1 align="center">
   🚌 NUS NextBus Redesign
 </h1>
