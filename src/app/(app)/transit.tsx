@@ -428,7 +428,7 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
             textAlignVertical: 'center', // Android centering
             includeFontPadding: false as any, // Android typography padding
             lineHeight: 20, // match text-base (~16) with comfortable line height
-            transform: [{ translateY: -2 }], // slight upward nudge to visually center
+            transform: [{ translateY: 2 }], // slight downward nudge for proper alignment
             outlineWidth: 0,
             // @ts-ignore - Web-specific properties to remove Safari focus outline
             outlineStyle: 'none',
@@ -1700,6 +1700,8 @@ export default function TransitPage() {
         'bus-stops': true,
         'bus-route-d2': false,
         printers: false,
+        sports: false,
+        canteens: false,
       };
 
       // Load from storage (works on both web and native)

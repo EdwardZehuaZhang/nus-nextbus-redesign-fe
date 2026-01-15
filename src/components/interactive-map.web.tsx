@@ -3827,15 +3827,16 @@ const useBusStopMarkers = (
           url:
             'data:image/svg+xml;charset=UTF-8,' +
             encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="250" height="40">
-              <text x="125" y="25" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" 
-                    fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="${strokeWidth}" paint-order="stroke">
-                ${stop.ShortName}
-              </text>
-              <text x="125" y="25" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" 
-                    fill="${stopColor}" text-anchor="middle">
-                ${stop.ShortName}
-              </text>
+            <svg xmlns="http://www.w3.org/2000/svg" width="250" height="40" overflow="hidden">
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="0">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="0">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="0" dy="-1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="0" dy="1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="-1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="-1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="1">${stop.ShortName}</text>
+              <text x="125" y="20" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="600" fill="${stopColor}" text-anchor="middle" dominant-baseline="middle">${stop.ShortName}</text>
             </svg>
           `),
           anchor: new google.maps.Point(125, svgAnchorY),
@@ -3918,15 +3919,16 @@ const useBusStopMarkers = (
           url:
             'data:image/svg+xml;charset=UTF-8,' +
             encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="30">
-              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
-                    fill="${stopColor}" text-anchor="middle" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">
-                ${stop.ShortName}
-              </text>
-              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" 
-                    fill="${stopColor}" text-anchor="middle">
-                ${stop.ShortName}
-              </text>
+            <svg xmlns="http://www.w3.org/2000/svg" width="200" height="30" overflow="hidden">
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="0">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="0">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="0" dy="-1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="0" dy="1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="-1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="-1" dy="1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="-1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="middle" dx="1" dy="1">${stop.ShortName}</text>
+              <text x="100" y="20" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="${stopColor}" text-anchor="middle" dominant-baseline="middle">${stop.ShortName}</text>
             </svg>
           `),
           anchor: new google.maps.Point(100, svgAnchorY),
@@ -4534,20 +4536,20 @@ const useLandmarkMarkers = (
 
     // Function to calculate scale based on zoom level
     const getScaleForZoom = (zoom: number): number => {
-      // Base scale at zoom 16 (default)
+      // Base scale at zoom 16 (default) - reduced to 0.7 for important markers
       // Scale smaller when zoomed out, larger when zoomed in
       if (zoom <= 14) {
-        return 0.7; // Smaller at far zoom
+        return 0.49; // 0.7 * 0.7 for far zoom
       } else if (zoom <= 15) {
-        return 0.85; // Slightly smaller
+        return 0.595; // 0.7 * 0.85 for slightly smaller
       } else if (zoom === 16) {
-        return 1; // Default size
+        return 0.7; // 0.7 * 1.0 for default size
       } else if (zoom === 17) {
-        return 1.15; // Slightly larger
+        return 0.805; // 0.7 * 1.15 for slightly larger
       } else if (zoom === 18) {
-        return 1.3; // Larger
+        return 0.91; // 0.7 * 1.3 for larger
       } else {
-        return 1.5; // Maximum size at high zoom
+        return 1.05; // 0.7 * 1.5 for maximum size at high zoom
       }
     };
 

@@ -42,7 +42,7 @@ export const NUS_SPORTS_FACILITIES: SportsFacility[] = [
     id: 'pool-utown',
     name: 'NUS Swimming Pool (University Town)',
     type: 'swimming',
-    coordinates: { lat: 1.2995649803342673, lng: 103.77552925831773 },
+    coordinates: { lat: 1.3051276808898142, lng: 103.77237775074859 },
     address: 'University Town, NUS Campus',
     hours: 'Mon-Fri: 7am-9pm, Sat-Sun: 8am-8pm',
     googleMapsUrl: 'https://maps.app.goo.gl/knkXhVnfh1s9xBFL8',
@@ -55,15 +55,6 @@ export const NUS_SPORTS_FACILITIES: SportsFacility[] = [
     address: 'University Sports Centre, NUS Campus',
     hours: 'Mon-Fri: 7am-9pm, Sat-Sun: 8am-8pm',
     googleMapsUrl: 'https://maps.app.goo.gl/8ypSne6R8deuJMmS8',
-  },
-  {
-    id: 'pool-eusoff',
-    name: 'NUS Swimming Pool (Eusoff Hall)',
-    type: 'swimming',
-    coordinates: { lat: 1.3054693714472791, lng: 103.77268218249164 },
-    address: 'Eusoff Hall, NUS Campus',
-    hours: 'Mon-Fri: 7am-9pm, Sat-Sun: 8am-8pm',
-    googleMapsUrl: 'https://maps.app.goo.gl/mbH8545MNmXAY3VYA',
   },
   // Badminton courts (Cyan markers)
   {

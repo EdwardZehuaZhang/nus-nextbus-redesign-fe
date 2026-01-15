@@ -5,33 +5,42 @@ interface BubbleProps {
   active: boolean;
   label: string;
   onPress: () => void;
+  type?: 'sports' | 'printers' | 'canteens';
 }
 
-const BubbleButton: React.FC<BubbleProps> = ({ active, label, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    style={{
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: active ? '#274F9C' : '#FFFFFF',
-      borderWidth: 1,
-      borderColor: '#E5E5E5',
-      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-    }}
-  >
-    <Text
+const BubbleButton: React.FC<BubbleProps> = ({ active, label, onPress, type = 'sports' }) => {
+  // Use distinct colors for each type when active
+  const activeBackgroundColor = 
+    type === 'printers' ? '#FF8C00' : 
+    type === 'canteens' ? '#E91E63' : 
+    '#274F9C'; // sports default
+
+  return (
+    <Pressable
+      onPress={onPress}
       style={{
-        fontSize: 13,
-        fontWeight: '500',
-        color: active ? '#FFFFFF' : '#09090B',
-        fontFamily: 'Inter',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: active ? activeBackgroundColor : '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E5E5E5',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
       }}
     >
-      {label}
-    </Text>
-  </Pressable>
-);
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: '500',
+          color: active ? '#FFFFFF' : '#09090B',
+          fontFamily: 'Inter',
+        }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+};
 
 interface SportsAndPrintersBubblesProps {
   filters: Record<string, boolean>;
@@ -91,11 +100,19 @@ export const SportsAndPrintersBubbles: React.FC<
         active={filters['sports'] ?? false}
         label="Sports"
         onPress={() => handleToggle('sports')}
+        type="sports"
       />
       <BubbleButton
         active={filters['printers'] ?? false}
         label="Printers"
         onPress={() => handleToggle('printers')}
+        type="printers"
+      />
+      <BubbleButton
+        active={filters['canteens'] ?? false}
+        label="Canteens"
+        onPress={() => handleToggle('canteens')}
+        type="canteens"
       />
     </Animated.View>
   );

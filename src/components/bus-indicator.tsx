@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 const BusIcon = ({ color = '#274F9C' }: { color?: string }) => (
   <Svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -11,23 +11,34 @@ const BusIcon = ({ color = '#274F9C' }: { color?: string }) => (
   </Svg>
 );
 
-const BusIconWrapper = ({ color }: { color?: string }) => (
+const MRTIcon = ({ color = '#00A99D' }: { color?: string }) => (
+  <Svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <Circle cx="10" cy="10" r="8" fill={color} />
+    <Path
+      d="M7 10h6M10 7v6"
+      stroke="#FFFFFF"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const BusIconWrapper = ({ color, isMRT }: { color?: string; isMRT?: boolean }) => (
   <View
     style={{
-      flexDirection: 'row',
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
-      gap: 10,
-      padding: 6,
-      marginLeft: -5.5,
-      marginRight: -5.5,
+      justifyContent: 'center',
       backgroundColor: '#F5F5F5',
-      borderRadius: '97px',
       borderWidth: 1,
       borderColor: '#E5E5E5',
     }}
   >
     <View style={{ width: 20, height: 20, aspectRatio: 1 }}>
-      <BusIcon color={color} />
+      {isMRT ? <MRTIcon color={color} /> : <BusIcon color={color} />}
     </View>
   </View>
 );
@@ -35,27 +46,26 @@ const BusIconWrapper = ({ color }: { color?: string }) => (
 type BusIndicatorProps = {
   expanded?: boolean;
   color?: string;
+  isMRT?: boolean;
 };
 
-export const BusIndicator = ({ color = '#274F9C' }: BusIndicatorProps) => {
+export const BusIndicator = ({ color = '#274F9C', isMRT = false }: BusIndicatorProps) => {
   return (
     <View
       style={{
         flexDirection: 'column',
-        width: 21,
+        width: 32,
         alignItems: 'center',
         justifyContent: 'space-between',
         alignSelf: 'stretch',
         overflow: 'visible',
       }}
     >
-      <View style={{ marginTop: -2.5 }}>
-        <BusIconWrapper color={color} />
-      </View>
+      <BusIconWrapper color={color} isMRT={isMRT} />
 
       <View
         style={{
-          width: 13,
+          width: 2,
           flex: 1,
           backgroundColor: color,
           boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
@@ -63,9 +73,7 @@ export const BusIndicator = ({ color = '#274F9C' }: BusIndicatorProps) => {
         }}
       />
 
-      <View style={{ marginBottom: -2.5 }}>
-        <BusIconWrapper color={color} />
-      </View>
+      <BusIconWrapper color={color} isMRT={isMRT} />
     </View>
   );
 };

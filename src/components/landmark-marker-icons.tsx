@@ -168,16 +168,19 @@ const createPinMarkerWithIcon = (
 ): string => {
   const width = 40;
   const height = 52;
-  const iconSize = 22;
-  const iconOffset = 9;
-
-  const iconSVG = `<svg viewBox="0 0 256 256" width="${iconSize}" height="${iconSize}" xmlns="http://www.w3.org/2000/svg">${pathData}</svg>`;
+  // The pin's "head" is centered at (20, 20) in the 40x52 viewBox.
+  // Center the 256x256 icon glyph by scaling into an iconSize square and translating
+  // so the glyph sits exactly centered within the pin head.
+  const iconSize = 28;
+  const iconScale = iconSize / 256;
+  const iconTranslateX = 20 - iconSize / 2;
+  const iconTranslateY = 20 - iconSize / 2;
 
   const svgString = `
     <svg width="${width}" height="${height}" viewBox="0 0 40 52" xmlns="http://www.w3.org/2000/svg">
       <path d="M20 0C9 0 0 9 0 20C0 35 20 52 20 52C20 52 40 35 40 20C40 9 31 0 20 0Z" fill="${color}"/>
-      <g transform="translate(${iconOffset}, ${iconOffset})">
-        ${iconSVG}
+      <g transform="translate(${iconTranslateX}, ${iconTranslateY}) scale(${iconScale})" transform-origin="0 0">
+        ${pathData}
       </g>
     </svg>
   `.trim();

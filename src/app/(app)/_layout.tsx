@@ -1,4 +1,5 @@
 import { Redirect, SplashScreen, Stack } from 'expo-router';
+import { CardStyleInterpolators } from '@react-navigation/stack';
 import React, { useCallback, useEffect } from 'react';
 
 import { useAuth, useIsFirstTime } from '@/lib';
@@ -50,6 +51,8 @@ export default function TabLayout() {
         options={{
           title: 'Navigation',
           headerShown: false,
+          cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+          gestureDirection: 'rtl',
         }}
       />
       <Stack.Screen

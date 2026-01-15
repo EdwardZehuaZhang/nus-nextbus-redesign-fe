@@ -1,5 +1,5 @@
 import polyline from '@mapbox/polyline';
-import { Barbell, BookOpen, Bus, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
+import { Barbell, BookOpen, BowlFood, Bus, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, {
@@ -11,6 +11,10 @@ import MapView, {
   type Region,
 } from 'react-native-maps';
 import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
+import debounce from 'lodash.debounce';
+import { simplifyPolyline } from '@/lib/polyline-optimization';
+import { useMapClustering } from '@/lib/hooks/use-map-clustering';
+import { ClusterCircle } from '@/components/map/cluster-circle';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops } from '@/api/bus';
@@ -22,6 +26,7 @@ import { getPlaceDetails } from '@/api/google-maps/places';
 import { NUS_LANDMARKS } from '@/components/landmark-marker-icons';
 import { NUS_PRINTERS, type Printer as PrinterLocation } from '@/data/printer-locations';
 import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
+import { CANTEENS, type CanteenVenue, getCanteenColor } from '@/data/canteens';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 import {
   BLUE_AREA_BOUNDARY,
@@ -194,8 +199,13 @@ const PinMarker: React.FC<{
   const color = getLandmarkColor(type);
   const width = 40 * scale;
   const height = 52 * scale;
-  const iconSize = 22 * scale;
-  const iconOffset = 9 * scale;
+  // IMPORTANT: Keep icon sizing/positioning in viewBox units.
+  // The outer SVG already scales via its `width/height`, so multiplying by `scale`
+  // here would effectively apply scale twice and make icons look tiny/misaligned.
+  // Match the web marker glyph sizing (see `createPinMarkerWithIcon`).
+  const iconSize = 24;
+  const iconTranslateX = 20 - iconSize / 2;
+  const iconTranslateY = 20 - iconSize / 2;
 
   // Select the appropriate icon component
   const IconComponent = {
@@ -222,7 +232,7 @@ const PinMarker: React.FC<{
           fill={color}
         />
         {/* Icon inside the pin */}
-        <G transform={`translate(${iconOffset}, ${iconOffset})`}>
+        <G transform={`translate(${iconTranslateX}, ${iconTranslateY})`}>
           <IconComponent size={iconSize} color="white" weight="fill" />
         </G>
       </Svg>
@@ -233,25 +243,29 @@ const PinMarker: React.FC<{
 /**
  * Calculate scale for landmark markers based on zoom level
  * Matches web version behavior (zoom levels now aligned)
+ * Reduced base scale to 0.7 for important markers
  */
 const getLandmarkScale = (zoom: number): number => {
-  if (zoom <= 14) return 0.7;
-  else if (zoom <= 15) return 0.85;
-  else if (zoom === 16) return 1;
-  else if (zoom === 17) return 1.15;
-  else if (zoom === 18) return 1.3;
-  else return 1.5;
+  if (zoom <= 14) return 0.49;
+  else if (zoom <= 15) return 0.595;
+  else if (zoom === 16) return 0.7;
+  else if (zoom === 17) return 0.805;
+  else if (zoom === 18) return 0.91;
+  else return 1.05;
 };
 
 /**
- * Circular marker for sports facilities and printers (smaller than landmarks)
+ * Circular marker for sports facilities, printers, and canteens (smaller than landmarks)
  * 30x30px base size with colored circle and white icon
  */
 const CircularMarker: React.FC<{
-  type: 'gym' | 'swimming' | 'badminton' | 'printer';
+  type: 'gym' | 'swimming' | 'badminton' | 'printer' | 'canteen';
   scale: number;
 }> = ({ type, scale }) => {
-  const color = type === 'printer' ? '#FF8C00' : getSportsFacilityColor(type);
+  const color = 
+    type === 'printer' ? '#FF8C00' : 
+    type === 'canteen' ? getCanteenColor() : 
+    getSportsFacilityColor(type);
   const size = 30 * scale;
   
   // Darker border color (30% darker)
@@ -267,6 +281,7 @@ const CircularMarker: React.FC<{
     swimming: Waves,
     badminton: Racquet,
     printer: Printer,
+    canteen: BowlFood,
   }[type];
 
   const iconSize = 16 * scale;
@@ -364,8 +379,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     priceLevel?: number;
     openNow?: boolean;
   } | null>(null);
-  const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
+  const [selectedPrinter, setSelectedPrinter] = useState<PrinterLocation | null>(null);
   const [selectedSportsFacility, setSelectedSportsFacility] = useState<SportsFacility | null>(null);
+  const [selectedCanteen, setSelectedCanteen] = useState<CanteenVenue | null>(null);
 
   // Get user's current location from hook
   const { coords: userLocation } = useLocation();
@@ -396,6 +412,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   };
 
   const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
+
+  const mapBounds = React.useMemo(() => {
+    const lat = currentRegion.latitude;
+    const lng = currentRegion.longitude;
+    const latDelta = currentRegion.latitudeDelta;
+    const lngDelta = currentRegion.longitudeDelta;
+    return {
+      ne: { lat: lat + latDelta / 2, lng: lng + lngDelta / 2 },
+      sw: { lat: lat - latDelta / 2, lng: lng - lngDelta / 2 },
+    };
+  }, [currentRegion]);
 
   // Generate custom map style based on zoom level to hide/show POI and road labels
   const customMapStyle = React.useMemo(() => {
@@ -470,6 +497,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const handleRegionChange = (region: Region) => {
     setCurrentRegion(region);
   };
+
+  const handleRegionChangeDebounced = React.useMemo(
+    () => debounce((region: Region) => setCurrentRegion(region), 150),
+    []
+  );
 
   // Removed unused nearest-location helper to reduce component size and re-render cost
 
@@ -818,6 +850,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return busStopsData?.BusStopsResult?.busstops || [];
   }, [busStopsData]);
 
+  const clusteredInputMarkers = React.useMemo(() => {
+    if (!allBusStops || allBusStops.length === 0) return [] as { id: string; name: string; latitude: number; longitude: number }[];
+    return allBusStops
+      .filter((stop: any) => isStopVisibleForActiveRoutes(stop) && shouldShowStop(stop.name))
+      .map((stop: any) => ({
+        id: stop.name,
+        name: stop.name,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+      }));
+  }, [allBusStops, isStopVisibleForActiveRoutes, currentZoom, visibleBusStops]);
+
+  const { displayMarkers: clusteredMarkers } = useMapClustering(
+    clusteredInputMarkers,
+    currentZoom,
+    mapBounds
+  );
+
   // Extract individual filter values to ensure proper re-rendering
   const filterImportant = mapFilters?.important ?? false;
   const filterBusStops = mapFilters?.['bus-stops'] ?? false;
@@ -835,6 +885,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const shouldShowLandmarks = showLandmarks && filterImportant;
   const shouldShowPrinters = mapFilters?.printers ?? false;
   const shouldShowSports = mapFilters?.sports ?? false;
+  const shouldShowCanteens = mapFilters?.canteens ?? false;
   const shouldShowBusStops = showBusStops || filterBusStops;
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
@@ -842,6 +893,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   console.log('[Map] Display states:', {
     landmarks: shouldShowLandmarks,
     printers: shouldShowPrinters,
+    sports: shouldShowSports,
+    canteens: shouldShowCanteens,
     busStops: shouldShowBusStops,
     academic: shouldShowAcademic,
     residences: shouldShowResidences,
@@ -955,6 +1008,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setSelectedSportsFacility(facility);
   };
 
+  const handleCanteenPress = (canteen: CanteenVenue) => (e: MarkerPressEvent) => {
+    e.stopPropagation();
+    setSelectedCanteen(canteen);
+  };
+
   const handleBusStopPress = (stop: any) => (e: MarkerPressEvent) => {
     e.stopPropagation();
     const stopName = stop.ShortName || stop.caption || stop.name;
@@ -1040,7 +1098,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         showsCompass
         showsScale
         mapType={externalMapType ?? internalMapType}
-        onRegionChangeComplete={handleRegionChange}
+        onRegionChangeComplete={handleRegionChangeDebounced}
         onMapReady={() => setMapReady(true)}
         onPoiClick={handlePoiClick}
         customMapStyle={customMapStyle}
@@ -1062,11 +1120,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <Polygon
           coordinates={[
             // Large outer boundary covering the entire visible map area
-            { latitude: 1.35, longitude: 103.65 },
-            { latitude: 1.35, longitude: 103.9 },
-            { latitude: 1.23, longitude: 103.9 },
-            { latitude: 1.23, longitude: 103.65 },
-            { latitude: 1.35, longitude: 103.65 },
+            { latitude: 85.55, longitude: 31.65 },
+            { latitude: 85.55, longitude: 203.9 },
+            { latitude: -85.23, longitude: 203.9 },
+            { latitude: -85.23, longitude: 31.65 },
+            { latitude: 1.35, longitude: 31.65 },
           ]}
           holes={[
             // Campus boundary as a hole - this area stays clear
@@ -1335,6 +1393,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               tracksViewChanges={false}
               opacity={shouldShowLandmarks ? 1 : 0}
               onPress={handleLandmarkPress(landmark)}
+              zIndex={20}
             >
               <PinMarker type={landmark.type} scale={scale} />
             </Marker>
@@ -1355,6 +1414,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               tracksViewChanges={false}
               opacity={shouldShowPrinters ? 1 : 0}
               onPress={handlePrinterPress(printer)}
+              zIndex={20}
             >
               <CircularMarker type="printer" scale={scale} />
             </Marker>
@@ -1375,11 +1435,49 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               tracksViewChanges={false}
               opacity={shouldShowSports ? 1 : 0}
               onPress={handleSportsFacilityPress(facility)}
+              zIndex={20}
             >
               <CircularMarker type={facility.type} scale={scale} />
             </Marker>
           );
         })}
+        {/* Canteen Markers - Pre-rendered, visibility controlled by opacity */}
+        {CANTEENS.map((canteen, index) => {
+          const scale = getCircularMarkerScale(currentZoom);
+
+          return (
+            <Marker
+              key={`canteen-${index}`}
+              coordinate={{
+                latitude: canteen.coords.lat,
+                longitude: canteen.coords.lng,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={shouldShowCanteens ? 1 : 0}
+              onPress={handleCanteenPress(canteen)}
+              zIndex={20}
+            >
+              <CircularMarker type="canteen" scale={scale} />
+            </Marker>
+          );
+        })}
+        {/* Cluster markers at low zoom to reduce marker count */}
+        {shouldShowBusStops && currentZoom < 17 && clusteredMarkers
+          .filter((m) => m.isCluster)
+          .map((cluster) => (
+            <Marker
+              key={cluster.id}
+              coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              opacity={1}
+              zIndex={45}
+            >
+              <ClusterCircle count={cluster.clusterCount || 0} />
+            </Marker>
+          ))}
+
         {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ (filtered by route if active) */}
         {allBusStops.map((stop: any) => {
           const showCircle = shouldShowBusStops && currentZoom >= 17;
@@ -1417,6 +1515,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               tracksViewChanges={false}
               opacity={opacity}
               onPress={handleBusStopPress(stop)}
+              zIndex={50}
             >
               <View
                 style={{
@@ -1479,6 +1578,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               tracksViewChanges={false}
               opacity={isLabelVisible ? 1 : 0}
               onPress={handleBusStopPress(stop)}
+              zIndex={60}
             >
               <View
                 style={{
@@ -1612,12 +1712,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             strokeWidth,
           });
 
+          const effectiveCoordinates = currentZoom < 16 ? simplifyPolyline(coordinates, currentZoom) : coordinates;
           return (
             <Polyline
               key={`bus-route-${routeCode}`}
-              coordinates={coordinates}
+              coordinates={effectiveCoordinates}
               strokeColor={rgbaColor}
-              strokeColors={coordinates.map(() => rgbaColor)}
+              strokeColors={effectiveCoordinates.map(() => rgbaColor)}
               strokeWidth={strokeWidth}
               lineCap="round"
               lineJoin="round"
@@ -1817,6 +1918,95 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </View>
         </View>
       )}
+
+      {/* Canteen Details Popup */}
+      {selectedCanteen && (
+        <View style={styles.placePopupContainer}>
+          <View style={styles.placeCard}>
+            {/* Horizontal layout: Photo LEFT, Content RIGHT */}
+            <View style={styles.placeHorizontalRow}>
+              {/* Left: Photo */}
+              {selectedCanteen.imageSource ? (
+                <Image
+                  source={selectedCanteen.imageSource}
+                  style={styles.placePhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.placePhotoPlaceholder} />
+              )}
+
+              {/* Right: Content */}
+              <View style={styles.placeTextContent}>
+                {/* Title */}
+                <Text style={styles.placeTitle} numberOfLines={2}>
+                  {selectedCanteen.name}
+                </Text>
+
+                {/* Location label */}
+                <Text style={styles.placeTypeText}>{selectedCanteen.locationLabel}</Text>
+
+                {/* Dietary info */}
+                <View style={styles.placeMetaRow}>
+                  {selectedCanteen.dietary.halal && (
+                    <Text style={styles.placeDietaryBadge}>🥙 Halal option</Text>
+                  )}
+                  {selectedCanteen.dietary.vegetarian && (
+                    <Text style={styles.placeDietaryBadge}>🥗 Vegetarian option</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Additional details below photo */}
+            <View style={styles.canteenDetailsSection}>
+              {/* Hours summary */}
+              <View style={styles.printerSection}>
+                <Text style={styles.printerLabel}>HOURS (TERM)</Text>
+                <Text style={styles.printerValue}>
+                  {selectedCanteen.hours.term.map((h, i) => (
+                    h.closed 
+                      ? `${h.days}: Closed` 
+                      : `${h.days}: ${h.open} - ${h.close}`
+                  )).join('\n')}
+                </Text>
+              </View>
+
+              {/* Notes */}
+              {selectedCanteen.notes && selectedCanteen.notes.length > 0 && (
+                <View style={styles.printerSection}>
+                  <Text style={styles.printerLabel}>NOTES</Text>
+                  <Text style={styles.canteenNotesText}>
+                    {selectedCanteen.notes.join(' ')}
+                  </Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.printerMapButton,
+                  { backgroundColor: getCanteenColor() }
+                ]}
+                onPress={() => {
+                  if (selectedCanteen.mapsUrl) {
+                    Linking.openURL(selectedCanteen.mapsUrl);
+                  }
+                }}
+              >
+                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Close button */}
+            <TouchableOpacity
+              style={styles.placeCloseBtn}
+              onPress={() => setSelectedCanteen(null)}
+            >
+              <Text style={styles.placeCloseBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -2002,5 +2192,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+  },
+  placeDietaryBadge: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 8,
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  canteenDetailsSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  canteenNotesText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });

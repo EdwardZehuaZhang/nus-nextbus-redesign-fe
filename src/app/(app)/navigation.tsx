@@ -706,6 +706,7 @@ export default function NavigationPage() {
     handleDrag,
     handleDragMove,
     handleDragEnd,
+    handleTap,
     dragStartY,
     dragStartTime,
     isDragging,
@@ -2221,6 +2222,7 @@ export default function NavigationPage() {
                         fontSize: 16,
                         color: '#211F26',
                         padding: 0,
+                        paddingTop: 4,
                         outlineWidth: 0,
                       }}
                     />
@@ -2778,7 +2780,9 @@ export default function NavigationPage() {
                           >
                             {/* Boarding stop */}
                             <View style={{ alignSelf: 'stretch' }}>
-                              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                              <Text 
+                                numberOfLines={1}
+                                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                                 {boardingStop}
                               </Text>
 
@@ -2786,8 +2790,6 @@ export default function NavigationPage() {
                                 style={{
                                   flexDirection: 'row',
                                   alignItems: 'center',
-                                  height: 37,
-                                    borderRadius: 5,
                                   marginTop: 8,
                                 }}
                               >
@@ -2827,17 +2829,14 @@ export default function NavigationPage() {
                                     borderTopRightRadius: 5,
                                     borderBottomRightRadius: 5,
                                     backgroundColor: '#FFFFFF',
-                                    overflow: 'hidden',
                                     marginLeft: -1,
+                                    paddingHorizontal: 10,
                                   }}
                                 >
                                   <View
                                     style={{
                                       flexDirection: 'row',
                                       alignItems: 'center',
-                                      paddingVertical: 7,
-                                      paddingHorizontal: 10,
-                                      backgroundColor: '#FFFFFF',
                                       gap: 8,
                                     }}
                                   >
@@ -2910,9 +2909,11 @@ export default function NavigationPage() {
                                           borderWidth: 1,
                                           borderColor: '#A3A3A3',
                                           backgroundColor: 'transparent',
+                                          flexShrink: 0,
                                         }}
                                       />
                                       <Text
+                                        numberOfLines={1}
                                         style={{
                                           fontSize: 13,
                                           fontWeight: '400',
@@ -2930,7 +2931,9 @@ export default function NavigationPage() {
 
                             {/* Alighting stop */}
                             <View style={{ alignSelf: 'stretch' }}>
-                              <Text style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
+                              <Text 
+                                numberOfLines={1}
+                                style={{ fontSize: 16, fontWeight: '500', color: '#211F26' }}>
                                 {alightingStop}
                               </Text>
                             </View>
