@@ -52,7 +52,7 @@ export default function TabLayout() {
           title: 'Navigation',
           headerShown: false,
           cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-          gestureDirection: 'rtl',
+          gestureDirection: 'horizontal',
         }}
       />
       <Stack.Screen
