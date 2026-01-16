@@ -1,6 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
-import { Animated, TextInput, Keyboard, Platform, Dimensions } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { storage } from '@/lib/storage';
@@ -20,7 +21,7 @@ import {
 import { getPlaceDetails } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { Frame } from '@/components/frame';
-import { InteractiveMap } from '@/components/interactive-map';
+import { InteractiveMap, type MapSelection } from '@/components/interactive-map';
 import { MapTypeSelector } from '@/components/map-type-selector';
 import { SportsAndPrintersBubbles } from '@/components/sports-printers-bubbles';
 import {
@@ -60,6 +61,8 @@ import {
   addRecentSearch,
   getRecentSearches,
 } from '@/lib/storage/recent-searches';
+import { getCanteenColor } from '@/data/canteens';
+import { getSportsFacilityColor } from '@/data/sports-facilities';
 
 
 type BusRoute = {
@@ -1300,6 +1303,8 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 const BottomSheetContent = ({
   isCollapsed,
   isSearchMode,
+  mapSelection,
+  onCloseSelection,
   activeTab,
   onTabChange,
   onExpandSheet,
@@ -1310,6 +1315,8 @@ const BottomSheetContent = ({
 }: {
   isCollapsed: boolean;
   isSearchMode: boolean;
+  mapSelection: MapSelection | null;
+  onCloseSelection: () => void;
   activeTab: string;
   onTabChange: (tabId: string) => void;
   onExpandSheet: () => void;
@@ -1318,6 +1325,24 @@ const BottomSheetContent = ({
   selectedRoute: string | null;
   onRouteClick: (routeName: string) => void;
 }) => {
+  const detailScrollRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    if (mapSelection) {
+      detailScrollRef.current?.scrollTo?.({ y: 0, animated: false });
+    }
+  }, [mapSelection]);
+
+  if (mapSelection) {
+    return (
+      <MapSelectionDetails
+        selection={mapSelection}
+        onClose={onCloseSelection}
+        scrollRef={detailScrollRef}
+      />
+    );
+  }
+
   if (isSearchMode) {
     return <SearchContent onCancel={onCancelSearch} />;
   }
@@ -1685,12 +1710,320 @@ const useDragHandlers = () => {
   };
 };
 
+const MapSelectionDetails = ({
+  selection,
+  onClose,
+  scrollRef,
+}: {
+  selection: MapSelection;
+  onClose: () => void;
+  scrollRef: React.RefObject<any>;
+}) => {
+  const { coords: userLocation } = useLocation();
+
+  const openInMaps = (label: string, latitude: number, longitude: number) => {
+    const encodedLabel = encodeURIComponent(label);
+    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}(${encodedLabel})`;
+    Linking.openURL(url);
+  };
+
+  const startNavigation = (label: string, latitude: number, longitude: number) => {
+    router.push({
+      pathname: '/navigation' as any,
+      params: {
+        destination: label,
+        destinationLat: latitude.toString(),
+        destinationLng: longitude.toString(),
+        userLat: userLocation?.latitude?.toString(),
+        userLng: userLocation?.longitude?.toString(),
+      },
+    });
+  };
+
+  return (
+    <ScrollView
+      ref={scrollRef}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingTop: 8, paddingBottom: 24 }}
+    >
+      <View style={{ position: 'relative' }}>
+        <Pressable
+          onPress={onClose}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: '#F3F4F6',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2,
+          }}
+        >
+          <Text style={{ fontSize: 20, color: '#374151', lineHeight: 20 }}>×</Text>
+        </Pressable>
+
+        {selection.type === 'place' && (
+          <View>
+            {selection.place.photo && (
+              <Image
+                source={{ uri: selection.place.photo }}
+                resizeMode="cover"
+                style={{
+                  width: '100%',
+                  aspectRatio: 16 / 9,
+                  borderRadius: 10,
+                  marginBottom: 12,
+                }}
+              />
+            )}
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 6 }}>
+              {selection.place.name}
+            </Text>
+            {selection.place.address && (
+              <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 10 }}>
+                {selection.place.address}
+              </Text>
+            )}
+            {selection.place.rating && (
+              <Text style={{ fontSize: 14, color: '#111827', marginBottom: 6 }}>
+                {selection.place.rating.toFixed(1)} ★
+                {selection.place.userRatingsTotal
+                  ? ` (${selection.place.userRatingsTotal})`
+                  : ''}
+              </Text>
+            )}
+            {selection.place.openNow !== undefined && (
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: selection.place.openNow ? '#188038' : '#D93025',
+                  marginBottom: 12,
+                }}
+              >
+                {selection.place.openNow ? 'Open' : 'Closed'}
+              </Text>
+            )}
+            <Pressable
+              onPress={() =>
+                openInMaps(
+                  selection.place.name,
+                  selection.place.coordinates.latitude,
+                  selection.place.coordinates.longitude
+                )
+              }
+              style={{
+                backgroundColor: '#1A73E8',
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                Open in Google Maps
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {selection.type === 'printer' && (
+          <View>
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 6 }}>
+              {selection.printer.building} Printer
+            </Text>
+            <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>LOCATION</Text>
+            <Text style={{ fontSize: 14, color: '#111827', marginBottom: 12 }}>
+              {selection.printer.location}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>OPERATING HOURS</Text>
+            <Text style={{ fontSize: 14, color: '#111827', marginBottom: 16 }}>
+              {selection.printer.hours}
+            </Text>
+            <Pressable
+              onPress={() =>
+                startNavigation(
+                  `${selection.printer.building} Printer`,
+                  selection.printer.coordinates.lat,
+                  selection.printer.coordinates.lng
+                )
+              }
+              style={{
+                backgroundColor: '#FF8C00',
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                Start navigation
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {selection.type === 'sports' && (
+          <View>
+            {selection.facility.imageSource && (
+              <Image
+                source={selection.facility.imageSource}
+                resizeMode="cover"
+                style={{
+                  width: '100%',
+                  aspectRatio: 16 / 6,
+                  borderRadius: 10,
+                  marginBottom: 12,
+                }}
+              />
+            )}
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 6 }}>
+              {selection.facility.name}
+            </Text>
+            {selection.facility.address && (
+              <>
+                <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>LOCATION</Text>
+                <Text style={{ fontSize: 14, color: '#111827', marginBottom: 12 }}>
+                  {selection.facility.address}
+                </Text>
+              </>
+            )}
+            {selection.facility.hours && (
+              <>
+                <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
+                  OPERATING HOURS
+                </Text>
+                <Text style={{ fontSize: 14, color: '#111827', marginBottom: 16 }}>
+                  {selection.facility.hours}
+                </Text>
+              </>
+            )}
+            <Pressable
+              onPress={() =>
+                startNavigation(
+                  selection.facility.name,
+                  selection.facility.coordinates.lat,
+                  selection.facility.coordinates.lng
+                )
+              }
+              style={{
+                backgroundColor: getSportsFacilityColor(selection.facility.type),
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                Start navigation
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {selection.type === 'canteen' && (
+          <View>
+            {selection.canteen.imageSource && (
+              <Image
+                source={selection.canteen.imageSource}
+                resizeMode="cover"
+                style={{
+                  width: '100%',
+                  aspectRatio: 16 / 6,
+                  borderRadius: 10,
+                  marginBottom: 12,
+                }}
+              />
+            )}
+            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 6 }}>
+              {selection.canteen.name}
+            </Text>
+            <Text style={{ fontSize: 14, color: '#6B7280', marginBottom: 10 }}>
+              {selection.canteen.locationLabel}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+              {selection.canteen.dietary.halal && (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#374151',
+                    backgroundColor: '#F3F4F6',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    marginRight: 8,
+                    marginBottom: 6,
+                  }}
+                >
+                  🥙 Halal option
+                </Text>
+              )}
+              {selection.canteen.dietary.vegetarian && (
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#374151',
+                    backgroundColor: '#F3F4F6',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 6,
+                    marginBottom: 6,
+                  }}
+                >
+                  🥗 Vegetarian option
+                </Text>
+              )}
+            </View>
+            <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
+              HOURS (TERM)
+            </Text>
+            <Text style={{ fontSize: 14, color: '#111827', marginBottom: 12 }}>
+              {selection.canteen.hours.term
+                .map((h) => (h.closed ? `${h.days}: Closed` : `${h.days}: ${h.open} - ${h.close}`))
+                .join('\n')}
+            </Text>
+            {selection.canteen.notes && selection.canteen.notes.length > 0 && (
+              <>
+                <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>
+                  NOTES
+                </Text>
+                <Text style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic', marginBottom: 16 }}>
+                  {selection.canteen.notes.join(' ')}
+                </Text>
+              </>
+            )}
+            <Pressable
+              onPress={() =>
+                startNavigation(
+                  selection.canteen.name,
+                  selection.canteen.coords.lat,
+                  selection.canteen.coords.lng
+                )
+              }
+              style={{
+                backgroundColor: getCanteenColor(),
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+                Start navigation
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+};
+
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
+  const [mapSelection, setMapSelection] = React.useState<MapSelection | null>(null);
   const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(
     () => {
       const defaultFilters = {
@@ -1747,6 +2080,20 @@ export default function TransitPage() {
     setSelectedRoute((prev) => (prev === routeName ? null : routeName));
   };
 
+  React.useEffect(() => {
+    if (mapSelection) {
+      setMapSelection(null);
+    }
+  }, [activeTab]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setMapSelection(null);
+      };
+    }, [])
+  );
+
   // Store the map type change handler from InteractiveMap
   const mapTypeChangeHandlerRef = React.useRef<
     ((mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) | null
@@ -1791,6 +2138,8 @@ export default function TransitPage() {
           showMapControls={false} // Disable map controls in InteractiveMap, we'll render them at top level
           mapFilters={mapFilters} // Pass filters from parent
           onMapFiltersChange={handleFilterChange} // Handle filter changes
+          onMapItemSelect={(selection) => setMapSelection(selection)}
+          selectedMapItem={mapSelection}
           onMapTypeChangeReady={(handler) => {
             mapTypeChangeHandlerRef.current = handler;
           }}
@@ -1854,6 +2203,8 @@ export default function TransitPage() {
         <BottomSheetContent
           isCollapsed={isCollapsed}
           isSearchMode={isSearchMode}
+          mapSelection={mapSelection}
+          onCloseSelection={() => setMapSelection(null)}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onExpandSheet={handleExpandSheet}

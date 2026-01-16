@@ -20,6 +20,7 @@ import {
 } from '@/components/landmark-marker-icons';
 import { MapTypeSelector } from '@/components/map-type-selector';
 import { NUS_PRINTERS, type Printer } from '@/data/printer-locations';
+import type { CanteenVenue } from '@/data/canteens';
 import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
 import { createCircularMarkerSVG, svgToDataURL as circularSvgToDataURL } from '@/components/circular-marker-icon';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
@@ -80,6 +81,31 @@ declare global {
   }
 }
 
+export type MapPlaceSelection = {
+  name: string;
+  address?: string;
+  coordinates: { latitude: number; longitude: number };
+  type?:
+    | 'hospital'
+    | 'mrt'
+    | 'library'
+    | 'bus-terminal'
+    | 'bus-stop'
+    | 'location'
+    | 'google-place';
+  photo?: string;
+  rating?: number;
+  userRatingsTotal?: number;
+  priceLevel?: number;
+  openNow?: boolean;
+};
+
+export type MapSelection =
+  | { type: 'place'; place: MapPlaceSelection }
+  | { type: 'printer'; printer: Printer }
+  | { type: 'sports'; facility: SportsFacility }
+  | { type: 'canteen'; canteen: CanteenVenue };
+
 interface InteractiveMapProps {
   origin?: LatLng;
   destination?: LatLng;
@@ -118,6 +144,8 @@ interface InteractiveMapProps {
     handler: (mapType: google.maps.MapTypeId | 'dark' | 'light') => void
   ) => void; // Callback to receive map type change handler
   enablePlaceDetails?: boolean; // Control place details compact element visibility (default true)
+  onMapItemSelect?: (selection: MapSelection | null) => void;
+  selectedMapItem?: MapSelection | null;
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -4670,7 +4698,8 @@ const usePrinterMarkers = (
   mapRef: React.RefObject<google.maps.Map | null>,
   isMapCreated: boolean,
   activeRoute?: RouteCode | null,
-  onPrinterSelected?: (printer: Printer) => void
+  onPrinterSelected?: (printer: Printer) => void,
+  selectedPrinterId?: string | null
 ) => {
   const printerMarkersRef = useRef<google.maps.Marker[]>([]);
 
@@ -4722,7 +4751,9 @@ const usePrinterMarkers = (
         if (!printer) return;
 
         const scaledSize = baseSize * scale;
-        const color = '#FF8C00'; // Orange
+        const isDimmed =
+          selectedPrinterId !== null && selectedPrinterId !== printer.id;
+        const color = isDimmed ? '#D1D5DB' : '#FF8C00'; // Orange
 
         marker.setIcon({
           url: circularSvgToDataURL(createCircularMarkerSVG('printer', color)),
@@ -4737,7 +4768,9 @@ const usePrinterMarkers = (
       const initialZoom = map.getZoom() || 16;
       const initialScale = getScaleForZoom(initialZoom);
       const initialSize = 30 * initialScale;
-      const color = '#FF8C00'; // Orange
+      const isDimmed =
+        selectedPrinterId !== null && selectedPrinterId !== printer.id;
+      const color = isDimmed ? '#D1D5DB' : '#FF8C00'; // Orange
 
       const marker = new google.maps.Marker({
         position: printer.coordinates,
@@ -4771,7 +4804,7 @@ const usePrinterMarkers = (
       }
       printerMarkersRef.current.forEach((marker) => marker.setMap(null));
     };
-  }, [mapRef, isMapCreated, activeRoute, onPrinterSelected]);
+  }, [mapRef, isMapCreated, activeRoute, onPrinterSelected, selectedPrinterId]);
 
   return printerMarkersRef;
 };
@@ -4781,7 +4814,8 @@ const useSportsFacilityMarkers = (
   mapRef: React.RefObject<google.maps.Map | null>,
   isMapCreated: boolean,
   activeRoute?: RouteCode | null,
-  onFacilitySelected?: (facility: SportsFacility) => void
+  onFacilitySelected?: (facility: SportsFacility) => void,
+  selectedFacilityId?: string | null
 ) => {
   const facilityMarkersRef = useRef<google.maps.Marker[]>([]);
 
@@ -4833,7 +4867,11 @@ const useSportsFacilityMarkers = (
         if (!facility) return;
 
         const scaledSize = baseSize * scale;
-        const color = getSportsFacilityColor(facility.type);
+        const isDimmed =
+          selectedFacilityId !== null && selectedFacilityId !== facility.id;
+        const color = isDimmed
+          ? '#D1D5DB'
+          : getSportsFacilityColor(facility.type);
 
         marker.setIcon({
           url: circularSvgToDataURL(createCircularMarkerSVG(facility.type, color)),
@@ -4848,7 +4886,11 @@ const useSportsFacilityMarkers = (
       const initialZoom = map.getZoom() || 16;
       const initialScale = getScaleForZoom(initialZoom);
       const initialSize = 30 * initialScale;
-      const color = getSportsFacilityColor(facility.type);
+      const isDimmed =
+        selectedFacilityId !== null && selectedFacilityId !== facility.id;
+      const color = isDimmed
+        ? '#D1D5DB'
+        : getSportsFacilityColor(facility.type);
 
       const marker = new google.maps.Marker({
         position: facility.coordinates,
@@ -4882,7 +4924,7 @@ const useSportsFacilityMarkers = (
       }
       facilityMarkersRef.current.forEach((marker) => marker.setMap(null));
     };
-  }, [mapRef, isMapCreated, activeRoute, onFacilitySelected]);
+  }, [mapRef, isMapCreated, activeRoute, onFacilitySelected, selectedFacilityId]);
 
   return facilityMarkersRef;
 };
@@ -5478,6 +5520,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapFiltersChange,
   onMapTypeChangeReady,
   enablePlaceDetails = true, // Default to true for backward compatibility
+  selectedMapItem,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -5567,6 +5610,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const shouldShowLandmarks = mapFilters.important && showLandmarks;
   const shouldShowPrinters = mapFilters.printers;
   const shouldShowSports = mapFilters.sports;
+
+  const selectedPrinterId =
+    selectedMapItem?.type === 'printer'
+      ? selectedMapItem.printer.id
+      : selectedPrinter?.id ?? null;
+  const selectedSportsFacilityId =
+    selectedMapItem?.type === 'sports'
+      ? selectedMapItem.facility.id
+      : selectedSportsFacility?.id ?? null;
 
   // Determine which bus route is selected from filters (radio button selection)
   const selectedFilterRoute = React.useMemo(() => {
@@ -5894,13 +5946,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     mapRef,
     isMapCreated && shouldShowPrinters,
     effectiveActiveRoute,
-    setSelectedPrinter
+    setSelectedPrinter,
+    selectedPrinterId
   ); // Control printers with filter
   useSportsFacilityMarkers(
     mapRef,
     isMapCreated && shouldShowSports,
     effectiveActiveRoute,
-    setSelectedSportsFacility
+    setSelectedSportsFacility,
+    selectedSportsFacilityId
   ); // Control sports facilities with filter
   useBusStopMarkers(
     mapRef,

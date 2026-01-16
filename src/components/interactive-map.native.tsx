@@ -1,7 +1,7 @@
 import polyline from '@mapbox/polyline';
 import { Barbell, BookOpen, BowlFood, Bus, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -70,6 +70,31 @@ const hexToRgba = (hex: string, alpha = 1): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
+export type MapPlaceSelection = {
+  name: string;
+  address?: string;
+  coordinates: { latitude: number; longitude: number };
+  type?:
+    | 'hospital'
+    | 'mrt'
+    | 'library'
+    | 'bus-terminal'
+    | 'bus-stop'
+    | 'location'
+    | 'google-place';
+  photo?: string;
+  rating?: number;
+  userRatingsTotal?: number;
+  priceLevel?: number;
+  openNow?: boolean;
+};
+
+export type MapSelection =
+  | { type: 'place'; place: MapPlaceSelection }
+  | { type: 'printer'; printer: PrinterLocation }
+  | { type: 'sports'; facility: SportsFacility }
+  | { type: 'canteen'; canteen: CanteenVenue };
+
 interface InteractiveMapProps {
   origin?: LatLng;
   destination?: LatLng;
@@ -101,6 +126,9 @@ interface InteractiveMapProps {
   visibleBusStops?: string[];
   mapFilters?: Record<string, boolean>;
   onMapFiltersChange?: (filters: Record<string, boolean>) => void;
+  onMapItemSelect?: (selection: MapSelection | null) => void;
+  enablePlaceDetails?: boolean;
+  selectedMapItem?: MapSelection | null;
 }
 
 const DEFAULT_REGION: Region = {
@@ -261,11 +289,16 @@ const getLandmarkScale = (zoom: number): number => {
 const CircularMarker: React.FC<{
   type: 'gym' | 'swimming' | 'badminton' | 'printer' | 'canteen';
   scale: number;
-}> = ({ type, scale }) => {
-  const color = 
-    type === 'printer' ? '#FF8C00' : 
-    type === 'canteen' ? getCanteenColor() : 
-    getSportsFacilityColor(type);
+  isDimmed?: boolean;
+}> = ({ type, scale, isDimmed = false }) => {
+  const dimmedColor = '#D1D5DB';
+  const color = isDimmed
+    ? dimmedColor
+    : type === 'printer'
+      ? '#FF8C00'
+      : type === 'canteen'
+        ? getCanteenColor()
+        : getSportsFacilityColor(type);
   const size = 30 * scale;
   
   // Darker border color (30% darker)
@@ -351,6 +384,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapFiltersChange: _onMapFiltersChange,
   routeSteps,
   internalRoutePolylines,
+  onMapItemSelect,
+  enablePlaceDetails = true,
+  selectedMapItem,
 }) => {
   const mapRef = useRef<MapView>(null);
   const [internalMapType, setInternalMapType] = useState<
@@ -361,27 +397,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
   const hasFitToCoordinates = useRef(false); // Guard to prevent repeated fitToCoordinates calls
-  const [selectedPlace, setSelectedPlace] = useState<{
-    name: string;
-    address?: string;
-    coordinates: { latitude: number; longitude: number };
-    type?:
-      | 'hospital'
-      | 'mrt'
-      | 'library'
-      | 'bus-terminal'
-      | 'bus-stop'
-      | 'location'
-      | 'google-place';
-    photo?: string;
-    rating?: number;
-    userRatingsTotal?: number;
-    priceLevel?: number;
-    openNow?: boolean;
-  } | null>(null);
-  const [selectedPrinter, setSelectedPrinter] = useState<PrinterLocation | null>(null);
-  const [selectedSportsFacility, setSelectedSportsFacility] = useState<SportsFacility | null>(null);
-  const [selectedCanteen, setSelectedCanteen] = useState<CanteenVenue | null>(null);
+  const emitSelection = React.useCallback(
+    (selection: MapSelection | null) => {
+      onMapItemSelect?.(selection);
+    },
+    [onMapItemSelect]
+  );
 
   // Get user's current location from hook
   const { coords: userLocation } = useLocation();
@@ -890,6 +911,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
 
+  const selectedPrinterId =
+    selectedMapItem?.type === 'printer' ? selectedMapItem.printer.id : null;
+  const selectedSportsFacilityId =
+    selectedMapItem?.type === 'sports' ? selectedMapItem.facility.id : null;
+  const selectedCanteenId =
+    selectedMapItem?.type === 'canteen' ? selectedMapItem.canteen.id : null;
+
   console.log('[Map] Display states:', {
     landmarks: shouldShowLandmarks,
     printers: shouldShowPrinters,
@@ -943,6 +971,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const handleLandmarkPress =
     (landmark: (typeof NUS_LANDMARKS)[0]) => async (e: MarkerPressEvent) => {
       e.stopPropagation();
+      if (!enablePlaceDetails) return;
 
       // If we have a Google Place ID, fetch full details (matching web behavior)
       if (landmark.placeId) {
@@ -959,7 +988,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
             }
 
-            setSelectedPlace({
+            emitSelection({
+              type: 'place',
+              place: {
               name: place.name || landmark.name,
               address: place.formatted_address || landmark.address,
               coordinates: {
@@ -974,6 +1005,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               userRatingsTotal: place.user_ratings_total,
               priceLevel: place.price_level,
               openNow: place.opening_hours?.open_now,
+              },
             });
             return;
           }
@@ -987,40 +1019,55 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }
 
       // Fallback: just show basic landmark info
-      setSelectedPlace({
-        name: landmark.name,
-        address: landmark.address,
-        coordinates: {
-          latitude: landmark.coordinates.lat,
-          longitude: landmark.coordinates.lng,
+      const safePlaceType: MapPlaceSelection['type'] =
+        landmark.type === 'hospital' ||
+        landmark.type === 'mrt' ||
+        landmark.type === 'library' ||
+        landmark.type === 'bus-terminal'
+          ? landmark.type
+          : 'location';
+
+      emitSelection({
+        type: 'place',
+        place: {
+          name: landmark.name,
+          address: landmark.address,
+          coordinates: {
+            latitude: landmark.coordinates.lat,
+            longitude: landmark.coordinates.lng,
+          },
+          type: safePlaceType,
         },
-        type: landmark.type,
       });
     };
 
   const handlePrinterPress = (printer: PrinterLocation) => (e: MarkerPressEvent) => {
     e.stopPropagation();
-    setSelectedPrinter(printer);
+    emitSelection({ type: 'printer', printer });
   };
 
   const handleSportsFacilityPress = (facility: SportsFacility) => (e: MarkerPressEvent) => {
     e.stopPropagation();
-    setSelectedSportsFacility(facility);
+    emitSelection({ type: 'sports', facility });
   };
 
   const handleCanteenPress = (canteen: CanteenVenue) => (e: MarkerPressEvent) => {
     e.stopPropagation();
-    setSelectedCanteen(canteen);
+    emitSelection({ type: 'canteen', canteen });
   };
 
   const handleBusStopPress = (stop: any) => (e: MarkerPressEvent) => {
     e.stopPropagation();
+    if (!enablePlaceDetails) return;
     const stopName = stop.ShortName || stop.caption || stop.name;
-    setSelectedPlace({
-      name: stopName,
-      address: undefined,
-      coordinates: { latitude: stop.latitude, longitude: stop.longitude },
-      type: 'bus-stop',
+    emitSelection({
+      type: 'place',
+      place: {
+        name: stopName,
+        address: undefined,
+        coordinates: { latitude: stop.latitude, longitude: stop.longitude },
+        type: 'bus-stop',
+      },
     });
   };
 
@@ -1029,7 +1076,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const { placeId, name, coordinate } = event.nativeEvent;
     console.log('[Map] POI clicked:', { placeId, name, coordinate });
 
-    if (!placeId) return;
+    if (!placeId || !enablePlaceDetails) return;
 
     try {
       // Fetch place details from backend using the API helper
@@ -1047,37 +1094,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
         }
 
-        setSelectedPlace({
-          name: place.name || name,
-          address: place.formatted_address || place.vicinity,
-          coordinates: {
-            latitude: place.geometry?.location?.lat || coordinate.latitude,
-            longitude: place.geometry?.location?.lng || coordinate.longitude,
+        emitSelection({
+          type: 'place',
+          place: {
+            name: place.name || name,
+            address: place.formatted_address || place.vicinity,
+            coordinates: {
+              latitude: place.geometry?.location?.lat || coordinate.latitude,
+              longitude: place.geometry?.location?.lng || coordinate.longitude,
+            },
+            type: 'google-place',
+            photo: photoUrl,
+            rating: place.rating,
+            userRatingsTotal: place.user_ratings_total,
+            priceLevel: place.price_level,
+            openNow: place.opening_hours?.open_now,
           },
-          type: 'google-place',
-          photo: photoUrl,
-          rating: place.rating,
-          userRatingsTotal: place.user_ratings_total,
-          priceLevel: place.price_level,
-          openNow: place.opening_hours?.open_now,
         });
       } else {
         // Fallback if API fails
-        setSelectedPlace({
-          name: name,
-          address: undefined,
-          coordinates: coordinate,
-          type: 'google-place',
+        emitSelection({
+          type: 'place',
+          place: {
+            name: name,
+            address: undefined,
+            coordinates: coordinate,
+            type: 'google-place',
+          },
         });
       }
     } catch (error) {
       console.error('[Map] Error fetching place details:', error);
       // Fallback on error
-      setSelectedPlace({
-        name: name,
-        address: undefined,
-        coordinates: coordinate,
-        type: 'google-place',
+      emitSelection({
+        type: 'place',
+        place: {
+          name: name,
+          address: undefined,
+          coordinates: coordinate,
+          type: 'google-place',
+        },
       });
     }
   };
@@ -1402,6 +1458,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Printer Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_PRINTERS.map((printer, index) => {
           const scale = getCircularMarkerScale(currentZoom);
+          const isDimmed =
+            selectedPrinterId !== null && selectedPrinterId !== printer.id;
 
           return (
             <Marker
@@ -1416,13 +1474,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               onPress={handlePrinterPress(printer)}
               zIndex={20}
             >
-              <CircularMarker type="printer" scale={scale} />
+              <CircularMarker type="printer" scale={scale} isDimmed={isDimmed} />
             </Marker>
           );
         })}
         {/* Sports Facility Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_SPORTS_FACILITIES.map((facility, index) => {
           const scale = getCircularMarkerScale(currentZoom);
+          const isDimmed =
+            selectedSportsFacilityId !== null &&
+            selectedSportsFacilityId !== facility.id;
 
           return (
             <Marker
@@ -1437,13 +1498,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               onPress={handleSportsFacilityPress(facility)}
               zIndex={20}
             >
-              <CircularMarker type={facility.type} scale={scale} />
+              <CircularMarker type={facility.type} scale={scale} isDimmed={isDimmed} />
             </Marker>
           );
         })}
         {/* Canteen Markers - Pre-rendered, visibility controlled by opacity */}
         {CANTEENS.map((canteen, index) => {
           const scale = getCircularMarkerScale(currentZoom);
+          const isDimmed =
+            selectedCanteenId !== null && selectedCanteenId !== canteen.id;
 
           return (
             <Marker
@@ -1458,7 +1521,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               onPress={handleCanteenPress(canteen)}
               zIndex={20}
             >
-              <CircularMarker type="canteen" scale={scale} />
+              <CircularMarker type="canteen" scale={scale} isDimmed={isDimmed} />
             </Marker>
           );
         })}
@@ -1730,283 +1793,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         })}
       </MapView>
 
-      {/* Place Details Popup - positioned absolutely on screen like web version */}
-      {selectedPlace && (
-        <View style={styles.placePopupContainer}>
-          <View style={styles.placeCard}>
-            {/* Horizontal layout: Photo LEFT, Content RIGHT (matching web) */}
-            <View style={styles.placeHorizontalRow}>
-              {/* Left: Photo */}
-              {selectedPlace.photo ? (
-                <Image
-                  source={{ uri: selectedPlace.photo }}
-                  style={styles.placePhoto}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.placePhotoPlaceholder} />
-              )}
-
-              {/* Right: Content */}
-              <View style={styles.placeTextContent}>
-                {/* Title */}
-                <Text style={styles.placeTitle} numberOfLines={2}>
-                  {selectedPlace.name}
-                </Text>
-
-                {/* Rating row */}
-                {selectedPlace.rating && (
-                  <View style={styles.placeMetaRow}>
-                    <Text style={styles.placeRatingText}>
-                      {selectedPlace.rating.toFixed(1)}
-                    </Text>
-                    <Text style={styles.placeRatingStar}> ★ </Text>
-                    {selectedPlace.userRatingsTotal && (
-                      <Text style={styles.placeRatingCount}>
-                        ({selectedPlace.userRatingsTotal})
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {/* Type (e.g., Restaurant) + Price */}
-                {selectedPlace.type === 'google-place' && (
-                  <View style={styles.placeMetaRow}>
-                    <Text style={styles.placeTypeText}>Restaurant</Text>
-                    {selectedPlace.priceLevel && (
-                      <Text style={styles.placeTypePriceText}>
-                        {' · '}
-                        {selectedPlace.priceLevel === 1
-                          ? '$10-20'
-                          : selectedPlace.priceLevel === 2
-                            ? '$20-30'
-                            : selectedPlace.priceLevel === 3
-                              ? '$30-50'
-                              : '$50+'}
-                      </Text>
-                    )}
-                  </View>
-                )}
-
-                {/* Open status with hours */}
-                {selectedPlace.openNow !== undefined && (
-                  <Text
-                    style={[
-                      styles.placeOpenText,
-                      { color: selectedPlace.openNow ? '#188038' : '#d93025' },
-                    ]}
-                  >
-                    {selectedPlace.openNow ? 'Open' : 'Closed'}
-                    <Text style={styles.placeHoursText}> · Closes 9:30 PM</Text>
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Buttons overlaid on the card - positioned absolutely like web */}
-            <TouchableOpacity
-              style={styles.placeCloseBtn}
-              onPress={() => setSelectedPlace(null)}
-            >
-              <Text style={styles.placeCloseBtnText}>×</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.placeDirectionsBtn}>
-              <Svg width={16} height={16} viewBox="0 0 20 20">
-                <Path
-                  d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
-                  fill="#FFFFFF"
-                />
-              </Svg>
-              <Text style={styles.placeDirectionsBtnText}>Directions</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Printer Details Popup */}
-      {selectedPrinter && (
-        <View style={styles.placePopupContainer}>
-          <View style={styles.placeCard}>
-            {/* Header */}
-            <View style={styles.printerHeader}>
-              <Text style={styles.placeTitle}>{selectedPrinter.building} Printer</Text>
-            </View>
-
-            {/* Content */}
-            <View style={styles.printerContent}>
-              <View style={styles.printerSection}>
-                <Text style={styles.printerLabel}>LOCATION</Text>
-                <Text style={styles.printerValue}>{selectedPrinter.location}</Text>
-              </View>
-
-              <View style={styles.printerSection}>
-                <Text style={styles.printerLabel}>OPERATING HOURS</Text>
-                <Text style={styles.printerValue}>{selectedPrinter.hours}</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.printerMapButton}
-                onPress={() => {
-                  if (selectedPrinter.googleMapsUrl) {
-                    Linking.openURL(selectedPrinter.googleMapsUrl);
-                  }
-                }}
-              >
-                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Close button */}
-            <TouchableOpacity
-              style={styles.placeCloseBtn}
-              onPress={() => setSelectedPrinter(null)}
-            >
-              <Text style={styles.placeCloseBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Sports Facility Details Popup */}
-      {selectedSportsFacility && (
-        <View style={styles.placePopupContainer}>
-          <View style={styles.placeCard}>
-            {/* Header */}
-            <View style={styles.printerHeader}>
-              <Text style={styles.placeTitle}>{selectedSportsFacility.name}</Text>
-            </View>
-
-            {/* Content */}
-            <View style={styles.printerContent}>
-              {selectedSportsFacility.address && (
-                <View style={styles.printerSection}>
-                  <Text style={styles.printerLabel}>LOCATION</Text>
-                  <Text style={styles.printerValue}>{selectedSportsFacility.address}</Text>
-                </View>
-              )}
-
-              {selectedSportsFacility.hours && (
-                <View style={styles.printerSection}>
-                  <Text style={styles.printerLabel}>OPERATING HOURS</Text>
-                  <Text style={styles.printerValue}>{selectedSportsFacility.hours}</Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.printerMapButton,
-                  { backgroundColor: getSportsFacilityColor(selectedSportsFacility.type) }
-                ]}
-                onPress={() => {
-                  if (selectedSportsFacility.googleMapsUrl) {
-                    Linking.openURL(selectedSportsFacility.googleMapsUrl);
-                  }
-                }}
-              >
-                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Close button */}
-            <TouchableOpacity
-              style={styles.placeCloseBtn}
-              onPress={() => setSelectedSportsFacility(null)}
-            >
-              <Text style={styles.placeCloseBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Canteen Details Popup */}
-      {selectedCanteen && (
-        <View style={styles.placePopupContainer}>
-          <View style={styles.placeCard}>
-            {/* Horizontal layout: Photo LEFT, Content RIGHT */}
-            <View style={styles.placeHorizontalRow}>
-              {/* Left: Photo */}
-              {selectedCanteen.imageSource ? (
-                <Image
-                  source={selectedCanteen.imageSource}
-                  style={styles.placePhoto}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.placePhotoPlaceholder} />
-              )}
-
-              {/* Right: Content */}
-              <View style={styles.placeTextContent}>
-                {/* Title */}
-                <Text style={styles.placeTitle} numberOfLines={2}>
-                  {selectedCanteen.name}
-                </Text>
-
-                {/* Location label */}
-                <Text style={styles.placeTypeText}>{selectedCanteen.locationLabel}</Text>
-
-                {/* Dietary info */}
-                <View style={styles.placeMetaRow}>
-                  {selectedCanteen.dietary.halal && (
-                    <Text style={styles.placeDietaryBadge}>🥙 Halal option</Text>
-                  )}
-                  {selectedCanteen.dietary.vegetarian && (
-                    <Text style={styles.placeDietaryBadge}>🥗 Vegetarian option</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* Additional details below photo */}
-            <View style={styles.canteenDetailsSection}>
-              {/* Hours summary */}
-              <View style={styles.printerSection}>
-                <Text style={styles.printerLabel}>HOURS (TERM)</Text>
-                <Text style={styles.printerValue}>
-                  {selectedCanteen.hours.term.map((h, i) => (
-                    h.closed 
-                      ? `${h.days}: Closed` 
-                      : `${h.days}: ${h.open} - ${h.close}`
-                  )).join('\n')}
-                </Text>
-              </View>
-
-              {/* Notes */}
-              {selectedCanteen.notes && selectedCanteen.notes.length > 0 && (
-                <View style={styles.printerSection}>
-                  <Text style={styles.printerLabel}>NOTES</Text>
-                  <Text style={styles.canteenNotesText}>
-                    {selectedCanteen.notes.join(' ')}
-                  </Text>
-                </View>
-              )}
-
-              <TouchableOpacity
-                style={[
-                  styles.printerMapButton,
-                  { backgroundColor: getCanteenColor() }
-                ]}
-                onPress={() => {
-                  if (selectedCanteen.mapsUrl) {
-                    Linking.openURL(selectedCanteen.mapsUrl);
-                  }
-                }}
-              >
-                <Text style={styles.printerMapButtonText}>Open in Google Maps</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Close button */}
-            <TouchableOpacity
-              style={styles.placeCloseBtn}
-              onPress={() => setSelectedCanteen(null)}
-            >
-              <Text style={styles.placeCloseBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 };
@@ -2018,198 +1804,5 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
-  },
-  placePopupContainer: {
-    position: 'absolute',
-    top: 84,
-    left: '5%',
-    right: '5%',
-    alignItems: 'center',
-    zIndex: 999999,
-    pointerEvents: 'box-none',
-  },
-  placeCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-    position: 'relative',
-  },
-  // Horizontal layout: photo on left, text on right
-  placeHorizontalRow: {
-    flexDirection: 'row',
-    padding: 12,
-  },
-  placePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  placePhotoPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#e8eaed',
-  },
-  placeTextContent: {
-    flex: 1,
-    paddingLeft: 12,
-    justifyContent: 'flex-start',
-  },
-  placeTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1f1f1f',
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  placeMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  placeRatingText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#1f1f1f',
-  },
-  placeRatingStar: {
-    fontSize: 14,
-    color: '#fbbc04',
-  },
-  placeRatingCount: {
-    fontSize: 14,
-    color: '#70757a',
-  },
-  placePriceText: {
-    fontSize: 14,
-    color: '#70757a',
-  },
-  placeTypeText: {
-    fontSize: 14,
-    color: '#70757a',
-  },
-  placeTypePriceText: {
-    fontSize: 14,
-    color: '#70757a',
-  },
-  placeOpenText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  placeHoursText: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#70757a',
-  },
-  // Buttons overlaid on card - positioned absolutely like web version
-  placeCloseBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-    zIndex: 10,
-  },
-  placeCloseBtnText: {
-    fontSize: 22,
-    color: '#5f6368',
-    fontWeight: '300',
-    lineHeight: 22,
-  },
-  placeDirectionsBtn: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    height: 36,
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    backgroundColor: '#1a73e8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 6,
-    zIndex: 10,
-  },
-  placeDirectionsBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#ffffff',
-  },
-  printerHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  printerContent: {
-    padding: 16,
-  },
-  printerSection: {
-    marginBottom: 16,
-  },
-  printerLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  printerValue: {
-    fontSize: 15,
-    color: '#000',
-    lineHeight: 22,
-  },
-  printerMapButton: {
-    backgroundColor: '#FF8C00',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  printerMapButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  placeDietaryBadge: {
-    fontSize: 12,
-    color: '#666',
-    marginRight: 8,
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  canteenDetailsSection: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  canteenNotesText: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-    fontStyle: 'italic',
   },
 });

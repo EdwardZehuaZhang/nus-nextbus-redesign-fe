@@ -6,27 +6,30 @@ export interface SportsFacility {
   address?: string;
   hours?: string;
   googleMapsUrl: string;
+  imageSource?: any;
 }
 
 export const NUS_SPORTS_FACILITIES: SportsFacility[] = [
   // Gyms (Purple markers)
   {
     id: 'gym-utown',
-    name: 'NUS Gym (University Town)',
+    name: 'UCS Gym',
     type: 'gym',
     coordinates: { lat: 1.299648492407296, lng: 103.77551730005814 },
-    address: 'University Town, NUS Campus',
+    address: 'University Sports Centre, NUS Campus',
     hours: 'Mon-Fri: 7am-11pm, Sat-Sun: 8am-10pm',
     googleMapsUrl: 'https://maps.app.goo.gl/QUYgAm1EoXH1hkkG8',
+    imageSource: require('../../assets/images/sports/USC_Gym_Sports.png'),
   },
   {
     id: 'gym-eusoff',
-    name: 'NUS Gym (Eusoff Hall)',
+    name: 'UTown Gym',
     type: 'gym',
     coordinates: { lat: 1.3058824627261878, lng: 103.7727738270419 },
-    address: 'Eusoff Hall, NUS Campus',
+    address: 'University Town, NUS Campus',
     hours: 'Mon-Fri: 7am-11pm, Sat-Sun: 8am-10pm',
     googleMapsUrl: 'https://maps.app.goo.gl/om5tYqp1DeMaHbQi8',
+    imageSource: require('../../assets/images/sports/Utown_Gym_Sports.jpg'),
   },
   {
     id: 'gym-ync',
@@ -40,16 +43,17 @@ export const NUS_SPORTS_FACILITIES: SportsFacility[] = [
   // Swimming pools (Light blue markers)
   {
     id: 'pool-utown',
-    name: 'NUS Swimming Pool (University Town)',
+    name: 'UTown Infinity Pool',
     type: 'swimming',
     coordinates: { lat: 1.3051276808898142, lng: 103.77237775074859 },
     address: 'University Town, NUS Campus',
     hours: 'Mon-Fri: 7am-9pm, Sat-Sun: 8am-8pm',
     googleMapsUrl: 'https://maps.app.goo.gl/knkXhVnfh1s9xBFL8',
+    imageSource: require('../../assets/images/sports/UTown_Swimming_Pool.jpg'),
   },
   {
     id: 'pool-utown-2',
-    name: 'NUS Swimming Pool (University Sports Centre)',
+    name: 'USC Swimming Pool',
     type: 'swimming',
     coordinates: { lat: 1.2998213715872569, lng: 103.77596553040573 },
     address: 'University Sports Centre, NUS Campus',
@@ -59,21 +63,13 @@ export const NUS_SPORTS_FACILITIES: SportsFacility[] = [
   // Badminton courts (Cyan markers)
   {
     id: 'badminton-utown',
-    name: 'NUS Badminton Court (University Town)',
+    name: 'MPSH5 Badminton Court',
     type: 'badminton',
     coordinates: { lat: 1.300400807583099, lng: 103.77630734223835 },
-    address: 'University Sports Centre, NUS Campus',
+    address: 'MPSH5, University Sports Centre, NUS Campus',
     hours: 'Mon-Fri: 7am-11pm, Sat-Sun: 8am-10pm',
     googleMapsUrl: 'https://maps.app.goo.gl/1d9nT6WV1Ko262z87',
-  },
-  {
-    id: 'badminton-eusoff',
-    name: 'NUS Badminton Court (Eusoff Hall)',
-    type: 'badminton',
-    coordinates: { lat: 1.304951001316462, lng: 103.77218324944066 },
-    address: 'Eusoff Hall, NUS Campus',
-    hours: 'Mon-Fri: 7am-11pm, Sat-Sun: 8am-10pm',
-    googleMapsUrl: 'https://maps.app.goo.gl/p6wFcHVNifXK6UXj8',
+    imageSource: require('../../assets/images/sports/MPSH5_Badminton_Courts_Sports.jpg'),
   },
 ];
 
