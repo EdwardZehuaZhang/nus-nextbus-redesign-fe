@@ -5549,6 +5549,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapFiltersChange,
   onMapTypeChangeReady,
   enablePlaceDetails = true, // Default to true for backward compatibility
+  onMapItemSelect,
   selectedMapItem,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);

@@ -27,11 +27,9 @@ import { SportsAndPrintersBubbles } from '@/components/sports-printers-bubbles';
 import {
   FocusAwareStatusBar,
   Image,
-  Modal,
   Pressable,
   ScrollView,
   Text,
-  useModal,
   View,
 } from '@/components/ui';
 import {
@@ -2176,7 +2174,7 @@ const MapSelectionDetails = ({
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
-  const infoModal = useModal();
+  const [isInfoOpen, setIsInfoOpen] = React.useState(false);
   const privacyUrl = 'https://nus-nextbus-redesign-fe.vercel.app/privacy';
   const termsUrl = 'https://nus-nextbus-redesign-fe.vercel.app/terms';
   const supportMailto =
@@ -2386,43 +2384,125 @@ export default function TransitPage() {
         />
       </Animated.View>
 
-      <Modal ref={infoModal.ref} title="Info" snapPoints={['35%']}>
-        <View className="px-4 pb-6">
+      {isInfoOpen && (
+        <View
+          style={{
+            position: 'absolute' as any,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            zIndex: 50,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <Pressable
-            onPress={() => {
-              infoModal.dismiss();
-              openExternal(privacyUrl);
+            onPress={() => setIsInfoOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.35)',
             }}
-            className="mb-3 rounded-xl bg-white px-4 py-4"
-          >
-            <Text className="text-[16px] font-semibold text-[#1F2937]">
-              Privacy Policy
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              infoModal.dismiss();
-              openExternal(termsUrl);
+          />
+          <View
+            style={{
+              width: 320,
+              borderRadius: 16,
+              backgroundColor: '#FFFFFF',
+              padding: 20,
+              shadowColor: '#000',
+              shadowOpacity: 0.2,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 8,
             }}
-            className="mb-3 rounded-xl bg-white px-4 py-4"
           >
-            <Text className="text-[16px] font-semibold text-[#1F2937]">
-              Terms of Service
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>
+                Info
+              </Text>
+              <Pressable
+                onPress={() => setIsInfoOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                style={{ padding: 6 }}
+              >
+                <Text style={{ fontSize: 16, color: '#6B7280' }}>✕</Text>
+              </Pressable>
+            </View>
+            <Text style={{ marginTop: 6, fontSize: 13, color: '#6B7280' }}>
+              Quick links
             </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              infoModal.dismiss();
-              openExternal(supportMailto);
-            }}
-            className="rounded-xl bg-white px-4 py-4"
-          >
-            <Text className="text-[16px] font-semibold text-[#1F2937]">
-              Support
-            </Text>
-          </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setIsInfoOpen(false);
+                openExternal(privacyUrl);
+              }}
+              style={{
+                marginTop: 16,
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                backgroundColor: '#F3F4F6',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>
+                Privacy Policy
+              </Text>
+              <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>
+                https://nus-nextbus-redesign-fe.vercel.app/privacy
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setIsInfoOpen(false);
+                openExternal(termsUrl);
+              }}
+              style={{
+                marginTop: 10,
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                backgroundColor: '#F3F4F6',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>
+                Terms of Service
+              </Text>
+              <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>
+                https://nus-nextbus-redesign-fe.vercel.app/terms
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setIsInfoOpen(false);
+                openExternal(supportMailto);
+              }}
+              style={{
+                marginTop: 10,
+                borderRadius: 12,
+                paddingVertical: 12,
+                paddingHorizontal: 14,
+                backgroundColor: '#111827',
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '600', color: '#FFFFFF' }}>
+                Contact Support
+              </Text>
+              <Text style={{ marginTop: 2, fontSize: 12, color: '#D1D5DB' }}>
+                edward.zehua.zhang@gmail.com
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </Modal>
+      )}
 
       {/* Map controls - hide when bottom panel/search is up */}
       {pathname === '/transit' && !isSearchMode && (
@@ -2454,7 +2534,7 @@ export default function TransitPage() {
           }}
         >
           <Pressable
-            onPress={infoModal.present}
+            onPress={() => setIsInfoOpen(true)}
             accessibilityRole="button"
             accessibilityLabel="Info"
             style={{
