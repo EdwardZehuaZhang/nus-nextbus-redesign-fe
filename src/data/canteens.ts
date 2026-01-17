@@ -68,7 +68,7 @@ export const CANTEENS: CanteenVenue[] = [
   },
   {
     id: 'pgp',
-    name: 'PGP',
+    name: 'PGP Canteen',
     coords: { lat: 1.2908865499056028, lng: 103.78085687162289 },
     mapsUrl: 'https://maps.app.goo.gl/PqmNey2m16hHDpPXA',
     locationLabel: 'Prince George\'s Park',
@@ -179,7 +179,7 @@ export const CANTEENS: CanteenVenue[] = [
       term: [{ days: 'Mon–Sun', open: '08:00', close: '20:30' }],
       vacation: [{ days: 'Mon–Sun', open: '08:00', close: '20:30' }],
     },
-    notes: ['Vegetarian options not specified; flag set to false (change to true if confirmed).'],
+    notes: ['Vegetarian options not specified.'],
     imageSource: require('../../assets/images/canteens/Fine-Food-Canteen.jpg'),
   },
   {
@@ -195,7 +195,7 @@ export const CANTEENS: CanteenVenue[] = [
       term: [{ days: 'Mon–Sun', open: '07:30', close: '20:30' }],
       vacation: [{ days: 'Mon–Sun', open: '07:30', close: '20:30' }],
     },
-    notes: ['Vegetarian options not specified; flag set to false (change to true if confirmed).'],
+    notes: ['Vegetarian options not specified.'],
     imageSource: require('../../assets/images/canteens/Flavours-Canteen.jpg'),
   },
 ];

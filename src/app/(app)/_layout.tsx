@@ -40,13 +40,6 @@ export default function TabLayout() {
         }}
       />
       <Stack.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
         name="navigation"
         options={{
           title: 'Navigation',

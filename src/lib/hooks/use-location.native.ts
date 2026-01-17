@@ -3,6 +3,18 @@ import * as Location from 'expo-location';
 
 import { useLocationStore } from '@/lib/store/location-store';
 
+const debugLog = (...args: any[]) => {
+  if (__DEV__) {
+    console.log(...args);
+  }
+};
+
+const debugWarn = (...args: any[]) => {
+  if (__DEV__) {
+    console.warn(...args);
+  }
+};
+
 export type LocationCoords = {
   latitude: number;
   longitude: number;
@@ -58,7 +70,7 @@ const initializeLocationWatcher = async () => {
 
   const store = useLocationStore.getState();
 
-  console.log('[useLocation] Requesting location permissions...');
+  debugLog('[useLocation] Requesting location permissions...');
   
   // Request location permissions
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -70,7 +82,7 @@ const initializeLocationWatcher = async () => {
     return;
   }
 
-  console.log('[useLocation] Location permission granted, starting watcher...');
+  debugLog('[useLocation] Location permission granted, starting watcher...');
   
   // Only set loading if we don't have a location yet
   if (!store.coords) {
@@ -79,7 +91,7 @@ const initializeLocationWatcher = async () => {
 
   try {
     // First, try to get the current location immediately
-    console.log('[useLocation] Getting current location...');
+    debugLog('[useLocation] Getting current location...');
     try {
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
@@ -91,8 +103,8 @@ const initializeLocationWatcher = async () => {
       
       // Check if it's the simulator mock location and replace with test location
       if (isSimulatorMockLocation(latitude, longitude)) {
-        console.log('[useLocation] ⚠️ Detected simulator mock location (San Francisco)');
-        console.log('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
+        debugLog('[useLocation] ⚠️ Detected simulator mock location (San Francisco)');
+        debugLog('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
         latitude = TEST_LOCATION.latitude;
         longitude = TEST_LOCATION.longitude;
       }
@@ -100,10 +112,10 @@ const initializeLocationWatcher = async () => {
       // Simulate heading if not available (simulators typically don't have heading)
       if (!heading || heading < 0) {
         heading = simulatedHeading;
-        console.log('[useLocation] 🧪 Using simulated heading:', heading);
+        debugLog('[useLocation] 🧪 Using simulated heading:', heading);
       }
       
-      console.log('[useLocation] Current location obtained:', { latitude, longitude, heading });
+      debugLog('[useLocation] Current location obtained:', { latitude, longitude, heading });
       store.setLocation({
         latitude,
         longitude,
@@ -112,7 +124,7 @@ const initializeLocationWatcher = async () => {
         accuracy: currentLocation.coords.accuracy ?? undefined,
       });
     } catch (err) {
-      console.warn('[useLocation] Failed to get current location immediately:', err);
+      debugWarn('[useLocation] Failed to get current location immediately:', err);
     }
 
     // Then start watching for continuous updates
@@ -129,8 +141,8 @@ const initializeLocationWatcher = async () => {
         
         // Check if it's the simulator mock location and replace with test location
         if (isSimulatorMockLocation(latitude, longitude)) {
-          console.log('[useLocation] ⚠️ Detected simulator mock location from watcher');
-          console.log('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
+          debugLog('[useLocation] ⚠️ Detected simulator mock location from watcher');
+          debugLog('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
           latitude = TEST_LOCATION.latitude;
           longitude = TEST_LOCATION.longitude;
         }
@@ -142,8 +154,8 @@ const initializeLocationWatcher = async () => {
           heading = simulatedHeading;
         }
         
-        console.log('[useLocation] Location update from watcher:', { latitude, longitude, heading });
-        console.log('[useLocation] Location accuracy (in meters):', location.coords.accuracy);
+        debugLog('[useLocation] Location update from watcher:', { latitude, longitude, heading });
+        debugLog('[useLocation] Location accuracy (in meters):', location.coords.accuracy);
         store.setLocation({
           latitude,
           longitude,
@@ -154,7 +166,7 @@ const initializeLocationWatcher = async () => {
       }
     );
 
-    console.log('[useLocation] Watcher initialized successfully');
+    debugLog('[useLocation] Watcher initialized successfully');
   } catch (err) {
     console.error('[useLocation] Failed to start location watcher:', err);
     store.setError('Failed to start location tracking');
@@ -182,20 +194,20 @@ export const useLocation = () => {
 
   useEffect(() => {
     activeSubscribers++;
-    console.log('[useLocation] Component mounted, subscribers:', activeSubscribers);
+    debugLog('[useLocation] Component mounted, subscribers:', activeSubscribers);
 
     // Initialize watcher on first mount
     initializeLocationWatcher();
 
     return () => {
       activeSubscribers--;
-      console.log('[useLocation] Component unmounted, subscribers:', activeSubscribers);
+      debugLog('[useLocation] Component unmounted, subscribers:', activeSubscribers);
 
       // Only clean up watcher when ALL components are unmounted
       if (activeSubscribers === 0) {
         setTimeout(() => {
           if (activeSubscribers === 0 && globalWatchSubscription !== null) {
-            console.log('[useLocation] Clearing global watcher');
+            debugLog('[useLocation] Clearing global watcher');
             globalWatchSubscription.remove();
             globalWatchSubscription = null;
           }

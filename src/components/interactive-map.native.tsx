@@ -74,6 +74,7 @@ export type MapPlaceSelection = {
   name: string;
   address?: string;
   coordinates: { latitude: number; longitude: number };
+  stopId?: string;
   type?:
     | 'hospital'
     | 'mrt'
@@ -407,8 +408,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Get user's current location from hook
   const { coords: userLocation } = useLocation();
 
-  // Debug: Log user location
+  // Debug: Log user location (dev only)
   useEffect(() => {
+    if (!__DEV__) return;
     console.log('[USER_LOCATION] Location update:', {
       hasLocation: !!userLocation,
       latitude: userLocation?.latitude,
@@ -917,6 +919,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     selectedMapItem?.type === 'sports' ? selectedMapItem.facility.id : null;
   const selectedCanteenId =
     selectedMapItem?.type === 'canteen' ? selectedMapItem.canteen.id : null;
+  const selectedBusStopId =
+    selectedMapItem?.type === 'place' && selectedMapItem.place.type === 'bus-stop'
+      ? selectedMapItem.place.stopId || selectedMapItem.place.name
+      : null;
 
   console.log('[Map] Display states:', {
     landmarks: shouldShowLandmarks,
@@ -1066,6 +1072,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         name: stopName,
         address: undefined,
         coordinates: { latitude: stop.latitude, longitude: stop.longitude },
+        stopId: stop.name,
         type: 'bus-stop',
       },
     });
@@ -1469,7 +1476,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: printer.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowPrinters ? 1 : 0}
               onPress={handlePrinterPress(printer)}
               zIndex={20}
@@ -1493,7 +1500,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: facility.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowSports ? 1 : 0}
               onPress={handleSportsFacilityPress(facility)}
               zIndex={20}
@@ -1516,7 +1523,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: canteen.coords.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowCanteens ? 1 : 0}
               onPress={handleCanteenPress(canteen)}
               zIndex={20}
@@ -1546,6 +1553,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const showCircle = shouldShowBusStops && currentZoom >= 17;
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
           const opacity = showCircle && visibleByRoute ? 1 : 0;
+          const stopId = stop.name || stop.ShortName || stop.caption;
           // Choose circle color: if multiple routes active, color by first matching route membership
           let circleColor = '#274F9C';
           if (visibleByRoute) {
@@ -1567,6 +1575,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             }
           }
 
+          if (selectedBusStopId && selectedBusStopId !== stopId) {
+            circleColor = '#D1D5DB';
+          }
+
           return (
             <Marker
               key={`bus-stop-circle-${stop.name}`}
@@ -1575,7 +1587,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: stop.longitude,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={selectedBusStopId !== null}
               opacity={opacity}
               onPress={handleBusStopPress(stop)}
               zIndex={50}
@@ -1599,6 +1611,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const allStops = allBusStops;
           const labelBelow = shouldLabelBelow(stop, allStops);
           const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
+          const stopId = stop.name || stopName;
 
           // Determine if label should be visible based on zoom and filters
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
@@ -1621,6 +1634,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               if (matchCode) labelColor = routeColors[matchCode] || labelColor;
             }
           }
+          if (selectedBusStopId && selectedBusStopId !== stopId) {
+            labelColor = '#D1D5DB';
+          }
 
           // Calculate font size based on zoom level (matching web version)
           let fontSize = 12;
@@ -1629,6 +1645,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             fontSize = Math.min(18, 12 + (currentZoom - 16) * 2);
             strokeWidth = Math.min(4, 3 + (currentZoom - 16) * 0.3);
           }
+          const labelWidth = Math.min(
+            200,
+            Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
+          );
+          const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
+          const textY = Math.round(labelHeight * 0.7);
 
           return (
             <Marker
@@ -1638,7 +1660,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: stop.longitude,
               }}
               anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
-              tracksViewChanges={false}
+              tracksViewChanges={selectedBusStopId !== null}
               opacity={isLabelVisible ? 1 : 0}
               onPress={handleBusStopPress(stop)}
               zIndex={60}
@@ -1649,11 +1671,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   justifyContent: 'center',
                 }}
               >
-                <Svg width="200" height="30" viewBox="0 0 200 30">
+                <Svg
+                  width={labelWidth}
+                  height={labelHeight}
+                  viewBox={`0 0 ${labelWidth} ${labelHeight}`}
+                >
                   {/* White stroke outline - rendered first (behind) */}
                   <SvgText
-                    x="100"
-                    y="20"
+                    x={labelWidth / 2}
+                    y={textY}
                     fontSize={fontSize}
                     fontWeight="600"
                     fill="none"
@@ -1665,8 +1691,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   </SvgText>
                   {/* Route-colored text on top */}
                   <SvgText
-                    x="100"
-                    y="20"
+                    x={labelWidth / 2}
+                    y={textY}
                     fontSize={fontSize}
                     fontWeight="600"
                     fill={labelColor}

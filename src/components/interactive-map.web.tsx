@@ -85,6 +85,7 @@ export type MapPlaceSelection = {
   name: string;
   address?: string;
   coordinates: { latitude: number; longitude: number };
+  stopId?: string;
   type?:
     | 'hospital'
     | 'mrt'
@@ -3630,7 +3631,9 @@ const useBusStopMarkers = (
   showBusStops: boolean,
   activeRoute?: RouteCode | null,
   routeColor?: string,
-  visibleBusStops?: string[] // Optional array of stop names to show
+  visibleBusStops?: string[], // Optional array of stop names to show
+  onBusStopSelected?: (stop: BusStop) => void,
+  selectedStopId?: string | null
 ) => {
   const circleMarkersRef = useRef<google.maps.Marker[]>([]);
   const labelMarkersRef = useRef<google.maps.Marker[]>([]);
@@ -3846,8 +3849,13 @@ const useBusStopMarkers = (
 
         const isStopPriority = isPriorityStop(stop);
         const isRouteStop = belongsToRoute(stop);
-        const stopColor =
-          activeRoute && isRouteStop && routeColor ? routeColor : '#274F9C';
+        const isDimmed =
+          selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
+        const stopColor = isDimmed
+          ? '#D1D5DB'
+          : activeRoute && isRouteStop && routeColor
+            ? routeColor
+            : '#274F9C';
         const labelBelow = shouldLabelBelow(stop);
         const svgAnchorY = labelBelow ? 5 : 25;
 
@@ -3871,6 +3879,31 @@ const useBusStopMarkers = (
         };
 
         marker.setIcon(newIcon);
+      });
+    };
+
+    const updateCircleColors = () => {
+      circleMarkersRef.current.forEach((marker, index) => {
+        const stop = busStops[index];
+        if (!stop) return;
+
+        const isRouteStop = belongsToRoute(stop);
+        const isDimmed =
+          selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
+        const stopColor = isDimmed
+          ? '#D1D5DB'
+          : activeRoute && isRouteStop && routeColor
+            ? routeColor
+            : '#274F9C';
+
+        marker.setIcon({
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: stopColor,
+          fillOpacity: 0.8,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 2,
+          scale: 4,
+        });
       });
     };
 
@@ -3914,8 +3947,13 @@ const useBusStopMarkers = (
       const isRouteStop = belongsToRoute(stop);
 
       // Determine the color to use
-      const stopColor =
-        activeRoute && isRouteStop && routeColor ? routeColor : '#274F9C';
+      const isDimmed =
+        selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
+      const stopColor = isDimmed
+        ? '#D1D5DB'
+        : activeRoute && isRouteStop && routeColor
+          ? routeColor
+          : '#274F9C';
 
       // Determine label position based on nearby stops
       const labelBelow = shouldLabelBelow(stop);
@@ -3966,6 +4004,11 @@ const useBusStopMarkers = (
         visible: activeRoute ? isRouteStop : isStopPriority, // Show route stops if route selected, else priority stops
       });
 
+      if (onBusStopSelected) {
+        marker.addListener('click', () => onBusStopSelected(stop));
+        label.addListener('click', () => onBusStopSelected(stop));
+      }
+
       circleMarkersRef.current.push(marker);
       labelMarkersRef.current.push(label);
     });
@@ -3974,11 +4017,13 @@ const useBusStopMarkers = (
     const zoomListener = map.addListener('zoom_changed', () => {
       updateMarkersVisibility();
       updateLabelSizes();
+      updateCircleColors();
     });
 
     // Initial visibility and size update
     updateMarkersVisibility();
     updateLabelSizes();
+    updateCircleColors();
 
     return () => {
       if (zoomListener) {
@@ -3998,6 +4043,8 @@ const useBusStopMarkers = (
     pickupPointsData,
     routeColor,
     visibleBusStops,
+    onBusStopSelected,
+    selectedStopId,
   ]);
 };
 
@@ -5619,6 +5666,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     selectedMapItem?.type === 'sports'
       ? selectedMapItem.facility.id
       : selectedSportsFacility?.id ?? null;
+  const selectedBusStopId =
+    selectedMapItem?.type === 'place' && selectedMapItem.place.type === 'bus-stop'
+      ? selectedMapItem.place.stopId || selectedMapItem.place.name
+      : null;
 
   // Determine which bus route is selected from filters (radio button selection)
   const selectedFilterRoute = React.useMemo(() => {
@@ -5747,6 +5798,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     mapContainerRef,
     initialRegion,
     !!routePolyline // Don't pan/zoom if we have a route polyline
+  );
+
+  const handleBusStopSelected = React.useCallback(
+    (stop: BusStop) => {
+      if (!enablePlaceDetails) return;
+      const stopName = stop.ShortName || (stop as any).caption || stop.name;
+      onMapItemSelect?.({
+        type: 'place',
+        place: {
+          name: stopName,
+          address: undefined,
+          coordinates: { latitude: stop.latitude, longitude: stop.longitude },
+          stopId: stop.name,
+          type: 'bus-stop',
+        },
+      });
+    },
+    [enablePlaceDetails, onMapItemSelect]
   );
 
   // Fetch active buses for the selected route (use effectiveActiveRoute)
@@ -5962,7 +6031,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     shouldShowBusStops,
     effectiveActiveRoute,
     routeColor,
-    visibleBusStops
+    visibleBusStops,
+    handleBusStopSelected,
+    selectedBusStopId
   ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)

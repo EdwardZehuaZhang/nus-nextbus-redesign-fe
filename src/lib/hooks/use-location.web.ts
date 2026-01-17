@@ -2,6 +2,18 @@ import { useEffect } from 'react';
 
 import { useLocationStore } from '@/lib/store/location-store';
 
+const debugLog = (...args: any[]) => {
+  if (__DEV__) {
+    console.log(...args);
+  }
+};
+
+const debugWarn = (...args: any[]) => {
+  if (__DEV__) {
+    console.warn(...args);
+  }
+};
+
 export type LocationCoords = {
   latitude: number;
   longitude: number;
@@ -46,7 +58,7 @@ const initializeGeolocationWatcher = () => {
 
   const store = useLocationStore.getState();
 
-  console.log('[useLocation] Initializing global geolocation watcher');
+  debugLog('[useLocation] Initializing global geolocation watcher');
   
   // Only set loading if we don't have a location yet
   if (!store.coords) {
@@ -72,7 +84,7 @@ const initializeGeolocationWatcher = () => {
         store.setError(getLocationErrorMessage(err));
       } else {
         // We have a location, just log the error but don't update state
-        console.warn('[useLocation] Error occurred but keeping cached location');
+        debugWarn('[useLocation] Error occurred but keeping cached location');
         store.setLoading(false);
       }
     },
@@ -83,7 +95,7 @@ const initializeGeolocationWatcher = () => {
     }
   );
 
-  console.log('[useLocation] Watcher initialized with ID:', globalWatchId);
+  debugLog('[useLocation] Watcher initialized with ID:', globalWatchId);
 };
 
 /**
@@ -95,21 +107,21 @@ export const useLocation = () => {
 
   useEffect(() => {
     activeSubscribers++;
-    console.log('[useLocation] Component mounted, subscribers:', activeSubscribers);
+    debugLog('[useLocation] Component mounted, subscribers:', activeSubscribers);
 
     // Initialize watcher on first mount
     initializeGeolocationWatcher();
 
     return () => {
       activeSubscribers--;
-      console.log('[useLocation] Component unmounted, subscribers:', activeSubscribers);
+      debugLog('[useLocation] Component unmounted, subscribers:', activeSubscribers);
 
       // Only clean up watcher when ALL components are unmounted
       // Keep a small delay to handle quick re-mounts during navigation
       if (activeSubscribers === 0) {
         setTimeout(() => {
           if (activeSubscribers === 0 && globalWatchId !== null) {
-            console.log('[useLocation] Clearing global watcher');
+            debugLog('[useLocation] Clearing global watcher');
             navigator.geolocation.clearWatch(globalWatchId);
             globalWatchId = null;
           }

@@ -1,7 +1,7 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking } from 'react-native';
+import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { storage } from '@/lib/storage';
@@ -27,9 +27,11 @@ import { SportsAndPrintersBubbles } from '@/components/sports-printers-bubbles';
 import {
   FocusAwareStatusBar,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Text,
+  useModal,
   View,
 } from '@/components/ui';
 import {
@@ -61,8 +63,6 @@ import {
   addRecentSearch,
   getRecentSearches,
 } from '@/lib/storage/recent-searches';
-import { getCanteenColor } from '@/data/canteens';
-import { getSportsFacilityColor } from '@/data/sports-facilities';
 
 
 type BusRoute = {
@@ -1720,11 +1720,85 @@ const MapSelectionDetails = ({
   scrollRef: React.RefObject<any>;
 }) => {
   const { coords: userLocation } = useLocation();
+  const { width: windowWidth } = useWindowDimensions();
+  const shouldStackActions = windowWidth < 360;
+  const isBusStopSelection =
+    selection.type === 'place' && selection.place.type === 'bus-stop';
+  const busStopId =
+    isBusStopSelection ? selection.place.stopId || selection.place.name : '';
 
-  const openInMaps = (label: string, latitude: number, longitude: number) => {
+  const { data: busStopShuttleData, isLoading: isBusStopLoading } = useShuttleService(
+    busStopId,
+    isBusStopSelection
+  );
+
+  const { data: busStopServiceDescriptions } = useServiceDescriptions();
+
+  const busStopColorMap = React.useMemo(() => {
+    if (!busStopServiceDescriptions?.ServiceDescriptionResult?.ServiceDescription) {
+      return {} as Record<string, string>;
+    }
+
+    return busStopServiceDescriptions.ServiceDescriptionResult.ServiceDescription.reduce(
+      (map, service) => {
+        map[service.Route] = service.Color;
+        return map;
+      },
+      {} as Record<string, string>
+    );
+  }, [busStopServiceDescriptions]);
+
+  const busStopRoutes: BusRoute[] = React.useMemo(() => {
+    if (!busStopShuttleData?.ShuttleServiceResult?.shuttles) {
+      return [];
+    }
+
+    const sortedShuttles = sortShuttlesByArrival(
+      busStopShuttleData.ShuttleServiceResult.shuttles
+    );
+
+    return sortedShuttles
+      .map((shuttle) => {
+        const routeName = shuttle.name.replace(/^PUB:/, '').toUpperCase();
+        const isPublicBus = shuttle.name.startsWith('PUB:');
+        const routeColor = isPublicBus
+          ? '#55DD33'
+          : getRouteColor(shuttle.name, busStopColorMap[shuttle.name]);
+
+        return {
+          route: routeName,
+          color: routeColor,
+          isPublicBus: isPublicBus,
+          times: [
+            {
+              time: formatArrivalTime(shuttle.arrivalTime),
+              crowding: passengerLoadToCrowding(shuttle.passengers),
+              textColor: '#211F26',
+            },
+            {
+              time: formatArrivalTime(shuttle.nextArrivalTime),
+              crowding: passengerLoadToCrowding(shuttle.nextPassengers),
+              textColor: '#737373',
+            },
+          ],
+        };
+      })
+      .filter((route) => route.times.some((t) => t.time !== 'N/A'));
+  }, [busStopShuttleData, busStopColorMap]);
+
+  const openInMaps = (
+    label: string,
+    latitude: number,
+    longitude: number,
+    mapsUrl?: string
+  ) => {
+    if (mapsUrl) {
+      Linking.openURL(mapsUrl);
+      return;
+    }
     const encodedLabel = encodeURIComponent(label);
-    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}(${encodedLabel})`;
-    Linking.openURL(url);
+    const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}(${encodedLabel})`;
+    Linking.openURL(fallbackUrl);
   };
 
   const startNavigation = (label: string, latitude: number, longitude: number) => {
@@ -1739,6 +1813,52 @@ const MapSelectionDetails = ({
       },
     });
   };
+
+  const renderActionButtons = ({
+    onNavigate,
+    onOpenMaps,
+  }: {
+    onNavigate: () => void;
+    onOpenMaps: () => void;
+  }) => (
+    <View
+      style={{
+        flexDirection: shouldStackActions ? 'column' : 'row',
+        gap: 8,
+      }}
+    >
+      <Pressable
+        onPress={onOpenMaps}
+        style={{
+          backgroundColor: '#FFFFFF',
+          paddingVertical: 12,
+          borderRadius: 8,
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          flex: shouldStackActions ? undefined : 1,
+        }}
+      >
+        <Text style={{ color: '#111827', fontWeight: '600' }}>
+          Open in Google Maps
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={onNavigate}
+        style={{
+          backgroundColor: '#274F9C',
+          paddingVertical: 12,
+          borderRadius: 8,
+          alignItems: 'center',
+          flex: shouldStackActions ? undefined : 1,
+        }}
+      >
+        <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
+          Start navigation
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <ScrollView
@@ -1773,7 +1893,7 @@ const MapSelectionDetails = ({
                 resizeMode="cover"
                 style={{
                   width: '100%',
-                  aspectRatio: 16 / 9,
+                  aspectRatio: 16 / 6,
                   borderRadius: 10,
                   marginBottom: 12,
                 }}
@@ -1787,44 +1907,93 @@ const MapSelectionDetails = ({
                 {selection.place.address}
               </Text>
             )}
-            {selection.place.rating && (
-              <Text style={{ fontSize: 14, color: '#111827', marginBottom: 6 }}>
-                {selection.place.rating.toFixed(1)} ★
-                {selection.place.userRatingsTotal
-                  ? ` (${selection.place.userRatingsTotal})`
-                  : ''}
-              </Text>
-            )}
-            {selection.place.openNow !== undefined && (
-              <Text
+            {(selection.place.rating || selection.place.openNow !== undefined) && (
+              <View
                 style={{
-                  fontSize: 14,
-                  color: selection.place.openNow ? '#188038' : '#D93025',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
                   marginBottom: 12,
+                  flexWrap: 'wrap',
                 }}
               >
-                {selection.place.openNow ? 'Open' : 'Closed'}
-              </Text>
+                {selection.place.rating && (
+                  <Text style={{ fontSize: 14, color: '#111827' }}>
+                    {selection.place.rating.toFixed(1)} ★
+                    {selection.place.userRatingsTotal
+                      ? ` (${selection.place.userRatingsTotal})`
+                      : ''}
+                  </Text>
+                )}
+                {selection.place.openNow !== undefined && (
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      color: selection.place.openNow ? '#188038' : '#D93025',
+                    }}
+                  >
+                    {selection.place.openNow ? 'Open' : 'Closed'}
+                  </Text>
+                )}
+              </View>
             )}
-            <Pressable
-              onPress={() =>
+            {isBusStopSelection && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 8 }}>
+                  BUS SERVICES
+                </Text>
+                {isBusStopLoading ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 13, color: '#6B7280' }}>
+                      Loading bus data...
+                    </Text>
+                  </View>
+                ) : busStopRoutes.length === 0 ? (
+                  <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                    <Text style={{ fontSize: 13, color: '#6B7280' }}>
+                      No buses available
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    <View className="flex-row gap-2">
+                      {busStopRoutes.slice(0, 3).map((route) => (
+                        <BusRouteCard key={route.route} route={route} />
+                      ))}
+                      {busStopRoutes.length < 3 &&
+                        Array.from({ length: 3 - busStopRoutes.length }).map(
+                          (_, i) => <View key={`empty-${i}`} className="flex-1" />
+                        )}
+                    </View>
+                    {busStopRoutes.length > 3 && (
+                      <View className="flex-row gap-2">
+                        {busStopRoutes.slice(3, 6).map((route) => (
+                          <BusRouteCard key={route.route} route={route} />
+                        ))}
+                        {busStopRoutes.length < 6 &&
+                          Array.from({ length: 6 - busStopRoutes.length }).map(
+                            (_, i) => <View key={`empty-row2-${i}`} className="flex-1" />
+                          )}
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+            {renderActionButtons({
+              onNavigate: () =>
+                startNavigation(
+                  selection.place.name,
+                  selection.place.coordinates.latitude,
+                  selection.place.coordinates.longitude
+                ),
+              onOpenMaps: () =>
                 openInMaps(
                   selection.place.name,
                   selection.place.coordinates.latitude,
                   selection.place.coordinates.longitude
-                )
-              }
-              style={{
-                backgroundColor: '#1A73E8',
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
-                Open in Google Maps
-              </Text>
-            </Pressable>
+                ),
+            })}
           </View>
         )}
 
@@ -1841,25 +2010,21 @@ const MapSelectionDetails = ({
             <Text style={{ fontSize: 14, color: '#111827', marginBottom: 16 }}>
               {selection.printer.hours}
             </Text>
-            <Pressable
-              onPress={() =>
+            {renderActionButtons({
+              onNavigate: () =>
                 startNavigation(
                   `${selection.printer.building} Printer`,
                   selection.printer.coordinates.lat,
                   selection.printer.coordinates.lng
-                )
-              }
-              style={{
-                backgroundColor: '#FF8C00',
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
-                Start navigation
-              </Text>
-            </Pressable>
+                ),
+              onOpenMaps: () =>
+                openInMaps(
+                  `${selection.printer.building} Printer`,
+                  selection.printer.coordinates.lat,
+                  selection.printer.coordinates.lng,
+                  selection.printer.googleMapsUrl
+                ),
+            })}
           </View>
         )}
 
@@ -1898,25 +2063,21 @@ const MapSelectionDetails = ({
                 </Text>
               </>
             )}
-            <Pressable
-              onPress={() =>
+            {renderActionButtons({
+              onNavigate: () =>
                 startNavigation(
                   selection.facility.name,
                   selection.facility.coordinates.lat,
                   selection.facility.coordinates.lng
-                )
-              }
-              style={{
-                backgroundColor: getSportsFacilityColor(selection.facility.type),
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
-                Start navigation
-              </Text>
-            </Pressable>
+                ),
+              onOpenMaps: () =>
+                openInMaps(
+                  selection.facility.name,
+                  selection.facility.coordinates.lat,
+                  selection.facility.coordinates.lng,
+                  selection.facility.googleMapsUrl
+                ),
+            })}
           </View>
         )}
 
@@ -1991,25 +2152,21 @@ const MapSelectionDetails = ({
                 </Text>
               </>
             )}
-            <Pressable
-              onPress={() =>
+            {renderActionButtons({
+              onNavigate: () =>
                 startNavigation(
                   selection.canteen.name,
                   selection.canteen.coords.lat,
                   selection.canteen.coords.lng
-                )
-              }
-              style={{
-                backgroundColor: getCanteenColor(),
-                paddingVertical: 12,
-                borderRadius: 8,
-                alignItems: 'center',
-              }}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
-                Start navigation
-              </Text>
-            </Pressable>
+                ),
+              onOpenMaps: () =>
+                openInMaps(
+                  selection.canteen.name,
+                  selection.canteen.coords.lat,
+                  selection.canteen.coords.lng,
+                  selection.canteen.mapsUrl
+                ),
+            })}
           </View>
         )}
       </View>
@@ -2019,6 +2176,20 @@ const MapSelectionDetails = ({
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
+  const infoModal = useModal();
+  const privacyUrl = 'https://nus-nextbus-redesign-fe.vercel.app/privacy';
+  const termsUrl = 'https://nus-nextbus-redesign-fe.vercel.app/terms';
+  const supportMailto =
+    'mailto:edward.zehua.zhang@gmail.com?subject=' +
+    encodeURIComponent('NUS NextBus Support') +
+    '&body=' +
+    encodeURIComponent('Hi Edward,\n\nI need help with...\n\n');
+
+  const openExternal = (url: string) => {
+    Linking.openURL(url).catch(() => {
+      // Silent catch
+    });
+  };
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
@@ -2215,6 +2386,44 @@ export default function TransitPage() {
         />
       </Animated.View>
 
+      <Modal ref={infoModal.ref} title="Info" snapPoints={['35%']}>
+        <View className="px-4 pb-6">
+          <Pressable
+            onPress={() => {
+              infoModal.dismiss();
+              openExternal(privacyUrl);
+            }}
+            className="mb-3 rounded-xl bg-white px-4 py-4"
+          >
+            <Text className="text-[16px] font-semibold text-[#1F2937]">
+              Privacy Policy
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              infoModal.dismiss();
+              openExternal(termsUrl);
+            }}
+            className="mb-3 rounded-xl bg-white px-4 py-4"
+          >
+            <Text className="text-[16px] font-semibold text-[#1F2937]">
+              Terms of Service
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              infoModal.dismiss();
+              openExternal(supportMailto);
+            }}
+            className="rounded-xl bg-white px-4 py-4"
+          >
+            <Text className="text-[16px] font-semibold text-[#1F2937]">
+              Support
+            </Text>
+          </Pressable>
+        </View>
+      </Modal>
+
       {/* Map controls - hide when bottom panel/search is up */}
       {pathname === '/transit' && !isSearchMode && (
         <View
@@ -2231,6 +2440,41 @@ export default function TransitPage() {
             onFilterChange={handleFilterChange}
             filters={mapFilters}
           />
+        </View>
+      )}
+
+      {/* Info button (top-left) */}
+      {pathname === '/transit' && !isSearchMode && (
+        <View
+          style={{
+            position: 'absolute' as any,
+            top: insets.top + 8,
+            left: 20,
+            zIndex: 1,
+          }}
+        >
+          <Pressable
+            onPress={infoModal.present}
+            accessibilityRole="button"
+            accessibilityLabel="Info"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOpacity: 0.12,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 3,
+            }}
+          >
+            <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>
+              i
+            </Text>
+          </Pressable>
         </View>
       )}
     </View>
