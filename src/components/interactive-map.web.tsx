@@ -4561,24 +4561,6 @@ const useFilteredBusRoutes = (
 };
 
 /**
- * Get landmark color based on type - matches mobile version
- */
-const getLandmarkColor = (type: string) => {
-  switch (type) {
-    case 'hospital':
-      return '#D32F2F'; // Red
-    case 'mrt':
-      return '#274F9C'; // Blue
-    case 'library':
-      return '#FF8C00'; // Orange
-    case 'bus-terminal':
-      return '#00B050'; // Green
-    default:
-      return '#274F9C';
-  }
-};
-
-/**
  * Custom hook to render landmark markers (hospital, MRT, library, bus terminal)
  */
 const useLandmarkMarkers = (
