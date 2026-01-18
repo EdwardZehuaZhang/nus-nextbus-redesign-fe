@@ -3,6 +3,7 @@ import React from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Info } from 'phosphor-react-native';
 
 import { storage } from '@/lib/storage';
 
@@ -2175,8 +2176,7 @@ const MapSelectionDetails = ({
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
-  const privacyUrl = 'https://nus-nextbus-redesign-fe.vercel.app/privacy';
-  const termsUrl = 'https://nus-nextbus-redesign-fe.vercel.app/terms';
+  const githubUrl = 'https://github.com/EdwardZehuaZhang';
   const supportMailto =
     'mailto:edward.zehua.zhang@gmail.com?subject=' +
     encodeURIComponent('NUS NextBus Support') +
@@ -2187,6 +2187,14 @@ export default function TransitPage() {
     Linking.openURL(url).catch(() => {
       // Silent catch
     });
+  };
+
+  const openPrivacy = () => {
+    router.push('/privacy');
+  };
+
+  const openTerms = () => {
+    router.push('/terms');
   };
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -2422,7 +2430,7 @@ export default function TransitPage() {
             }}
           >
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>
+              <Text style={{ fontSize: 18, fontWeight: '500', color: '#111827' }}>
                 Info
               </Text>
               <Pressable
@@ -2434,49 +2442,33 @@ export default function TransitPage() {
                 <Text style={{ fontSize: 16, color: '#6B7280' }}>✕</Text>
               </Pressable>
             </View>
-            <Text style={{ marginTop: 6, fontSize: 13, color: '#6B7280' }}>
-              Quick links
-            </Text>
-
             <Pressable
               onPress={() => {
                 setIsInfoOpen(false);
-                openExternal(privacyUrl);
+                openPrivacy();
               }}
               style={{
                 marginTop: 16,
-                borderRadius: 12,
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                backgroundColor: '#F3F4F6',
+                paddingVertical: 6,
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
                 Privacy Policy
-              </Text>
-              <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>
-                https://nus-nextbus-redesign-fe.vercel.app/privacy
               </Text>
             </Pressable>
 
             <Pressable
               onPress={() => {
                 setIsInfoOpen(false);
-                openExternal(termsUrl);
+                openTerms();
               }}
               style={{
-                marginTop: 10,
-                borderRadius: 12,
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                backgroundColor: '#F3F4F6',
+                marginTop: 8,
+                paddingVertical: 6,
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
                 Terms of Service
-              </Text>
-              <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>
-                https://nus-nextbus-redesign-fe.vercel.app/terms
               </Text>
             </Pressable>
 
@@ -2486,18 +2478,27 @@ export default function TransitPage() {
                 openExternal(supportMailto);
               }}
               style={{
-                marginTop: 10,
-                borderRadius: 12,
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                backgroundColor: '#111827',
+                marginTop: 8,
+                paddingVertical: 6,
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '600', color: '#FFFFFF' }}>
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
                 Contact Support
               </Text>
-              <Text style={{ marginTop: 2, fontSize: 12, color: '#D1D5DB' }}>
-                edward.zehua.zhang@gmail.com
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setIsInfoOpen(false);
+                openExternal(githubUrl);
+              }}
+              style={{
+                marginTop: 8,
+                paddingVertical: 6,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
+                Developer GitHub
               </Text>
             </Pressable>
           </View>
@@ -2511,8 +2512,7 @@ export default function TransitPage() {
             position: 'absolute' as any,
             top: insets.top + 8,
             right: 20,
-            zIndex: 1,
-            pointerEvents: 'box-none',
+            zIndex: 80,
           }}
         >
           <MapTypeSelector
@@ -2522,8 +2522,6 @@ export default function TransitPage() {
           />
         </View>
       )}
-
-      {/* Info button (top-left) */}
       {pathname === '/transit' && !isSearchMode && (
         <View
           style={{
@@ -2538,22 +2536,10 @@ export default function TransitPage() {
             accessibilityRole="button"
             accessibilityLabel="Info"
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOpacity: 0.12,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 2 },
-              elevation: 3,
+              padding: 6,
             }}
           >
-            <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700' }}>
-              i
-            </Text>
+            <Info size={22} color="rgba(0, 0, 0, 0.4)" />
           </Pressable>
         </View>
       )}

@@ -36,6 +36,15 @@ export default function PrivacyPage() {
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">
+          Third-Party Services
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          We use service providers (e.g., crash reporting and map services) to
+          operate the app. These providers process data only on our behalf and
+          only for app functionality and stability.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
           Data Sharing
         </Text>
         <Text className="mt-2 text-base text-[#374151]">
@@ -50,6 +59,27 @@ export default function PrivacyPage() {
         <Text className="mt-2 text-base text-[#374151]">
           You can disable location access in device settings, which may limit
           some features.
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          The app does not require an account. If you contact support, we use
+          your email only to respond to your request.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          Data Retention
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          Diagnostic data is retained only as long as needed to troubleshoot and
+          improve reliability. Location data is used in real time and is not
+          stored as part of your profile.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          Tracking and Advertising
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          We do not use data for advertising and do not track you across apps
+          or websites owned by other companies.
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">

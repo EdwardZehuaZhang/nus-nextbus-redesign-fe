@@ -4300,6 +4300,9 @@ const useFilteredBusRoutes = (
     L: '#BFBFBF',
     E: '#00B050',
     K: '#345A9B',
+    R1: '#FF7913',
+    R2: '#008200',
+    P: '#838383',
   };
 
   useEffect(() => {

@@ -798,6 +798,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       L: '#BFBFBF',
       E: '#00B050',
       K: '#345A9B',
+      R1: '#FF7913',
+      R2: '#008200',
+      P: '#838383',
     }),
     []
   );
@@ -1467,6 +1470,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const scale = getCircularMarkerScale(currentZoom);
           const isDimmed =
             selectedPrinterId !== null && selectedPrinterId !== printer.id;
+          const isPrinterClickable = shouldShowPrinters;
 
           return (
             <Marker
@@ -1478,7 +1482,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={true}
               opacity={shouldShowPrinters ? 1 : 0}
-              onPress={handlePrinterPress(printer)}
+              onPress={isPrinterClickable ? handlePrinterPress(printer) : undefined}
               zIndex={20}
             >
               <CircularMarker type="printer" scale={scale} isDimmed={isDimmed} />
@@ -1491,6 +1495,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const isDimmed =
             selectedSportsFacilityId !== null &&
             selectedSportsFacilityId !== facility.id;
+          const isSportsClickable = shouldShowSports;
 
           return (
             <Marker
@@ -1502,7 +1507,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={true}
               opacity={shouldShowSports ? 1 : 0}
-              onPress={handleSportsFacilityPress(facility)}
+              onPress={isSportsClickable ? handleSportsFacilityPress(facility) : undefined}
               zIndex={20}
             >
               <CircularMarker type={facility.type} scale={scale} isDimmed={isDimmed} />
@@ -1514,6 +1519,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const scale = getCircularMarkerScale(currentZoom);
           const isDimmed =
             selectedCanteenId !== null && selectedCanteenId !== canteen.id;
+          const isCanteenClickable = shouldShowCanteens;
 
           return (
             <Marker
@@ -1525,7 +1531,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={true}
               opacity={shouldShowCanteens ? 1 : 0}
-              onPress={handleCanteenPress(canteen)}
+              onPress={isCanteenClickable ? handleCanteenPress(canteen) : undefined}
               zIndex={20}
             >
               <CircularMarker type="canteen" scale={scale} isDimmed={isDimmed} />
@@ -1554,6 +1560,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
           const opacity = showCircle && visibleByRoute ? 1 : 0;
           const stopId = stop.name || stop.ShortName || stop.caption;
+          const isCircleClickable = showCircle && visibleByRoute;
           // Choose circle color: if multiple routes active, color by first matching route membership
           let circleColor = '#274F9C';
           if (visibleByRoute) {
@@ -1589,7 +1596,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={selectedBusStopId !== null}
               opacity={opacity}
-              onPress={handleBusStopPress(stop)}
+              onPress={isCircleClickable ? handleBusStopPress(stop) : undefined}
               zIndex={50}
             >
               <View
@@ -1617,6 +1624,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
           const isLabelVisible =
             shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
+          const isLabelClickable = isLabelVisible;
           // Choose label color: per-route membership (same logic as circle)
           let labelColor = '#274F9C';
           if (visibleByRoute) {
@@ -1662,7 +1670,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
               tracksViewChanges={selectedBusStopId !== null}
               opacity={isLabelVisible ? 1 : 0}
-              onPress={handleBusStopPress(stop)}
+              onPress={isLabelClickable ? handleBusStopPress(stop) : undefined}
               zIndex={60}
             >
               <View

@@ -80,6 +80,9 @@ export const getRouteColor = (
     L: '#BFBFBF', // Gray
     E: '#00B050', // Green
     K: '#345A9B', // Blue
+    R1: '#FF7913', // Orange
+    R2: '#008200', // Green
+    P: '#838383', // Gray
   };
 
   return colorMap[routeCode] || '#000000';

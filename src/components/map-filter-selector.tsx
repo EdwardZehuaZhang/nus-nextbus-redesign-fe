@@ -29,10 +29,10 @@ const defaultFilterItems = [
   { id: 'bus-route-a2', label: 'A2', checked: false, type: 'radio', group: 'bus-view' },
   { id: 'bus-route-d1', label: 'D1', checked: false, type: 'radio', group: 'bus-view' },
   { id: 'bus-route-d2', label: 'D2', checked: false, type: 'radio', group: 'bus-view' },
-  { id: 'bus-route-btc', label: 'BTC', checked: false, type: 'radio', group: 'bus-view' },
-  { id: 'bus-route-e', label: 'E', checked: false, type: 'radio', group: 'bus-view' },
   { id: 'bus-route-k', label: 'K', checked: false, type: 'radio', group: 'bus-view' },
-  { id: 'bus-route-l', label: 'L', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-r1', label: 'R1', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-r2', label: 'R2', checked: false, type: 'radio', group: 'bus-view' },
+  { id: 'bus-route-p', label: 'P', checked: false, type: 'radio', group: 'bus-view' },
 ];
 
 interface MapFilterSelectorProps {
