@@ -130,6 +130,7 @@ interface InteractiveMapProps {
   onMapItemSelect?: (selection: MapSelection | null) => void;
   enablePlaceDetails?: boolean;
   selectedMapItem?: MapSelection | null;
+  forceResetCenter?: boolean;
 }
 
 const DEFAULT_REGION: Region = {
@@ -137,6 +138,19 @@ const DEFAULT_REGION: Region = {
   longitude: 103.777, // Adjusted slightly right (east)
   latitudeDelta: 0.02, // Zoom level 14 - zoomed out to see full campus
   longitudeDelta: 0.02,
+};
+
+const isValidInitialRegion = (region: Region): boolean => {
+  return (
+    typeof region.latitude === 'number' &&
+    typeof region.longitude === 'number' &&
+    !isNaN(region.latitude) &&
+    !isNaN(region.longitude) &&
+    region.latitude >= 1.1 &&
+    region.latitude <= 1.5 &&
+    region.longitude >= 103.6 &&
+    region.longitude <= 104.1
+  );
 };
 
 // Mobile zoom offset to align with web zoom levels
@@ -388,12 +402,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapItemSelect,
   enablePlaceDetails = true,
   selectedMapItem,
+  forceResetCenter = false,
 }) => {
   const mapRef = useRef<MapView>(null);
   const [internalMapType, setInternalMapType] = useState<
     'standard' | 'satellite' | 'hybrid' | 'terrain'
   >('standard');
-  const [currentRegion, setCurrentRegion] = useState<Region>(initialRegion);
+  const safeInitialRegion = React.useMemo(
+    () => (isValidInitialRegion(initialRegion) ? initialRegion : DEFAULT_REGION),
+    [initialRegion]
+  );
+  const [currentRegion, setCurrentRegion] = useState<Region>(safeInitialRegion);
   const [mapReady, setMapReady] = useState(false);
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
@@ -422,8 +441,30 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Initialize currentRegion with initialRegion when it changes
   useEffect(() => {
-    setCurrentRegion(initialRegion);
-  }, [initialRegion]);
+    setCurrentRegion(safeInitialRegion);
+  }, [safeInitialRegion]);
+
+  // Force reset map center when requested (e.g., on navigation screen focus)
+  useEffect(() => {
+    if (!forceResetCenter || !mapReady || !mapRef.current) {
+      if (forceResetCenter) {
+        console.log('[NATIVE MAP] forceResetCenter blocked - mapReady:', mapReady, 'mapRef:', !!mapRef.current);
+      }
+      return;
+    }
+    if (routePolyline || internalRoutePolylines) {
+      console.log('[NATIVE MAP] forceResetCenter blocked - has route polylines');
+      return;
+    }
+    console.log('[NATIVE MAP] forceResetCenter firing - animating to:', safeInitialRegion);
+    mapRef.current.animateToRegion(safeInitialRegion, 100);
+  }, [
+    forceResetCenter,
+    mapReady,
+    routePolyline,
+    internalRoutePolylines,
+    safeInitialRegion,
+  ]);
 
   // Calculate Google Maps zoom level from latitudeDelta
   // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
@@ -480,30 +521,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     ];
   }, [currentZoom]);
 
-  // Force map to use correct initial region after it's ready - only once
-  useEffect(() => {
-    if (
-      mapReady &&
-      mapRef.current &&
-      !origin &&
-      !destination &&
-      waypoints.length === 0 &&
-      !hasSetInitialRegion.current
-    ) {
-      // Mark as set IMMEDIATELY to prevent double-execution
-      hasSetInitialRegion.current = true;
-      isInitializing.current = true;
-
-      // Only set region if there's no route being displayed
-      setTimeout(() => {
-        mapRef.current?.animateToRegion(initialRegion, 100);
-        // After setting initial region, allow region updates
-        setTimeout(() => {
-          isInitializing.current = false;
-        }, 500);
-      }, 100);
-    }
-  }, [mapReady, initialRegion, origin, destination, waypoints.length]);
+  // Note: Initial region animation is now handled by forceResetCenter effect
+  // This effect is kept for reference but is no longer needed since navigation.tsx sets forceResetCenter on focus
+  // Removed duplicate animateToRegion to prevent conflicting animations
 
   // Handle region changes
   const handleRegionChange = (region: Region) => {
@@ -912,7 +932,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         hasFitToCoordinates.current = true; // Mark that we've fitted coordinates
         setTimeout(() => {
           mapRef.current?.fitToCoordinates(coordinates, {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+            edgePadding: { top: 320, right: 260, bottom: 560, left: 260 },
             animated: true,
           });
         }, 100);
@@ -1111,7 +1131,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={initialRegion}
+        initialRegion={safeInitialRegion}
         showsUserLocation={Platform.OS === 'android'}
         userLocationAnnotationTitle="My Location"
         userLocationCalloutEnabled={false}
@@ -1121,7 +1141,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         showsScale
         mapType={externalMapType ?? internalMapType}
         onRegionChangeComplete={handleRegionChangeDebounced}
-        onMapReady={() => setMapReady(true)}
+        onMapReady={() => {
+          console.log('[NATIVE MAP] mapReady fired with safeInitialRegion:', safeInitialRegion);
+          setMapReady(true);
+        }}
         onPoiClick={handlePoiClick}
         customMapStyle={customMapStyle}
         showsIndoors={currentZoom >= 17}

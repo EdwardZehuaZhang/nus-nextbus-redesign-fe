@@ -49,6 +49,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ITSAppUsesNonExemptEncryption: false,
       NSLocationWhenInUseUsageDescription:
         'This app needs your location to show nearby bus stops and help you navigate to them.',
+      NSUserNotificationUsageDescription:
+        'This app uses notifications to remind you when it is time to leave.',
     },
     config: {
       googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -66,6 +68,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     permissions: [
       'ACCESS_COARSE_LOCATION',
       'ACCESS_FINE_LOCATION',
+      'POST_NOTIFICATIONS',
     ],
     config: {
       googleMaps: {
@@ -80,6 +83,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'sentry-expo',
     '@sentry/react-native',
+    'expo-notifications',
     [
       'expo-splash-screen',
       {

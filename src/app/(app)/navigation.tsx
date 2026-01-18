@@ -1,4 +1,5 @@
 import polyline from '@mapbox/polyline';
+import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Animated, TextInput, Platform, ActivityIndicator, Dimensions, Keyboard } from 'react-native';
@@ -37,6 +38,14 @@ import { Search as SearchIcon, Van } from '@/components/ui/icons';
 import { NavigationArrowIcon } from '@/components/ui/icons/navigation-arrow';
 import { useLocation } from '@/lib/hooks/use-location';
 import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
+import {
+  cancelLeaveReminderNotification,
+  clearLeaveReminderState,
+  getLeaveReminderState,
+  requestLeaveReminderPermissions,
+  scheduleLeaveReminderNotification,
+  setLeaveReminderState,
+} from '@/lib/notifications/leave-reminder';
 import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
 import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
 import { InternalRoutesSection } from '@/components/internal-route-card';
@@ -377,7 +386,6 @@ const useDragHandlers = (config?: {
     
     let targetHeight = DEFAULT_HEIGHT;
 
-    console.log('[NAV DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy);
 
     // Smart snapping based on current position and velocity
     // Three states: MIN (5%) -> DEFAULT (39%) -> MAX (75%)
@@ -389,26 +397,21 @@ const useDragHandlers = (config?: {
         if (currentHeight < DEFAULT_HEIGHT - 5) {
           // From collapsed/below DEFAULT - snap to DEFAULT
           targetHeight = DEFAULT_HEIGHT;
-          console.log('[NAV DRAG] ⬆️ Fast swipe UP from collapsed - Snapping to DEFAULT');
         } else if (currentHeight < DEFAULT_HEIGHT + 10) {
           // From around DEFAULT - snap to MAX
           targetHeight = MAX_HEIGHT;
-          console.log('[NAV DRAG] ⬆️ Fast swipe UP from DEFAULT - Snapping to EXPANDED (MAX_HEIGHT)');
         } else {
           // Already above DEFAULT - snap to MAX
           targetHeight = MAX_HEIGHT;
-          console.log('[NAV DRAG] ⬆️ Fast swipe UP from upper position - Snapping to EXPANDED (MAX_HEIGHT)');
         }
       } else {
         // Fast downward swipe
         if (currentHeight > DEFAULT_HEIGHT + 10) {
           // From well above DEFAULT - snap to DEFAULT
           targetHeight = DEFAULT_HEIGHT;
-          console.log('[NAV DRAG] ⬇️ Fast swipe DOWN from upper position - Snapping to DEFAULT');
         } else {
           // From DEFAULT or below - snap to MIN
           targetHeight = MIN_HEIGHT;
-          console.log('[NAV DRAG] ⬇️ Fast swipe DOWN from DEFAULT/lower - Snapping to COLLAPSED (MIN_HEIGHT)');
         }
       }
     } else {
@@ -418,19 +421,15 @@ const useDragHandlers = (config?: {
       
       if (currentHeight < midLower) {
         targetHeight = MIN_HEIGHT;
-        console.log('[NAV DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
       } else if (currentHeight > midUpper) {
         targetHeight = MAX_HEIGHT;
-        console.log('[NAV DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
       } else {
         targetHeight = DEFAULT_HEIGHT;
-        console.log('[NAV DRAG] 🔄 Snapping to DEFAULT height');
       }
     }
 
     animateToHeight(targetHeight);
     setTempHeight(null);
-    console.log('[NAV DRAG] ✨ Animating to height:', targetHeight);
   };
 
   const handleDragEnd = () => {
@@ -660,6 +659,7 @@ export default function NavigationPage() {
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
+  const [forceResetCenter, setForceResetCenter] = useState(true); // Start as true to reset on initial load
   const [routes, setRoutes] = useState<Route[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -676,10 +676,37 @@ export default function NavigationPage() {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setForceResetCenter(true);
+      // Keep forceResetCenter true for long enough for animation to complete (100ms animation + buffer)
+      const timeoutId = setTimeout(() => setForceResetCenter(false), 300);
+      return () => clearTimeout(timeoutId);
+    }, [])
+  );
   
   // Arrival time selector state
   const [showArrivalTimeDropdown, setShowArrivalTimeDropdown] = useState(false);
   const [selectedArrivalTime, setSelectedArrivalTime] = useState<Date | null>(null);
+
+  // Restore leave reminder state on mount (Option A persistence)
+  useEffect(() => {
+    const stored = getLeaveReminderState();
+    if (!stored?.enabled) return;
+
+    setReminderEnabled(true);
+
+    if (stored.arrivalTimeISO) {
+      const arrivalDate = new Date(stored.arrivalTimeISO);
+      if (!Number.isNaN(arrivalDate.getTime()) && arrivalDate.getTime() > Date.now()) {
+        setSelectedArrivalTime(arrivalDate);
+      } else {
+        void cancelLeaveReminderNotification(stored.notificationId);
+        void clearLeaveReminderState();
+      }
+    }
+  }, []);
   
   // Internal route polylines for map display
   const [internalRoutePolylines, setInternalRoutePolylines] = useState<{
@@ -791,7 +818,6 @@ export default function NavigationPage() {
       const lat = parseFloat(customOriginLat);
       const lng = parseFloat(customOriginLng);
       if (!isNaN(lat) && !isNaN(lng)) {
-        console.log('📍 [URL] Custom origin from explicit coordinates:', { lat, lng });
         return { latitude: lat, longitude: lng };
       }
     }
@@ -803,10 +829,6 @@ export default function NavigationPage() {
     if (typeof customOrigin === 'string' && customOrigin !== '' && !customOriginCoords) {
       const busStation = getBusStationByName(customOrigin);
       if (busStation?.coordinates) {
-        console.log('📍 [URL] Origin from customOrigin bus station:', customOrigin, {
-          lat: busStation.coordinates.latitude,
-          lng: busStation.coordinates.longitude
-        });
         return {
           latitude: busStation.coordinates.latitude,
           longitude: busStation.coordinates.longitude
@@ -823,7 +845,6 @@ export default function NavigationPage() {
       const lat = parseFloat(userLat);
       const lng = parseFloat(userLng);
       if (!isNaN(lat) && !isNaN(lng)) {
-        console.log('📍 [URL] User location from URL coordinates:', { lat, lng });
         return { latitude: lat, longitude: lng };
       }
     }
@@ -868,7 +889,6 @@ export default function NavigationPage() {
     
     // Fall back to URL location only if state location is unavailable
     if (urlUserLocation) {
-      console.log('🎯 Using URL user location (fallback):', urlUserLocation);
       return urlUserLocation;
     }
     
@@ -946,7 +966,6 @@ export default function NavigationPage() {
   // This prevents infinite loops from constant GPS updates
   useEffect(() => {
     if (globalUserLocation && !userLocation && !hasCustomOrigin) {
-      console.log('📋 [INIT] Setting userLocation from GPS for first time:', globalUserLocation);
       setUserLocation({
         latitude: globalUserLocation.latitude,
         longitude: globalUserLocation.longitude,
@@ -1903,6 +1922,118 @@ export default function NavigationPage() {
     return routes[0]?.legs?.[0]?.steps;
   }, [isLoadingRoutes, isLoadingInternalRoutes, showInternal, routes]);
 
+  const selectedRouteDurationSeconds = useMemo(() => {
+    if (showInternal && bestInternalRoute?.totalTime) {
+      return bestInternalRoute.totalTime;
+    }
+
+    const leg = routes[0]?.legs?.[0];
+    const seconds = parseDurationSeconds(leg?.duration) || parseDurationSeconds(leg?.staticDuration);
+    if (seconds > 0) return seconds;
+    if (leg?.duration) return Math.ceil(durationToMinutes(leg.duration) * 60);
+    return 0;
+  }, [showInternal, bestInternalRoute, routes]);
+
+  const computedLeaveTime = useMemo(() => {
+    if (!selectedArrivalTime || selectedRouteDurationSeconds <= 0) return null;
+    return new Date(selectedArrivalTime.getTime() - selectedRouteDurationSeconds * 1000);
+  }, [selectedArrivalTime, selectedRouteDurationSeconds]);
+
+  const routeSignature = useMemo(() => {
+    if (!effectiveOrigin || !destinationCoords) return null;
+    return JSON.stringify({
+      type: showInternal ? 'internal' : 'google',
+      origin: { lat: effectiveOrigin.latitude, lng: effectiveOrigin.longitude },
+      destination: { lat: destinationCoords.lat, lng: destinationCoords.lng },
+      durationSeconds: selectedRouteDurationSeconds,
+      stopsKey,
+    });
+  }, [effectiveOrigin, destinationCoords, showInternal, selectedRouteDurationSeconds, stopsKey]);
+
+  useEffect(() => {
+    const syncLeaveReminder = async () => {
+      if (!reminderEnabled) {
+        const stored = getLeaveReminderState();
+        if (stored?.notificationId) {
+          await cancelLeaveReminderNotification(stored.notificationId);
+        }
+        await clearLeaveReminderState();
+        return;
+      }
+
+      if (!selectedArrivalTime) {
+        const stored = getLeaveReminderState();
+        if (stored?.notificationId) {
+          await cancelLeaveReminderNotification(stored.notificationId);
+        }
+        await clearLeaveReminderState();
+        return;
+      }
+
+      if (!computedLeaveTime || !routeSignature) {
+        return;
+      }
+
+      if (computedLeaveTime.getTime() <= Date.now()) {
+        const stored = getLeaveReminderState();
+        if (stored?.notificationId) {
+          await cancelLeaveReminderNotification(stored.notificationId);
+        }
+        await clearLeaveReminderState();
+        return;
+      }
+
+      const hasPermission = await requestLeaveReminderPermissions();
+      if (!hasPermission) {
+        setReminderEnabled(false);
+        return;
+      }
+
+      const stored = getLeaveReminderState();
+      const arrivalTimeISO = selectedArrivalTime.toISOString();
+      const leaveTimeISO = computedLeaveTime.toISOString();
+
+      const shouldReschedule =
+        !stored ||
+        stored.routeSignature !== routeSignature ||
+        stored.arrivalTimeISO !== arrivalTimeISO ||
+        stored.leaveTimeISO !== leaveTimeISO;
+
+      if (!shouldReschedule) return;
+
+      if (stored?.notificationId) {
+        await cancelLeaveReminderNotification(stored.notificationId);
+      }
+
+      const notificationId = await scheduleLeaveReminderNotification({
+        leaveTime: computedLeaveTime,
+        originName,
+        destinationName: currentDestination,
+      });
+
+      if (notificationId) {
+        await setLeaveReminderState({
+          enabled: true,
+          arrivalTimeISO,
+          leaveTimeISO,
+          routeSignature,
+          notificationId,
+          originName,
+          destinationName: currentDestination,
+        });
+      }
+    };
+
+    void syncLeaveReminder();
+  }, [
+    reminderEnabled,
+    selectedArrivalTime,
+    computedLeaveTime,
+    routeSignature,
+    originName,
+    currentDestination,
+  ]);
+
   // 🔧 TEMPORARY: Completely disable InteractiveMap on navigation page for crash debugging
   const DISABLE_MAP_ENTIRELY = false;
 
@@ -1918,24 +2049,7 @@ export default function NavigationPage() {
             routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
             routeSteps={stableRouteSteps}
             internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
-            origin={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : undefined}
-            destination={destinationCoords || undefined}
-            initialRegion={
-              userLocation
-                ? {
-                    latitude: userLocation.latitude,
-                    longitude: userLocation.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }
-                : {
-                    // Default to NUS center when no user location
-                    latitude: 1.295123780071173,
-                    longitude: 103.77776037392553,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }
-            }
+            forceResetCenter={forceResetCenter}
             showLandmarks={false}
             showMapControls={false}
             activeRoute={showInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
@@ -2447,7 +2561,7 @@ export default function NavigationPage() {
                     onPress={(e) => e?.stopPropagation?.()}
                     style={{
                       position: 'absolute',
-                      top: 40,
+                      top: 48,
                       left: 0,
                       zIndex: 1000,
                       backgroundColor: '#FFFFFF',
@@ -2456,7 +2570,7 @@ export default function NavigationPage() {
                       borderColor: '#E5E5E5',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                       elevation: 5,
-                      width: 180,
+                      width: 154,
                       maxHeight: 300,
                       overflow: 'hidden',
                     }}
@@ -2518,7 +2632,13 @@ export default function NavigationPage() {
                 )}
                 
                 <Pressable
-                  onPress={() => router.push('/(app)/transit')}
+                  onPress={() => {
+                    if (router.canGoBack()) {
+                      router.back();
+                    } else {
+                      router.replace('/(app)/transit');
+                    }
+                  }}
                   style={{
                     padding: 4,
                   }}
@@ -3669,7 +3789,6 @@ export default function NavigationPage() {
                 onPress={handleSaveFavorite}
                 variant="secondary"
                 icon={<BookmarkIcon fill={favorited ? '#FFFFFF' : '#000000'} />}
-                labelOffsetY={-2}
                 colors={{
                   background: favorited ? '#6B7280' : '#FFFFFF',
                   border: favorited ? '#6B7280' : '#E5E5E5',
@@ -3694,7 +3813,6 @@ export default function NavigationPage() {
                 }}
                 variant="primary"
                 icon={<NavigationArrowIcon fill="#FFFFFF" />}
-                labelOffsetY={-2}
                 iconOffsetY={-2}
               />
             </View>

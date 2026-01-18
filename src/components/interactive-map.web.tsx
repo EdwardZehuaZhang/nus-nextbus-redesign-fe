@@ -30,10 +30,10 @@ import { getTransitLineColor, PUBLIC_BUS_COLOR } from '@/lib/transit-colors';
 
 // Route fit bounds padding - adjust these to change map zoom and position
 const ROUTE_FIT_BOUNDS_PADDING = {
-  top: 150,
-  right: 60,
-  bottom: 250,
-  left: 60,
+  top: 280,
+  right: 220,
+  bottom: 520,
+  left: 220,
 };
 
 // Extend HTMLElement for Google Places UI Kit custom elements
@@ -147,6 +147,7 @@ interface InteractiveMapProps {
   enablePlaceDetails?: boolean; // Control place details compact element visibility (default true)
   onMapItemSelect?: (selection: MapSelection | null) => void;
   selectedMapItem?: MapSelection | null;
+  forceResetCenter?: boolean; // Force reset map center to initial region
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -157,6 +158,22 @@ const DEFAULT_REGION = {
   longitude: 103.77776037392553,
   latitudeDelta: 0.01,
   longitudeDelta: 0.01,
+};
+
+const isValidInitialRegion = (region: {
+  latitude: number;
+  longitude: number;
+}): boolean => {
+  return (
+    typeof region.latitude === 'number' &&
+    typeof region.longitude === 'number' &&
+    !isNaN(region.latitude) &&
+    !isNaN(region.longitude) &&
+    region.latitude >= 1.1 &&
+    region.latitude <= 1.5 &&
+    region.longitude >= 103.6 &&
+    region.longitude <= 104.1
+  );
 };
 
 const PADDING = { top: 50, right: 50, bottom: 50, left: 50 };
@@ -5554,6 +5571,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   enablePlaceDetails = true, // Default to true for backward compatibility
   onMapItemSelect,
   selectedMapItem,
+  forceResetCenter = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -5561,6 +5579,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [selectedPrinter, setSelectedPrinter] = useState<Printer | null>(null);
   const [selectedSportsFacility, setSelectedSportsFacility] = useState<SportsFacility | null>(null);
   const [currentMapType, setCurrentMapType] = useState<'light' | 'dark' | google.maps.MapTypeId>('light'); // Track map type for styling
+  const safeInitialRegion = useMemo(
+    () => (isValidInitialRegion(initialRegion) ? initialRegion : DEFAULT_REGION),
+    [initialRegion]
+  );
   
   // Get user location for directions
   const { coords: userLocation } = useLocation();
@@ -5782,9 +5804,26 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
-    initialRegion,
+    safeInitialRegion,
     !!routePolyline // Don't pan/zoom if we have a route polyline
   );
+
+  useEffect(() => {
+    if (!forceResetCenter || !mapRef.current || !isMapCreated) return;
+    if (routePolyline || internalRoutePolylines) return;
+    mapRef.current.setCenter({
+      lat: safeInitialRegion.latitude,
+      lng: safeInitialRegion.longitude,
+    });
+    mapRef.current.setZoom(16);
+  }, [
+    forceResetCenter,
+    isMapCreated,
+    mapRef,
+    routePolyline,
+    internalRoutePolylines,
+    safeInitialRegion,
+  ]);
 
   const handleBusStopSelected = React.useCallback(
     (stop: BusStop) => {

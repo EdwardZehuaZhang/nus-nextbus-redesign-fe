@@ -1442,6 +1442,17 @@ const useDragHandlers = () => {
   const MAX_HEIGHT = 92; // Maximum height - allow nearly full screen expansion for small devices
   const DEFAULT_HEIGHT = 45; // Default state
 
+  const resetToDefault = React.useCallback(() => {
+    setIsSearchMode(false);
+    setIsCollapsed(false);
+    setTempHeight(null);
+    setKeyboardHeight(0);
+    setContainerHeight(DEFAULT_HEIGHT);
+    heightAnimation.setValue(DEFAULT_HEIGHT);
+    backdropOpacity.setValue(0);
+    translateY.setValue(0);
+  }, [backdropOpacity, heightAnimation, translateY]);
+
   // Listen for keyboard events
   React.useEffect(() => {
     const keyboardWillShow = Keyboard.addListener(
@@ -1746,6 +1757,7 @@ const useDragHandlers = () => {
     heightAnimation,
     MIN_HEIGHT,
     MAX_HEIGHT,
+    resetToDefault,
   };
 };
 
@@ -2278,6 +2290,7 @@ export default function TransitPage() {
     heightAnimation,
     MIN_HEIGHT,
     MAX_HEIGHT,
+    resetToDefault,
   } = useDragHandlers();
 
   const handleRouteClick = (routeName: string) => {
@@ -2292,10 +2305,11 @@ export default function TransitPage() {
 
   useFocusEffect(
     React.useCallback(() => {
+      resetToDefault();
       return () => {
         setMapSelection(null);
       };
-    }, [])
+    }, [resetToDefault])
   );
 
   // Track if component has mounted to avoid flickering on initial focus changes
