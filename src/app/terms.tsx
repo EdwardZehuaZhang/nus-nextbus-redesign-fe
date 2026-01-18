@@ -61,3 +61,9 @@ export default function TermsPage() {
     </ScrollView>
   );
 }
+
+// Hide the header title and use a clear back label
+export const options = {
+  title: '',
+  headerBackTitle: 'Back',
+};

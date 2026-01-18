@@ -2184,9 +2184,15 @@ export default function TransitPage() {
     encodeURIComponent('Hi Edward,\n\nI need help with...\n\n');
 
   const openExternal = (url: string) => {
-    Linking.openURL(url).catch(() => {
-      // Silent catch
-    });
+    // Prefer capability check for mailto and custom schemes
+    Linking.canOpenURL(url)
+      .then((canOpen) => {
+        if (canOpen) return Linking.openURL(url);
+        throw new Error('Cannot open URL');
+      })
+      .catch(() => {
+        // Silent catch to avoid crashing if no handler is available
+      });
   };
 
   const openPrivacy = () => {
