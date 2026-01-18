@@ -421,6 +421,7 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
           style={{
             flex: 1,
             fontSize: 16,
+            fontWeight: '500',
             color: '#09090B',
             height: 40,
             paddingVertical: 0,
@@ -429,7 +430,7 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
             textAlignVertical: 'center', // Android centering
             includeFontPadding: false as any, // Android typography padding
             lineHeight: 20, // match text-base (~16) with comfortable line height
-            transform: [{ translateY: 2 }], // slight downward nudge for proper alignment
+            transform: [{ translateY: -0 }], // slight upward nudge for proper alignment
             outlineWidth: 0,
             // @ts-ignore - Web-specific properties to remove Safari focus outline
             outlineStyle: 'none',
@@ -1205,19 +1206,25 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
         <View className="flex-1 flex-row items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 shadow-sm" style={{ height: 40 }}>
           <SearchIcon />
           <TextInput
-            className="flex-1 text-base text-neutral-900"
+            className="flex-1"
             placeholder="Search for location..."
             placeholderTextColor="#737373"
             value={searchText}
             onChangeText={setSearchText}
             autoFocus={true}
             style={{
+              flex: 1,
+              fontSize: 16,
+              fontWeight: '500',
+              color: '#09090B',
               height: 40,
               paddingVertical: 0,
+              paddingHorizontal: 0,
+              margin: 0,
               textAlignVertical: 'center', // Android centering
               includeFontPadding: false as any, // Android typography padding
               lineHeight: 20, // match text-base (~16) with comfortable line height
-              transform: [{ translateY: -2 }], // slight upward nudge to visually center
+              transform: [{ translateY: -0 }], // slight upward nudge to visually center
               outlineWidth: 0,
               // @ts-ignore - Web-specific properties to remove Safari focus outline
               outlineStyle: 'none',

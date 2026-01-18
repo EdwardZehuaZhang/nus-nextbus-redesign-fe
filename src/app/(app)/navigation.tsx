@@ -1959,6 +1959,7 @@ export default function NavigationPage() {
                         fontSize: 16,
                         fontWeight: '500',
                         color: location.text ? '#211F26' : '#737373',
+                        transform: [{ translateY: -2 }],
                       }}
                     >
                       {location.text || 'Search for location...'}
@@ -2184,9 +2185,10 @@ export default function NavigationPage() {
                       style={{
                         flex: 1,
                         fontSize: 16,
+                        fontWeight: '500',
                         color: '#211F26',
                         padding: 0,
-                        paddingTop: 4,
+                        transform: [{ translateY: -2 }],
                         outlineWidth: 0,
                       }}
                     />
