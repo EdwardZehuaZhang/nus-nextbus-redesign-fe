@@ -2342,8 +2342,6 @@ export default function NavigationPage() {
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     minHeight: 40, // Ensure sufficient height for content
-                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                    elevation: 1,
                     width: 154,
                   }}
                 >
