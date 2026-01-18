@@ -1,7 +1,7 @@
 import polyline from '@mapbox/polyline';
 import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Animated, TextInput, Platform, ActivityIndicator, Dimensions } from 'react-native';
+import { Animated, TextInput, Platform, ActivityIndicator, Dimensions, Keyboard } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,9 +30,11 @@ import {
   ScrollView,
   Text,
   View,
+  ActionButton,
 } from '@/components/ui';
 import { XIcon } from '@/components/ui/icons/x-icon';
 import { Search as SearchIcon, Van } from '@/components/ui/icons';
+import { NavigationArrowIcon } from '@/components/ui/icons/navigation-arrow';
 import { useLocation } from '@/lib/hooks/use-location';
 import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
 import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
@@ -62,14 +64,6 @@ const NavigationArrow = () => (
   </Svg>
 );
 
-const NavigationArrowWhite = () => (
-  <Svg width={16} height={16} viewBox="0 0 20 20" fill="none">
-    <Path
-      d="M19.375 9.4984C19.3731 9.7625 19.2863 10.019 19.1275 10.23C18.9687 10.441 18.7462 10.5954 18.4929 10.6703L18.4773 10.675L12.3836 12.3812L10.6773 18.475L10.6726 18.4906C10.5976 18.7438 10.4432 18.9662 10.2323 19.125C10.0213 19.2838 9.76483 19.3706 9.50076 19.3726H9.47732C9.21837 19.375 8.96524 19.2958 8.75389 19.1462C8.54254 18.9965 8.38372 18.7841 8.29998 18.539L3.20311 4.79762C3.20146 4.79357 3.20015 4.78938 3.1992 4.78512C3.12303 4.56389 3.11048 4.32573 3.16297 4.09772C3.21546 3.86972 3.3309 3.66102 3.49613 3.49538C3.66137 3.32973 3.86978 3.21379 4.09766 3.16073C4.32553 3.10768 4.56373 3.11965 4.78514 3.19527L4.79764 3.19918L18.5414 8.29762C18.7902 8.38268 19.0054 8.54509 19.1553 8.76113C19.3053 8.97717 19.3823 9.23551 19.375 9.4984Z"
-      fill="#FFFFFF"
-    />
-  </Svg>
-);
 
 const MapPin = () => (
   <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
@@ -312,18 +306,23 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
 );
 
 // Custom hook for drag handlers (similar to transit page)
-const useDragHandlers = () => {
-  const [containerHeight, setContainerHeight] = React.useState(39); // Start at 39%
+const useDragHandlers = (config?: {
+  minHeight?: number;
+  defaultHeight?: number;
+  maxHeight?: number;
+}) => {
+  const initialDefault = config?.defaultHeight ?? 39;
+  const MIN_HEIGHT = config?.minHeight ?? 5; // Minimum height - just frame visible
+  const MAX_HEIGHT = config?.maxHeight ?? 75; // Maximum height - reduced to better fit content
+  const DEFAULT_HEIGHT = config?.defaultHeight ?? 39; // Default state
+
+  const [containerHeight, setContainerHeight] = React.useState(DEFAULT_HEIGHT); // Start at default
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
-  const startHeight = React.useRef(39);
+  const startHeight = React.useRef(DEFAULT_HEIGHT);
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
   const isDragging = React.useRef(false);
-  const heightAnimation = React.useRef(new Animated.Value(39)).current;
-
-  const MIN_HEIGHT = 5; // Minimum height - just frame visible
-  const MAX_HEIGHT = 75; // Maximum height - reduced to better fit content
-  const DEFAULT_HEIGHT = 39; // Default state
+  const heightAnimation = React.useRef(new Animated.Value(initialDefault)).current;
 
   // Animate to target height smoothly
   const animateToHeight = (targetHeight: number) => {
@@ -462,6 +461,11 @@ const useDragHandlers = () => {
     }
   };
 
+  const snapToHeight = (targetHeight: number) => {
+    setTempHeight(null);
+    animateToHeight(targetHeight);
+  };
+
   return {
     containerHeight,
     handleDrag,
@@ -471,6 +475,8 @@ const useDragHandlers = () => {
     dragStartY,
     dragStartTime,
     isDragging,
+    snapToHeight,
+    constants: { MIN_HEIGHT, MAX_HEIGHT, DEFAULT_HEIGHT },
   };
 };
 
@@ -689,15 +695,34 @@ export default function NavigationPage() {
   const [recentSearches, setRecentSearches] = useState<any[]>([]);
   const [searchMode, setSearchMode] = useState<'origin' | 'destination' | 'stop'>('origin'); // Track what we're selecting
   const [activeStopId, setActiveStopId] = useState<string | null>(null); // Track which stop is being edited
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
+  const [editingOriginalText, setEditingOriginalText] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // Log panel state changes
   useEffect(() => {
   }, [panelState]);
+
+  // Always expand sheet when entering search/animating state
+  useEffect(() => {
+    if (panelState === 'animating') {
+      snapToHeight(MAX_HEIGHT);
+    }
+  }, [panelState, MAX_HEIGHT, snapToHeight]);
+
+  // Clear selection state when panel fully closes
+  useEffect(() => {
+    if (panelState === 'closed') {
+      resetEditingState();
+    }
+  }, [panelState, resetEditingState]);
   
   // Animation for search panel slide up
   const searchPanelAnimation = React.useRef(new Animated.Value(0)).current;
 
   // Use drag handlers for the bottom sheet
+  const effectiveMinHeight = panelState !== 'closed' || isKeyboardVisible ? 39 : 5;
   const {
     containerHeight,
     handleDrag,
@@ -707,7 +732,41 @@ export default function NavigationPage() {
     dragStartY,
     dragStartTime,
     isDragging,
-  } = useDragHandlers();
+    snapToHeight,
+    constants: { MAX_HEIGHT, DEFAULT_HEIGHT },
+  } = useDragHandlers({ minHeight: effectiveMinHeight, defaultHeight: 39, maxHeight: 75 });
+
+  // Keep sheet above keyboard and prevent collapsing while editing
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (e: any) => {
+      setIsKeyboardVisible(true);
+      setKeyboardHeight(e?.endCoordinates?.height ?? 0);
+      snapToHeight(MAX_HEIGHT);
+    };
+
+    const onHide = () => {
+      setIsKeyboardVisible(false);
+      setKeyboardHeight(0);
+    };
+
+    const showListener = Keyboard.addListener(showEvent, onShow);
+    const hideListener = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, [MAX_HEIGHT, snapToHeight]);
+
+  // If min height increases (search/keyboard), snap up to avoid being stuck below default
+  useEffect(() => {
+    if (containerHeight < effectiveMinHeight) {
+      snapToHeight(Math.max(effectiveMinHeight, DEFAULT_HEIGHT));
+    }
+  }, [containerHeight, effectiveMinHeight, DEFAULT_HEIGHT, snapToHeight]);
   
   // Log containerHeight changes to see if it's affecting the animation
   useEffect(() => {
@@ -959,6 +1018,7 @@ export default function NavigationPage() {
         
         // Set the selected location based on search mode
         if (searchMode === 'destination') {
+          setLocations((prev) => prev.map((loc) => loc.type === 'destination' ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords } : loc));
           console.log('[NAV GOOGLE PLACE] 🎯 Setting as destination');
           // Update destination
           router.push({
@@ -975,7 +1035,8 @@ export default function NavigationPage() {
               customOriginLng,
             },
           });
-        } else {
+        } else if (searchMode === 'origin') {
+          setLocations((prev) => prev.map((loc) => loc.type === 'origin' ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords } : loc));
           console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
           // Update origin
           router.push({
@@ -992,9 +1053,14 @@ export default function NavigationPage() {
               userLng: userLocation?.longitude?.toString(),
             },
           });
+        } else if (searchMode === 'stop' && activeStopId) {
+          setLocations((prev) => prev.map((loc) => loc.id === activeStopId ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords, isEditable: false } : loc));
+          setActiveStopId(null);
         }
         
         // Close the search panel
+        resetEditingState();
+        Keyboard.dismiss();
         setPanelState('closed');
         setSearchText('');
       } else {
@@ -1417,17 +1483,14 @@ export default function NavigationPage() {
       coords: undefined,
     };
     // Insert before the last item (destination)
-    setLocations([
-      ...locations.slice(0, -1),
+    setLocations((prev) => [
+      ...prev.slice(0, -1),
       newStop,
-      locations[locations.length - 1],
+      prev[prev.length - 1],
     ]);
-    
-    // Open search panel for the new stop
-    setSearchMode('stop');
-    setActiveStopId(newStop.id);
-    setPanelState('animating');
-    setSearchText('');
+
+    // Open search panel for the new stop with live editing
+    startEditingLocation(newStop);
   };
 
   const handleRemoveLocation = (id: string) => {
@@ -1465,6 +1528,39 @@ export default function NavigationPage() {
     ];
     setLocations(newLocations);
   };
+
+  const resetEditingState = React.useCallback(() => {
+    setEditingLocationId(null);
+    setEditingOriginalText('');
+    setActiveStopId(null);
+  }, []);
+
+  const startEditingLocation = React.useCallback((location: LocationItem) => {
+    const mode = location.type === 'stop' ? 'stop' : location.type === 'destination' ? 'destination' : 'origin';
+    setSearchMode(mode);
+    if (location.type === 'stop') {
+      setActiveStopId(location.id);
+    } else {
+      setActiveStopId(null);
+    }
+    setEditingLocationId(location.id);
+    setEditingOriginalText(location.text || '');
+    setSearchText(location.text || '');
+    if (panelState !== 'expanded') {
+      setPanelState('animating');
+    }
+    snapToHeight(MAX_HEIGHT);
+  }, [MAX_HEIGHT, panelState, snapToHeight]);
+
+  const setSearchTextAndSync = React.useCallback((text: string) => {
+    setSearchText(text);
+  }, []);
+
+  const revertEditingText = React.useCallback(() => {
+    if (editingLocationId) {
+      setLocations((prev) => prev.map((loc) => loc.id === editingLocationId ? { ...loc, text: editingOriginalText } : loc));
+    }
+  }, [editingLocationId, editingOriginalText]);
 
   // Helper: get coordinates for a location name (bus stop)
   const getCoordsForName = React.useCallback((name: string): { lat: number; lng: number } | null => {
@@ -1688,6 +1784,7 @@ export default function NavigationPage() {
     
     if (searchMode === 'origin') {
       // Update origin with selected location
+      setLocations((prev) => prev.map((loc) => loc.type === 'origin' ? { ...loc, text: item.name, coords: item.coordinates ? { lat: item.coordinates.latitude, lng: item.coordinates.longitude } : loc.coords } : loc));
       router.replace({
         pathname: '/navigation' as any,
         params: {
@@ -1701,6 +1798,7 @@ export default function NavigationPage() {
       });
     } else if (searchMode === 'destination') {
       // Update destination with selected location
+      setLocations((prev) => prev.map((loc) => loc.type === 'destination' ? { ...loc, text: item.name, coords: item.coordinates ? { lat: item.coordinates.latitude, lng: item.coordinates.longitude } : loc.coords } : loc));
       router.replace({
         pathname: '/navigation' as any,
         params: {
@@ -1731,7 +1829,9 @@ export default function NavigationPage() {
       setActiveStopId(null);
     }
     
-    // Close search panel
+    // Close search panel and clear selection state
+    resetEditingState();
+    Keyboard.dismiss();
     setPanelState('closed');
     setSearchText('');
   };
@@ -1887,6 +1987,14 @@ export default function NavigationPage() {
             const isDestination = location.type === 'destination';
             const isStop = location.type === 'stop';
             const isLast = index === locations.length - 1;
+            const isEditing = editingLocationId === location.id;
+            const editingPlaceholder = location.type === 'origin'
+              ? 'Search for starting location...'
+              : location.type === 'destination'
+                ? 'Search for destination...'
+                : 'Search for stop location...';
+            const displayText = isEditing ? searchText : location.text;
+            const textToShow = displayText || (isEditing ? editingPlaceholder : 'Search for location...');
 
             // Determine icon
             let LocationIcon = null;
@@ -1902,42 +2010,7 @@ export default function NavigationPage() {
               <React.Fragment key={location.id}>
                 <Pressable
                   onPress={() => {
-                    // Allow clicking on origin, destination, and stops to change them
-                    if (isOrigin) {
-                      console.log('[CLICK] 🎯 Origin clicked - Current panelState:', panelState);
-                      setSearchMode('origin');
-                      setSearchText('');
-                      // Only trigger animation if not already expanded
-                      if (panelState !== 'expanded') {
-                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
-                        setPanelState('animating');
-                      } else {
-                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
-                      }
-                    } else if (isDestination) {
-                      console.log('[CLICK] 🎯 Destination clicked - Current panelState:', panelState);
-                      setSearchMode('destination');
-                      setSearchText('');
-                      // Only trigger animation if not already expanded
-                      if (panelState !== 'expanded') {
-                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
-                        setPanelState('animating');
-                      } else {
-                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
-                      }
-                    } else if (isStop) {
-                      console.log('[CLICK] 🎯 Stop clicked - Current panelState:', panelState);
-                      setSearchMode('stop');
-                      setActiveStopId(location.id);
-                      setSearchText('');
-                      // Only trigger animation if not already expanded
-                      if (panelState !== 'expanded') {
-                        console.log('[CLICK] 🚀 Setting panelState to ANIMATING');
-                        setPanelState('animating');
-                      } else {
-                        console.log('[CLICK] ⏸️ Panel already EXPANDED - not triggering animation');
-                      }
-                    }
+                    startEditingLocation(location);
                   }}
                   style={{
                     flexDirection: 'row',
@@ -1958,13 +2031,16 @@ export default function NavigationPage() {
                       style={{
                         fontSize: 16,
                         fontWeight: '500',
-                        color: location.text ? '#211F26' : '#737373',
+                        color: displayText ? '#211F26' : '#737373',
                         lineHeight: 20,
                         includeFontPadding: false as any,
                         transform: [{ translateY: 0 }],
+                        backgroundColor: isEditing ? '#E0E7FF' : 'transparent',
+                        paddingHorizontal: isEditing ? 4 : 0,
+                        borderRadius: isEditing ? 0 : 0,
                       }}
                     >
-                      {location.text || 'Search for location...'}
+                      {textToShow}
                     </Text>
                   </View>
 
@@ -2082,7 +2158,7 @@ export default function NavigationPage() {
             backgroundColor: '#FFFFFF',
             paddingHorizontal: 20,
             paddingTop: 4,
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingBottom: Math.max(insets.bottom, 16) + keyboardHeight,
             boxShadow: searchPanelAnimation.interpolate({
               inputRange: [0, 1],
               outputRange: [
@@ -2182,7 +2258,7 @@ export default function NavigationPage() {
                       }
                       placeholderTextColor="#737373"
                       value={searchText}
-                      onChangeText={setSearchText}
+                      onChangeText={setSearchTextAndSync}
                       autoFocus={true}
                       style={{
                         flex: 1,
@@ -2202,14 +2278,16 @@ export default function NavigationPage() {
                   </View>
                   <Pressable
                     onPress={() => {
-                      // If canceling a stop search and the stop is empty, remove it
-                      if (searchMode === 'stop' && activeStopId) {
-                        const stop = locations.find(loc => loc.id === activeStopId);
-                        if (stop && !stop.text) {
-                          setLocations(locations.filter(loc => loc.id !== activeStopId));
-                        }
-                        setActiveStopId(null);
+                      // Revert any in-progress edits
+                      revertEditingText();
+
+                      // If canceling a stop search and the original was empty, remove the temp stop
+                      if (searchMode === 'stop' && activeStopId && editingOriginalText.trim().length === 0) {
+                        setLocations((prev) => prev.filter((loc) => loc.id !== activeStopId));
                       }
+
+                      resetEditingState();
+                      Keyboard.dismiss();
                       setPanelState('closed');
                       setSearchText('');
                     }}
@@ -2768,7 +2846,6 @@ export default function NavigationPage() {
                               >
                                 <View
                                   style={{
-                                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
                                     minWidth: 38,
                                     height: 37,
                                     backgroundColor: routeColor,
@@ -3338,11 +3415,6 @@ export default function NavigationPage() {
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                         paddingHorizontal: 8,
-                                        shadowColor: '#000',
-                                        shadowOffset: { width: 0, height: 1 },
-                                        shadowOpacity: 0.1,
-                                        shadowRadius: 2,
-                                        elevation: 1,
                                       }}
                                     >
                                       <Text
@@ -3591,82 +3663,40 @@ export default function NavigationPage() {
                 alignSelf: 'stretch',
               }}
             >
+              {/* Save as Favorite Button */}
+              <ActionButton
+                label={favorited ? 'Unsave' : 'Save'}
+                onPress={handleSaveFavorite}
+                variant="secondary"
+                icon={<BookmarkIcon fill={favorited ? '#FFFFFF' : '#000000'} />}
+                labelOffsetY={-2}
+                colors={{
+                  background: favorited ? '#6B7280' : '#FFFFFF',
+                  border: favorited ? '#6B7280' : '#E5E5E5',
+                  text: favorited ? '#FFFFFF' : '#211F26',
+                }}
+              />
+
               {/* Start Navigation Button */}
-              <Pressable
+              <ActionButton
+                label="Start Navigation"
                 onPress={() => {
-                  // Navigate to the new turn-by-turn navigation page
                   router.push({
                     pathname: '/turn-by-turn-navigation',
                     params: {
                       destination: currentDestination,
-                      destinationLat: destinationCoords?.lat,
-                      destinationLng: destinationCoords?.lng,
-                      userLat,
-                      userLng,
+                      destinationLat: destinationCoords?.lat?.toString(),
+                      destinationLng: destinationCoords?.lng?.toString(),
+                      userLat: userLat?.toString(),
+                      userLng: userLng?.toString(),
                     },
                   });
                 }}
-                style={{
-                  flex: 1,
-                  height: 36,
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: 4,
-                  borderRadius: 8,
-                  backgroundColor: '#274F9C',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                  elevation: 1,
-                  flexDirection: 'row',
-                }}
-              >
-                <View style={{ justifyContent: 'center', alignItems: 'center' }}>
-                  <NavigationArrowWhite />
-                </View>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: '500',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  Start Navigation
-                </Text>
-              </Pressable>
-
-              {/* Save as Favorite Button */}
-              <Pressable
-                onPress={handleSaveFavorite}
-                style={{
-                  flex: 1,
-                  height: 36,
-                  paddingVertical: 8,
-                  paddingLeft: 16,
-                  paddingRight: 13,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: 4,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: favorited ? '#6B7280' : '#E5E5E5',
-                  backgroundColor: favorited ? '#6B7280' : '#FFFFFF',
-                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-                  elevation: 1,
-                  flexDirection: 'row',
-                }}
-              >
-                <BookmarkIcon fill={favorited ? '#FFFFFF' : '#000000'} />
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: '500',
-                    color: favorited ? '#FFFFFF' : '#211F26',
-                  }}
-                >
-                  {favorited ? 'Unsave' : 'Save'}
-                </Text>
-              </Pressable>
+                variant="primary"
+                icon={<NavigationArrowIcon fill="#FFFFFF" />}
+                labelOffsetY={-2}
+                iconOffsetY={-2}
+              />
             </View>
             </Animated.View>
             )}

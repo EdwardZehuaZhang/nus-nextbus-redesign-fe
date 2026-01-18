@@ -1,6 +1,7 @@
 import { cssInterop } from 'nativewind';
 import Svg from 'react-native-svg';
 
+export * from './action-button';
 export * from './button';
 export * from './checkbox';
 export { default as colors } from './colors';

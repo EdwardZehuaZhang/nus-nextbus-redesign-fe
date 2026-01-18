@@ -33,6 +33,7 @@ import {
   ScrollView,
   Text,
   View,
+  ActionButton,
 } from '@/components/ui';
 import {
   AvgCapacityIcon,
@@ -47,6 +48,8 @@ import {
   Train,
   Van,
 } from '@/components/ui/icons';
+import { NavigationArrowIcon } from '@/components/ui/icons/navigation-arrow';
+import { LocationIcon } from '@/components/ui/icons/location-icons';
 
 import { SearchResults } from '@/components/shared-search';
 import {
@@ -74,6 +77,85 @@ type BusRoute = {
     crowding: 'low' | 'medium' | 'high';
     textColor?: string;
   }[];
+};
+
+const parseBusTimeForSort = (time: string): number => {
+  if (time === 'Arr') {
+    return 0;
+  }
+
+  const minutes = parseInt(time, 10);
+  if (Number.isNaN(minutes)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return minutes;
+};
+
+const buildBusRoutes = (
+  shuttles: Array<any>,
+  colorMap: Record<string, string>
+): BusRoute[] => {
+  const routeMap = new Map<string, BusRoute>();
+
+  shuttles.forEach((shuttle) => {
+    const routeName = shuttle.name.replace(/^PUB:/, '').toUpperCase();
+    const isPublicBus = shuttle.name.startsWith('PUB:');
+    const routeColor = isPublicBus
+      ? '#55DD33'
+      : getRouteColor(shuttle.name, colorMap[shuttle.name]);
+
+    const times = [
+      {
+        time: formatArrivalTime(shuttle.arrivalTime),
+        crowding: passengerLoadToCrowding(shuttle.passengers),
+        textColor: '#211F26',
+      },
+      {
+        time: formatArrivalTime(shuttle.nextArrivalTime),
+        crowding: passengerLoadToCrowding(shuttle.nextPassengers),
+        textColor: '#737373',
+      },
+    ];
+
+    const existing = routeMap.get(routeName);
+    if (!existing) {
+      routeMap.set(routeName, {
+        route: routeName,
+        color: routeColor,
+        isPublicBus,
+        times: [...times],
+      });
+      return;
+    }
+
+    existing.times.push(...times);
+    if (!isPublicBus && existing.isPublicBus) {
+      existing.isPublicBus = false;
+      existing.color = routeColor;
+    }
+  });
+
+  return Array.from(routeMap.values())
+    .map((route) => {
+      const sortedTimes = route.times
+        .filter((timeItem) => timeItem.time !== 'N/A')
+        .sort(
+          (a, b) =>
+            parseBusTimeForSort(a.time) - parseBusTimeForSort(b.time)
+        )
+        .slice(0, 4)
+        .map((timeItem, index) => ({
+          ...timeItem,
+          textColor: index === 0 ? '#211F26' : '#737373',
+        }));
+
+      return {
+        ...route,
+        times: sortedTimes,
+      };
+    })
+    .filter((route) => route.times.length > 0);
 };
 
 type TabItem = {
@@ -331,8 +413,8 @@ const BusRouteCard = ({
           </Text>
         </View>
 
-        {/* Times List - Only show first 2 times (next bus and next next bus) */}
-        <BusTimingRows times={route.times.slice(0, 2)} />
+        {/* Times List - Show up to 4 timings */}
+        <BusTimingRows times={route.times.slice(0, 4)} />
       </View>
     </Pressable>
   );
@@ -913,40 +995,7 @@ const NearestStopsSection = ({
       shuttleData.ShuttleServiceResult.shuttles
     );
 
-    return sortedShuttles
-      .map((shuttle) => {
-        // Remove "PUB:" prefix from public bus routes and convert to uppercase
-        const routeName = shuttle.name.replace(/^PUB:/, '').toUpperCase();
-
-        // Use special color for public buses, otherwise use route color
-        const isPublicBus = shuttle.name.startsWith('PUB:');
-        const routeColor = isPublicBus
-          ? '#55DD33'
-          : getRouteColor(shuttle.name, colorMap[shuttle.name]);
-
-        return {
-          route: routeName,
-          color: routeColor,
-          isPublicBus: isPublicBus,
-          times: [
-            {
-              time: formatArrivalTime(shuttle.arrivalTime),
-              crowding: passengerLoadToCrowding(shuttle.passengers),
-              textColor: '#211F26',
-            },
-            {
-              time: formatArrivalTime(shuttle.nextArrivalTime),
-              crowding: passengerLoadToCrowding(shuttle.nextPassengers),
-              textColor: '#737373',
-            },
-          ],
-        };
-      })
-      .filter((route) => {
-        // Filter out routes where all timings are N/A
-        const hasValidTiming = route.times.some((t) => t.time !== 'N/A');
-        return hasValidTiming;
-      });
+    return buildBusRoutes(sortedShuttles, colorMap);
   }, [shuttleData, colorMap]);
 
   return (
@@ -1747,33 +1796,7 @@ const MapSelectionDetails = ({
       busStopShuttleData.ShuttleServiceResult.shuttles
     );
 
-    return sortedShuttles
-      .map((shuttle) => {
-        const routeName = shuttle.name.replace(/^PUB:/, '').toUpperCase();
-        const isPublicBus = shuttle.name.startsWith('PUB:');
-        const routeColor = isPublicBus
-          ? '#55DD33'
-          : getRouteColor(shuttle.name, busStopColorMap[shuttle.name]);
-
-        return {
-          route: routeName,
-          color: routeColor,
-          isPublicBus: isPublicBus,
-          times: [
-            {
-              time: formatArrivalTime(shuttle.arrivalTime),
-              crowding: passengerLoadToCrowding(shuttle.passengers),
-              textColor: '#211F26',
-            },
-            {
-              time: formatArrivalTime(shuttle.nextArrivalTime),
-              crowding: passengerLoadToCrowding(shuttle.nextPassengers),
-              textColor: '#737373',
-            },
-          ],
-        };
-      })
-      .filter((route) => route.times.some((t) => t.time !== 'N/A'));
+    return buildBusRoutes(sortedShuttles, busStopColorMap);
   }, [busStopShuttleData, busStopColorMap]);
 
   const openInMaps = (
@@ -1815,38 +1838,25 @@ const MapSelectionDetails = ({
       style={{
         flexDirection: shouldStackActions ? 'column' : 'row',
         gap: 8,
+        marginTop: 0,
       }}
     >
-      <Pressable
+      <ActionButton
+        label="Open in Google Maps"
         onPress={onOpenMaps}
-        style={{
-          backgroundColor: '#FFFFFF',
-          paddingVertical: 12,
-          borderRadius: 8,
-          alignItems: 'center',
-          borderWidth: 1,
-          borderColor: '#E5E7EB',
-          flex: shouldStackActions ? undefined : 1,
-        }}
-      >
-        <Text style={{ color: '#111827', fontWeight: '600' }}>
-          Open in Google Maps
-        </Text>
-      </Pressable>
-      <Pressable
+        variant="secondary"
+        labelOffsetY={0}
+        fullWidth={!shouldStackActions}
+      />
+      <ActionButton
+        label="Start navigation"
         onPress={onNavigate}
-        style={{
-          backgroundColor: '#274F9C',
-          paddingVertical: 12,
-          borderRadius: 8,
-          alignItems: 'center',
-          flex: shouldStackActions ? undefined : 1,
-        }}
-      >
-        <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>
-          Start navigation
-        </Text>
-      </Pressable>
+        variant="primary"
+        icon={<NavigationArrowIcon fill="#FFFFFF" />}
+        labelOffsetY={0}
+        iconOffsetY={-2}
+        fullWidth={!shouldStackActions}
+      />
     </View>
   );
 
@@ -1947,8 +1957,8 @@ const MapSelectionDetails = ({
                 ) : (
                   <View style={{ gap: 8 }}>
                     <View className="flex-row gap-2">
-                      {busStopRoutes.slice(0, 3).map((route) => (
-                        <BusRouteCard key={route.route} route={route} />
+                      {busStopRoutes.slice(0, 3).map((route, index) => (
+                        <BusRouteCard key={`${route.route}-${index}`} route={route} />
                       ))}
                       {busStopRoutes.length < 3 &&
                         Array.from({ length: 3 - busStopRoutes.length }).map(
@@ -1957,8 +1967,8 @@ const MapSelectionDetails = ({
                     </View>
                     {busStopRoutes.length > 3 && (
                       <View className="flex-row gap-2">
-                        {busStopRoutes.slice(3, 6).map((route) => (
-                          <BusRouteCard key={route.route} route={route} />
+                        {busStopRoutes.slice(3, 6).map((route, index) => (
+                          <BusRouteCard key={`${route.route}-${index + 3}`} route={route} />
                         ))}
                         {busStopRoutes.length < 6 &&
                           Array.from({ length: 6 - busStopRoutes.length }).map(
