@@ -1,7 +1,8 @@
 import { router, usePathname } from 'expo-router';
 import React from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking, useWindowDimensions } from 'react-native';
+import { showMessage } from 'react-native-flash-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Info } from 'phosphor-react-native';
 
@@ -383,14 +384,12 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
 
   const handleFocus = () => {
     // Trigger search mode when user focuses on search
-    console.log('[SEARCH BAR] ⌨️ TextInput focused - keyboard should appear');
     if (onSearchPress) {
       onSearchPress();
     }
   };
 
   const handleContainerPress = () => {
-    console.log('[SEARCH BAR] 🖱️ Container pressed - focusing input');
     if (onSearchPress) {
       onSearchPress();
     }
@@ -814,22 +813,22 @@ const NearestStopsSection = ({
   const { coords: userLocation, error: locationError, loading: locationLoading } = useLocation();
 
   // Log user location when homepage loads
-  React.useEffect(() => {
-    console.log('🏠 Homepage (Transit) Loaded - User Location:');
-    if (locationLoading) {
-      console.log('   Status: Loading location...');
-    } else if (locationError) {
-      console.log('   Status: Error -', locationError);
-      console.log('   Will use fallback location (SDE3)');
-    } else if (userLocation) {
-      console.log('   ✅ GPS Location:', {
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-      });
-    } else {
-      console.log('   Status: No location available yet');
-    }
-  }, [userLocation, locationError, locationLoading]);
+  // React.useEffect(() => {
+  //   console.log('🏠 Homepage (Transit) Loaded - User Location:');
+  //   if (locationLoading) {
+  //     console.log('   Status: Loading location...');
+  //   } else if (locationError) {
+  //     console.log('   Status: Error -', locationError);
+  //     console.log('   Will use fallback location (SDE3)');
+  //   } else if (userLocation) {
+  //     console.log('   ✅ GPS Location:', {
+  //       latitude: userLocation.latitude,
+  //       longitude: userLocation.longitude,
+  //     });
+  //   } else {
+  //     console.log('   Status: No location available yet');
+  //   }
+  // }, [userLocation, locationError, locationLoading]);
 
   // Fallback to SDE3 coordinates if geolocation fails
   const SDE3_FALLBACK_COORDS: LocationCoords = {
@@ -1428,7 +1427,6 @@ const useDragHandlers = () => {
     // Calculate new height (dragging down increases dy, so we subtract)
     let newHeight = startHeight.current - heightChange;
 
-    console.log('[DRAG MOVE] screenHeight:', screenHeight, 'dy:', dy, 'heightChange:', heightChange, 'newHeight:', newHeight);
 
     // Clamp between MIN and MAX
     newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
@@ -1448,7 +1446,6 @@ const useDragHandlers = () => {
     let targetHeight = DEFAULT_HEIGHT;
     let collapsed = false;
 
-    console.log('[DRAG] 📏 Drag ended at height:', currentHeight, 'velocity:', vy, 'isSearchMode:', isSearchMode);
 
     // Smart snapping based on current position and velocity
     // Consider both where we are and where we're going
@@ -1462,17 +1459,14 @@ const useDragHandlers = () => {
           // From collapsed/below DEFAULT - snap to DEFAULT
           targetHeight = DEFAULT_HEIGHT;
           collapsed = false;
-          console.log('[DRAG] ⬆️ Fast swipe UP from collapsed - Snapping to DEFAULT');
         } else if (currentHeight <= DEFAULT_HEIGHT + 5) {
           // From around DEFAULT - snap to MAX
           targetHeight = MAX_HEIGHT;
           collapsed = false;
-          console.log('[DRAG] ⬆️ Fast swipe UP from DEFAULT - Snapping to EXPANDED (MAX_HEIGHT)');
         } else {
           // Already above DEFAULT - snap to MAX
           targetHeight = MAX_HEIGHT;
           collapsed = false;
-          console.log('[DRAG] ⬆️ Fast swipe UP from upper position - Snapping to EXPANDED (MAX_HEIGHT)');
         }
       } else {
         // Fast downward swipe
@@ -1480,12 +1474,10 @@ const useDragHandlers = () => {
           // From well above DEFAULT - snap to DEFAULT
           targetHeight = DEFAULT_HEIGHT;
           collapsed = false;
-          console.log('[DRAG] ⬇️ Fast swipe DOWN from upper position - Snapping to DEFAULT');
         } else {
           // From DEFAULT or below - snap to MIN
           targetHeight = MIN_HEIGHT;
           collapsed = true;
-          console.log('[DRAG] ⬇️ Fast swipe DOWN from DEFAULT/lower - Snapping to COLLAPSED (MIN_HEIGHT)');
         }
       }
     } else {
@@ -1493,15 +1485,12 @@ const useDragHandlers = () => {
       if (currentHeight < 30) {
         targetHeight = MIN_HEIGHT;
         collapsed = true;
-        console.log('[DRAG] ⬇️ Snapping to COLLAPSED (MIN_HEIGHT)');
       } else if (currentHeight > 55) {
         targetHeight = MAX_HEIGHT;
         collapsed = false;
-        console.log('[DRAG] ⬆️ Snapping to EXPANDED (MAX_HEIGHT)');
       } else {
         targetHeight = DEFAULT_HEIGHT;
         collapsed = false;
-        console.log('[DRAG] 🔄 Snapping to DEFAULT height');
       }
     }
 
@@ -1517,7 +1506,6 @@ const useDragHandlers = () => {
       friction: 8,
     }).start();
     
-    console.log('[DRAG] ✅ Final height set to:', targetHeight, '- heightAnimation synced');
   };
 
   const handleDragEnd = () => {
@@ -1574,11 +1562,9 @@ const useDragHandlers = () => {
   const handleEnterSearchMode = () => {
     // Check current panel height
     const currentHeight = (heightAnimation as any)._value;
-    console.log('[TRANSIT SEARCH] 🎯 Search bar clicked - Current panel height:', currentHeight, 'MAX_HEIGHT:', MAX_HEIGHT);
     
     // If panel is already at MAX_HEIGHT (fully expanded), don't re-animate
     if (currentHeight >= MAX_HEIGHT - 1) { // Allow 1 unit tolerance
-      console.log('[TRANSIT SEARCH] ⏸️ Panel already at MAX_HEIGHT - skipping animation');
       // Just ensure search mode is on
       if (!isSearchMode) {
         setIsSearchMode(true);
@@ -1593,7 +1579,6 @@ const useDragHandlers = () => {
       return;
     }
     
-    console.log('[TRANSIT SEARCH] 🚀 Expanding panel from', currentHeight, 'to', MAX_HEIGHT);
     setIsSearchMode(true);
     setIsCollapsed(false);
     // Animate height expansion
@@ -1604,7 +1589,6 @@ const useDragHandlers = () => {
       friction: 8,
     }).start(() => {
       setContainerHeight(MAX_HEIGHT);
-      console.log('[TRANSIT SEARCH] ✅ Animation complete - height set to MAX_HEIGHT');
     });
     // Animate backdrop fade in
     Animated.timing(backdropOpacity, {
@@ -2202,7 +2186,27 @@ export default function TransitPage() {
   const openTerms = () => {
     router.push('/terms');
   };
+
+  const openSupport = () => {
+    Linking.canOpenURL(supportMailto)
+      .then((canOpen) => {
+        if (canOpen) return Linking.openURL(supportMailto);
+        showMessage({
+          message: 'No mail app available',
+          description: 'Please install or configure an email app.',
+          type: 'warning',
+        });
+      })
+      .catch(() => {
+        showMessage({
+          message: 'Unable to open email',
+          description: 'Please try again or check your mail app.',
+          type: 'danger',
+        });
+      });
+  };
   const pathname = usePathname();
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
@@ -2276,6 +2280,12 @@ export default function TransitPage() {
       };
     }, [])
   );
+
+  // Track if component has mounted to avoid flickering on initial focus changes
+  const isMountedRef = React.useRef(false);
+  React.useEffect(() => {
+    isMountedRef.current = true;
+  }, []);
 
   // Store the map type change handler from InteractiveMap
   const mapTypeChangeHandlerRef = React.useRef<
@@ -2366,7 +2376,7 @@ export default function TransitPage() {
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
             marginTop: 'auto',
             position: 'relative',
-            zIndex: 1,
+            zIndex: 100,
           },
           animatedStyle,
         ]}
@@ -2481,7 +2491,7 @@ export default function TransitPage() {
             <Pressable
               onPress={() => {
                 setIsInfoOpen(false);
-                openExternal(supportMailto);
+                openSupport();
               }}
               style={{
                 marginTop: 8,
@@ -2511,44 +2521,40 @@ export default function TransitPage() {
         </View>
       )}
 
-      {/* Map controls - hide when bottom panel/search is up */}
-      {pathname === '/transit' && !isSearchMode && (
-        <View
+      {/* Map controls - always visible like bottom panel */}
+      <View
+        style={{
+          position: 'absolute' as any,
+          top: insets.top + 8,
+          right: 20,
+          zIndex: 80,
+        }}
+      >
+        <MapTypeSelector
+          onMapTypeChange={handleMapTypeChange}
+          onFilterChange={handleFilterChange}
+          filters={mapFilters}
+        />
+      </View>
+      <View
+        style={{
+          position: 'absolute' as any,
+          top: insets.top + 8,
+          left: 20,
+          zIndex: 1,
+        }}
+      >
+        <Pressable
+          onPress={() => setIsInfoOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Info"
           style={{
-            position: 'absolute' as any,
-            top: insets.top + 8,
-            right: 20,
-            zIndex: 80,
+            padding: 6,
           }}
         >
-          <MapTypeSelector
-            onMapTypeChange={handleMapTypeChange}
-            onFilterChange={handleFilterChange}
-            filters={mapFilters}
-          />
-        </View>
-      )}
-      {pathname === '/transit' && !isSearchMode && (
-        <View
-          style={{
-            position: 'absolute' as any,
-            top: insets.top + 8,
-            left: 20,
-            zIndex: 1,
-          }}
-        >
-          <Pressable
-            onPress={() => setIsInfoOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Info"
-            style={{
-              padding: 6,
-            }}
-          >
-            <Info size={22} color="rgba(0, 0, 0, 0.4)" />
-          </Pressable>
-        </View>
-      )}
+          <Info size={22} color="rgba(0, 0, 0, 0.4)" />
+        </Pressable>
+      </View>
     </View>
   );
 }

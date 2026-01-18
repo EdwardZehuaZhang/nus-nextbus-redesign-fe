@@ -44,14 +44,13 @@ export default function RootLayout() {
         <ThemeProvider value={theme}>
           <APIProvider>
             <BottomSheetModalProvider>
-              <Stack>
+              <Stack screenOptions={{ headerBackTitle: 'Back' }}>
                 <Stack.Screen name="(app)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="search"
-                  options={{ headerShown: false, presentation: 'modal' }}
-                />
                 <Stack.Screen name="demo" options={{ headerShown: false }} />
                 <Stack.Screen name="investor" options={{ headerShown: false }} />
+                {/* Explicitly configure Privacy & Terms headers */}
+                <Stack.Screen name="privacy" options={{ headerTitle: '' }} />
+                <Stack.Screen name="terms" options={{ headerTitle: '' }} />
               </Stack>
               <FlashMessage position="top" />
             </BottomSheetModalProvider>

@@ -70,19 +70,15 @@ const initializeLocationWatcher = async () => {
 
   const store = useLocationStore.getState();
 
-  debugLog('[useLocation] Requesting location permissions...');
   
   // Request location permissions
   const { status } = await Location.requestForegroundPermissionsAsync();
   
   if (status !== 'granted') {
-    console.error('[useLocation] Location permission denied');
-    store.setError('Location permission denied. Please enable location access in Settings.');
     store.setLoading(false);
     return;
   }
 
-  debugLog('[useLocation] Location permission granted, starting watcher...');
   
   // Only set loading if we don't have a location yet
   if (!store.coords) {
@@ -91,7 +87,6 @@ const initializeLocationWatcher = async () => {
 
   try {
     // First, try to get the current location immediately
-    debugLog('[useLocation] Getting current location...');
     try {
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
@@ -103,8 +98,6 @@ const initializeLocationWatcher = async () => {
       
       // Check if it's the simulator mock location and replace with test location
       if (isSimulatorMockLocation(latitude, longitude)) {
-        debugLog('[useLocation] ⚠️ Detected simulator mock location (San Francisco)');
-        debugLog('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
         latitude = TEST_LOCATION.latitude;
         longitude = TEST_LOCATION.longitude;
       }
@@ -112,10 +105,8 @@ const initializeLocationWatcher = async () => {
       // Simulate heading if not available (simulators typically don't have heading)
       if (!heading || heading < 0) {
         heading = simulatedHeading;
-        debugLog('[useLocation] 🧪 Using simulated heading:', heading);
       }
       
-      debugLog('[useLocation] Current location obtained:', { latitude, longitude, heading });
       store.setLocation({
         latitude,
         longitude,
@@ -124,7 +115,6 @@ const initializeLocationWatcher = async () => {
         accuracy: currentLocation.coords.accuracy ?? undefined,
       });
     } catch (err) {
-      debugWarn('[useLocation] Failed to get current location immediately:', err);
     }
 
     // Then start watching for continuous updates
@@ -141,8 +131,6 @@ const initializeLocationWatcher = async () => {
         
         // Check if it's the simulator mock location and replace with test location
         if (isSimulatorMockLocation(latitude, longitude)) {
-          debugLog('[useLocation] ⚠️ Detected simulator mock location from watcher');
-          debugLog('[useLocation] 🧪 Using test location instead: NUS Campus', TEST_LOCATION);
           latitude = TEST_LOCATION.latitude;
           longitude = TEST_LOCATION.longitude;
         }
@@ -154,8 +142,6 @@ const initializeLocationWatcher = async () => {
           heading = simulatedHeading;
         }
         
-        debugLog('[useLocation] Location update from watcher:', { latitude, longitude, heading });
-        debugLog('[useLocation] Location accuracy (in meters):', location.coords.accuracy);
         store.setLocation({
           latitude,
           longitude,
@@ -166,9 +152,7 @@ const initializeLocationWatcher = async () => {
       }
     );
 
-    debugLog('[useLocation] Watcher initialized successfully');
   } catch (err) {
-    console.error('[useLocation] Failed to start location watcher:', err);
     store.setError('Failed to start location tracking');
     store.setLoading(false);
   }
@@ -194,20 +178,17 @@ export const useLocation = () => {
 
   useEffect(() => {
     activeSubscribers++;
-    debugLog('[useLocation] Component mounted, subscribers:', activeSubscribers);
 
     // Initialize watcher on first mount
     initializeLocationWatcher();
 
     return () => {
       activeSubscribers--;
-      debugLog('[useLocation] Component unmounted, subscribers:', activeSubscribers);
 
       // Only clean up watcher when ALL components are unmounted
       if (activeSubscribers === 0) {
         setTimeout(() => {
           if (activeSubscribers === 0 && globalWatchSubscription !== null) {
-            debugLog('[useLocation] Clearing global watcher');
             globalWatchSubscription.remove();
             globalWatchSubscription = null;
           }

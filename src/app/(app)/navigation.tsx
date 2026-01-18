@@ -35,7 +35,7 @@ import { XIcon } from '@/components/ui/icons/x-icon';
 import { Search as SearchIcon, Van } from '@/components/ui/icons';
 import { useLocation } from '@/lib/hooks/use-location';
 import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
-import { getTransitLineColor } from '@/lib/transit-colors';
+import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
 import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
 import { InternalRoutesSection } from '@/components/internal-route-card';
 import type { InternalBusRoute } from '@/lib/route-finding';
@@ -648,11 +648,9 @@ const IntermediateStops = React.memo(({
 IntermediateStops.displayName = 'IntermediateStops';
 
 export default function NavigationPage() {
-  console.log('[COMPONENT] 🔄 NavigationPage rendered - UPDATED V2');
   
   const router = useRouter();
   const { destination, from, to, userLat, userLng, customOrigin, customOriginLat, customOriginLng, destinationLat, destinationLng, destinationAddress, stops } = useLocalSearchParams();
-  console.log('[NAV] 🔍 URL params V2 - stops:', stops, 'destination:', destination);
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
@@ -694,7 +692,6 @@ export default function NavigationPage() {
   
   // Log panel state changes
   useEffect(() => {
-    console.log('[PANEL STATE] 🔄 State changed to:', panelState);
   }, [panelState]);
   
   // Animation for search panel slide up
@@ -714,9 +711,7 @@ export default function NavigationPage() {
   
   // Log containerHeight changes to see if it's affecting the animation
   useEffect(() => {
-    console.log('[CONTAINER HEIGHT] 📏 Height changed to:', containerHeight + '%', 'panelState:', panelState);
     if (panelState === 'expanded') {
-      console.log('[CONTAINER HEIGHT] ⚠️ Height changed while panel is EXPANDED - this might cause re-render!');
     }
   }, [containerHeight, panelState]);
 
@@ -902,17 +897,14 @@ export default function NavigationPage() {
 
   // Animate search panel slide up/down based on panelState
   useEffect(() => {
-    console.log('[PANEL STATE] useEffect triggered - panelState:', panelState);
     
     if (panelState === 'expanded') {
       // Already expanded, don't re-animate
-      console.log('[PANEL STATE] �?Already in EXPANDED state - skipping animation');
       return;
     }
     
     if (panelState === 'animating') {
       // Start animation to expand
-      console.log('[PANEL STATE] 🎬 Starting animation to EXPAND (0 �?1)');
       Animated.spring(searchPanelAnimation, {
         toValue: 1,
         useNativeDriver: false,
@@ -921,12 +913,10 @@ export default function NavigationPage() {
         velocity: 2,
       }).start(() => {
         // Mark as fully expanded after animation completes
-        console.log('[PANEL STATE] �?Animation complete - setting state to EXPANDED');
         setPanelState('expanded');
       });
     } else if (panelState === 'closed') {
       // Animate back to closed
-      console.log('[PANEL STATE] 📉 Animating back to CLOSED (1 �?0)');
       Animated.spring(searchPanelAnimation, {
         toValue: 0,
         useNativeDriver: false,
@@ -934,7 +924,6 @@ export default function NavigationPage() {
         friction: 10,
         velocity: 2,
       }).start(() => {
-        console.log('[PANEL STATE] �?Panel fully closed');
       });
     }
   }, [panelState, searchPanelAnimation]);
@@ -1515,21 +1504,16 @@ export default function NavigationPage() {
   // Recompute Google routing when intermediate stops are present
   useEffect(() => {
     const recomputeWithStops = async () => {
-      console.log('🚨🚨🚨 RECOMPUTE STARTS HERE 🚨🚨🚨');
       const rawStopKeys = JSON.parse(stopsKey) as string[];
-      console.log('[NAV] 🔍 recomputeWithStops triggered - rawStopKeys:', rawStopKeys);
       if (!rawStopKeys || rawStopKeys.length === 0) {
-        console.log('[NAV] ⏭️ No stops to process, skipping recompute');
         return;
       }
 
       const destCoords = getDestinationCoordinates(currentDestination);
       if (!effectiveOrigin || !destCoords) {
-        console.log('[NAV] ⚠️ Missing origin or destination coords');
         return;
       }
       // Build stops from location entries directly (prefer stored coords; fallback to name lookup)
-      console.log('[NAV] 📍 All locations:', locations);
       const stops = locations
         .filter((l) => l.type === 'stop' && l.text.trim().length > 0)
         .map((l) => ({
@@ -1538,9 +1522,7 @@ export default function NavigationPage() {
         }))
         .filter((s) => !!s.coords) as Array<{ name: string; coords: { lat: number; lng: number } }>;
 
-      console.log('[NAV] 🎯 Filtered stops with coords:', stops);
       if (stops.length === 0) {
-        console.log('[NAV] ❌ No valid stops found after filtering');
         return;
       }
 
@@ -1556,14 +1538,11 @@ export default function NavigationPage() {
         const segmentTargets = [...stops.map((s) => s.coords), destCoords];
         let currentPoint = { latitude: effectiveOrigin.latitude, longitude: effectiveOrigin.longitude };
 
-        console.log('[NAV LOOP] 🔁 Starting segment loop, segmentTargets:', segmentTargets.length);
         
         for (const target of segmentTargets) {
-          console.log('[NAV LOOP] 📍 Processing segment to target:', target);
           
           // Safety check for target
           if (!target || typeof target.lat !== 'number' || typeof target.lng !== 'number') {
-            console.warn('[NAV] ⚠️ Invalid target coordinates, skipping segment');
             continue;
           }
           
@@ -1581,14 +1560,11 @@ export default function NavigationPage() {
                 firstRoute = walkRes.routes[0];
               }
             } catch (walkError) {
-              console.warn('[NAV] ⚠️ Failed to get walking route for segment:', walkError);
             }
           }
           const firstLeg = firstRoute?.legs?.[0];
-          console.log('[NAV LOOP] 🛣️ Got route leg, steps count:', firstLeg?.steps?.length || 0);
           
           if (firstLeg?.steps && Array.isArray(firstLeg.steps)) {
-            console.log('[NAV LOOP] ✅ Adding steps to combinedSteps');
             combinedSteps.push(...firstLeg.steps);
             // Prefer leg duration/distance; fallback to route-level if leg is missing in field mask
             const segDuration = parseDurationSeconds(firstLeg.duration) || parseDurationSeconds(firstRoute?.duration) || 0;
@@ -1632,12 +1608,9 @@ export default function NavigationPage() {
               } as RouteStep);
               console.log('🔴🔴🔴 MARKER INSERTED 🔴🔴🔴');
               
-              console.log('[NAV MARKER] 📍 Marker inserted, new combined steps length:', combinedSteps.length);
             } else {
-              console.log('[NAV MARKER] ⏭️ Skipping marker (last segment - destination)');
             }
           } else {
-            console.warn('[NAV] ⚠️ No steps found for segment, using default values');
           }
 
           currentPoint = { latitude: target.lat, longitude: target.lng };
@@ -1654,7 +1627,6 @@ export default function NavigationPage() {
                   decodedPoints.push(...pts);
                 }
               } catch (decodeErr) {
-                console.warn('[NAV] Step polyline decode failed', decodeErr);
               }
             }
           });
@@ -1665,21 +1637,14 @@ export default function NavigationPage() {
             combinedPolyline = polyline.encode([decodedPoints[0], decodedPoints[0]]);
           }
         } catch (encodeErr) {
-          console.warn('[NAV] ⚠️ Failed to encode combined polyline', encodeErr);
         }
 
         // Filter out empty placeholder steps before passing to map to prevent child reordering crash
         const validSteps = combinedSteps.filter(step => step?.polyline?.encodedPolyline && step.polyline.encodedPolyline.length > 0);
         
-        console.log('[NAV] 📊 Steps summary:', {
-          total: combinedSteps.length,
-          valid: validSteps.length,
-          filtered: combinedSteps.length - validSteps.length
-        });
 
         // Safety check: ensure we have at least some valid steps
         if (validSteps.length === 0) {
-          console.warn('[NAV] ⚠️ No valid route steps found after combining segments');
           setRouteError('No route found with the selected stops');
           setIsLoadingRoutes(false);
           return;
@@ -1703,7 +1668,6 @@ export default function NavigationPage() {
           polyline: { encodedPolyline: combinedPolyline },
         };
 
-        console.log('[NAV] ✅ Combined route created with', combinedSteps.length, 'steps');
         setRoutes([combinedRoute]);
         setRouteError(null);
       } catch (err) {
@@ -2690,6 +2654,7 @@ export default function NavigationPage() {
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      marginLeft: -16,
                     }}
                   >
                     <View
@@ -2756,14 +2721,15 @@ export default function NavigationPage() {
                         style={{
                           flexDirection: 'row',
                           alignItems: 'flex-start',
-                          gap: 16,
+                          gap: 12,
                           overflow: 'visible',
+                          marginLeft: -2,
                         }}
                       >
                         <View
                           style={{
                             flexDirection: 'row',
-                            gap: 16,
+                            gap: 8,
                             flex: 1,
                             overflow: 'visible',
                           }}
@@ -2828,16 +2794,16 @@ export default function NavigationPage() {
                                     borderColor: '#E5E5E5',
                                     borderTopRightRadius: 5,
                                     borderBottomRightRadius: 5,
-                                    backgroundColor: '#FFFFFF',
                                     marginLeft: -1,
                                     paddingHorizontal: 10,
+                                    overflow: 'visible',
                                   }}
                                 >
                                   <View
                                     style={{
                                       flexDirection: 'row',
                                       alignItems: 'center',
-                                      gap: 8,
+                                      gap: 16,
                                     }}
                                   >
                                     <Text
@@ -3087,7 +3053,6 @@ export default function NavigationPage() {
                   {(() => {
                     // Combine consecutive walking steps
                     const steps = routes[0].legs[0].steps;
-                    console.log('====== COMBINING LOGIC RUNNING ======', steps.length, 'steps');
 
                     
                     // Safety check: ensure steps is an array
@@ -3102,10 +3067,10 @@ export default function NavigationPage() {
                     }> = [];
 
                     // Log raw steps before processing
-                    console.log('[NAV COMBINE] 🔍 Raw steps count:', steps.length);
-                    steps.forEach((step, idx) => {
-                      console.log(`[NAV COMBINE] Step ${idx + 1}: travelMode=${step.travelMode}, distance=${step.distanceMeters}, transitDetails=${!!step.transitDetails}, instruction=${step.navigationInstruction?.instructions || 'N/A'}`);
-                    });
+                    // console.log('[NAV COMBINE] 🔍 Raw steps count:', steps.length);
+                    // steps.forEach((step, idx) => {
+                    //   console.log(`[NAV COMBINE] Step ${idx + 1}: travelMode=${step.travelMode}, distance=${step.distanceMeters}, transitDetails=${!!step.transitDetails}, instruction=${step.navigationInstruction?.instructions || 'N/A'}`);
+                    // });
 
                     let i = 0;
                     while (i < steps.length) {
@@ -3121,7 +3086,7 @@ export default function NavigationPage() {
                       const isWaypointMarker = step.travelMode === 'TRANSIT' && !step.transitDetails && step.distanceMeters === 0;
                       
                       if (isWaypointMarker) {
-                        console.log('[NAV COMBINE] 🎯 Found waypoint marker at step', i + 1);
+                        // console.log('[NAV COMBINE] 🎯 Found waypoint marker at step', i + 1);
                         // Add waypoint marker as separate step
                         combinedSteps.push({
                           type: 'WAYPOINT',
@@ -3157,7 +3122,7 @@ export default function NavigationPage() {
 
                     return combinedSteps.map((combinedStep, stepIndex) => {
                       try {
-                        console.log(`[NAV RENDER] Step ${stepIndex + 1}/${combinedSteps.length} - Type: ${combinedStep.type}`);
+                        // console.log(`[NAV RENDER] Step ${stepIndex + 1}/${combinedSteps.length} - Type: ${combinedStep.type}`);
                         
                         // Handle WAYPOINT type
                         if (combinedStep.type === 'WAYPOINT') {
@@ -3274,7 +3239,6 @@ export default function NavigationPage() {
                       
                       // Safety check: ensure step exists for transit
                       if (!step) {
-                        console.warn('[NAV] ⚠️ Transit step missing data, skipping');
                         return null;
                       }
                       
@@ -3305,14 +3269,15 @@ export default function NavigationPage() {
                             style={{
                               flexDirection: 'row',
                               alignItems: 'flex-start',
-                              gap: 16,
+                              gap: 12,
+                              marginLeft: -6,
                             }}
                           >
                             <View
                               style={{
                                 flexDirection: 'row',
                                 alignItems: 'flex-start',
-                                gap: 16,
+                                gap: 8,
                                 flex: 1,
                               }}
                             >
@@ -3352,6 +3317,7 @@ export default function NavigationPage() {
                                       alignItems: 'center',
                                       height: 37,
                                       borderRadius: 5,
+                                      overflow: 'visible',
                                     }}
                                   >
                                     {/* Bus Number Badge */}
@@ -3390,7 +3356,6 @@ export default function NavigationPage() {
                                       style={{
                                         flexDirection: 'row',
                                         alignItems: 'center',
-                                        flex: 1,
                                         height: 37,
                                         borderTopWidth: 1,
                                         borderRightWidth: 1,
@@ -3398,8 +3363,7 @@ export default function NavigationPage() {
                                         borderColor: '#E5E5E5',
                                         borderTopRightRadius: 5,
                                         borderBottomRightRadius: 5,
-                                        backgroundColor: '#FFFFFF',
-                                        overflow: 'hidden',
+                                        overflow: 'visible',
                                         marginLeft: -1,
                                       }}
                                     >
@@ -3407,12 +3371,9 @@ export default function NavigationPage() {
                                         style={{
                                           flexDirection: 'row',
                                           alignItems: 'center',
-                                          justifyContent: 'space-between',
                                           paddingHorizontal: 10,
                                           paddingVertical: 7,
-                                          flex: 1,
-                                          backgroundColor: '#FFFFFF',
-                                          gap: 8,
+                                          gap: 16,
                                         }}
                                       >
                                         <Text
@@ -3430,40 +3391,44 @@ export default function NavigationPage() {
                                     </View>
                                   </View>
 
-                                  {/* Expandable Ride Info */}
-                                  <Pressable
-                                    onPress={toggleExpanded}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                    }}
-                                  >
-                                    <View
-                                      style={{
-                                        transform: [{ rotate: isExpanded ? '180deg' : '0deg' }],
-                                      }}
-                                    >
-                                      <ChevronDown />
-                                    </View>
-                                    <Text
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: '500',
-                                        color: '#211F26',
-                                        fontFamily: 'Inter',
-                                      }}
-                                    >
-                                      Ride {numStops} stop{numStops !== 1 ? 's' : ''} ({combinedStep.duration} mins)
-                                    </Text>
-                                  </Pressable>
+                                  {/* Expandable Ride Info - Only show for internal NUS buses */}
+                                  {!isPublicBus(lineName) && !lineName.toUpperCase().includes('MRT') && !lineName.toUpperCase().includes('LRT') && (
+                                    <>
+                                      <Pressable
+                                        onPress={toggleExpanded}
+                                        style={{
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          gap: 4,
+                                        }}
+                                      >
+                                        <View
+                                          style={{
+                                            transform: [{ rotate: isExpanded ? '180deg' : '0deg' }],
+                                          }}
+                                        >
+                                          <ChevronDown />
+                                        </View>
+                                        <Text
+                                          style={{
+                                            fontSize: 12,
+                                            fontWeight: '500',
+                                            color: '#211F26',
+                                            fontFamily: 'Inter',
+                                          }}
+                                        >
+                                          Ride {numStops} stop{numStops !== 1 ? 's' : ''} ({combinedStep.duration} mins)
+                                        </Text>
+                                      </Pressable>
 
-                                  {/* Expanded Stops List - Using LTA API */}
-                                  <IntermediateStops 
-                                    step={step} 
-                                    serviceNo={lineName} 
-                                    isExpanded={isExpanded} 
-                                  />
+                                      {/* Expanded Stops List - Using LTA API */}
+                                      <IntermediateStops 
+                                        step={step} 
+                                        serviceNo={lineName} 
+                                        isExpanded={isExpanded} 
+                                      />
+                                    </>
+                                  )}
                                 </View>
 
                                 {/* End Bus Stop */}
@@ -3507,7 +3472,6 @@ export default function NavigationPage() {
                         </React.Fragment>
                       );
                       } catch (err) {
-                        console.error(`[NAV] ❌ ERROR rendering step ${stepIndex}:`, err);
                         return null;
                       }
                     });

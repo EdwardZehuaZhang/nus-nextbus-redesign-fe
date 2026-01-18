@@ -58,7 +58,6 @@ const initializeGeolocationWatcher = () => {
 
   const store = useLocationStore.getState();
 
-  debugLog('[useLocation] Initializing global geolocation watcher');
   
   // Only set loading if we don't have a location yet
   if (!store.coords) {
@@ -76,7 +75,6 @@ const initializeGeolocationWatcher = () => {
       });
     },
     (err) => {
-      console.error('[useLocation] Geolocation error:', err);
       // Only set error if we don't have any location yet
       // If we have a cached location, keep using it despite the error
       const currentState = useLocationStore.getState();
@@ -84,7 +82,6 @@ const initializeGeolocationWatcher = () => {
         store.setError(getLocationErrorMessage(err));
       } else {
         // We have a location, just log the error but don't update state
-        debugWarn('[useLocation] Error occurred but keeping cached location');
         store.setLoading(false);
       }
     },
@@ -95,7 +92,6 @@ const initializeGeolocationWatcher = () => {
     }
   );
 
-  debugLog('[useLocation] Watcher initialized with ID:', globalWatchId);
 };
 
 /**
@@ -107,21 +103,18 @@ export const useLocation = () => {
 
   useEffect(() => {
     activeSubscribers++;
-    debugLog('[useLocation] Component mounted, subscribers:', activeSubscribers);
 
     // Initialize watcher on first mount
     initializeGeolocationWatcher();
 
     return () => {
       activeSubscribers--;
-      debugLog('[useLocation] Component unmounted, subscribers:', activeSubscribers);
 
       // Only clean up watcher when ALL components are unmounted
       // Keep a small delay to handle quick re-mounts during navigation
       if (activeSubscribers === 0) {
         setTimeout(() => {
           if (activeSubscribers === 0 && globalWatchId !== null) {
-            debugLog('[useLocation] Clearing global watcher');
             navigator.geolocation.clearWatch(globalWatchId);
             globalWatchId = null;
           }

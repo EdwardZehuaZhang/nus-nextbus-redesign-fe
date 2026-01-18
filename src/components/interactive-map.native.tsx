@@ -409,16 +409,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const { coords: userLocation } = useLocation();
 
   // Debug: Log user location (dev only)
-  useEffect(() => {
-    if (!__DEV__) return;
-    console.log('[USER_LOCATION] Location update:', {
-      hasLocation: !!userLocation,
-      latitude: userLocation?.latitude,
-      longitude: userLocation?.longitude,
-      heading: userLocation?.heading,
-      accuracy: userLocation?.accuracy,
-    });
-  }, [userLocation]);
+  // useEffect(() => {
+  //   if (!__DEV__) return;
+  //   console.log('[USER_LOCATION] Location update:', {
+  //     hasLocation: !!userLocation,
+  //     latitude: userLocation?.latitude,
+  //     longitude: userLocation?.longitude,
+  //     heading: userLocation?.heading,
+  //     accuracy: userLocation?.accuracy,
+  //   });
+  // }, [userLocation]);
 
   // Initialize currentRegion with initialRegion when it changes
   useEffect(() => {
@@ -482,13 +482,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Force map to use correct initial region after it's ready - only once
   useEffect(() => {
-    console.log('[Map] mapReady effect triggered:', {
-      mapReady,
-      hasOrigin: !!origin,
-      hasDestination: !!destination,
-      waypointsCount: waypoints.length,
-      hasSetInitialRegion: hasSetInitialRegion.current,
-    });
     if (
       mapReady &&
       mapRef.current &&
@@ -497,7 +490,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       waypoints.length === 0 &&
       !hasSetInitialRegion.current
     ) {
-      console.log('[Map] Forcing region to:', initialRegion);
       // Mark as set IMMEDIATELY to prevent double-execution
       hasSetInitialRegion.current = true;
       isInitializing.current = true;
@@ -507,9 +499,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapRef.current?.animateToRegion(initialRegion, 100);
         // After setting initial region, allow region updates
         setTimeout(() => {
-          console.log(
-            '[Map] Initialization complete, enabling region tracking'
-          );
           isInitializing.current = false;
         }, 500);
       }, 100);
@@ -526,26 +515,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     []
   );
 
-  // Removed unused nearest-location helper to reduce component size and re-render cost
-
-  // Map tap handler: show place details popup when tapping on map
-  // Debug: Log the initialRegion being used
-  useEffect(() => {
-    console.log('[Map] initialRegion:', initialRegion);
-    console.log(
-      '[Map] Expected zoom level:',
-      Math.log2(360 / initialRegion.latitudeDelta).toFixed(2)
-    );
-  }, [initialRegion]);
-
-  // Fetch bus stops data
   const { data: busStopsData } = useBusStops();
 
   // Log zoom level changes for debugging
   useEffect(() => {
-    console.log(
-      `[Map Zoom] latitudeDelta: ${currentRegion.latitudeDelta.toFixed(6)}, zoom level: ${currentZoom}, coords: ${currentRegion.latitude.toFixed(6)}, ${currentRegion.longitude.toFixed(6)}`
-    );
+    
   }, [
     currentRegion.latitudeDelta,
     currentZoom,
@@ -663,7 +637,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         ? pts.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
         : [];
     } catch (err) {
-      console.warn('[Map] Decode failed for polyline', err);
       return [];
     }
   };
@@ -900,12 +873,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const filterAcademic = mapFilters?.academic ?? false;
   const filterResidences = mapFilters?.residences ?? false;
 
-  console.log('[Map] Filter values:', {
-    important: filterImportant,
-    busStops: filterBusStops,
-    academic: filterAcademic,
-    residences: filterResidences,
-  });
 
   // Determine what to show based on filters
   const shouldShowLandmarks = showLandmarks && filterImportant;
@@ -927,15 +894,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       ? selectedMapItem.place.stopId || selectedMapItem.place.name
       : null;
 
-  console.log('[Map] Display states:', {
-    landmarks: shouldShowLandmarks,
-    printers: shouldShowPrinters,
-    sports: shouldShowSports,
-    canteens: shouldShowCanteens,
-    busStops: shouldShowBusStops,
-    academic: shouldShowAcademic,
-    residences: shouldShowResidences,
-  });
 
   // Fit map to show all markers ONLY on initial route load (not on every render)
   useEffect(() => {
@@ -1084,7 +1042,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Handle Google Places POI clicks
   const handlePoiClick = async (event: any) => {
     const { placeId, name, coordinate } = event.nativeEvent;
-    console.log('[Map] POI clicked:', { placeId, name, coordinate });
 
     if (!placeId || !enablePlaceDetails) return;
 
@@ -1134,7 +1091,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         });
       }
     } catch (error) {
-      console.error('[Map] Error fetching place details:', error);
       // Fallback on error
       emitSelection({
         type: 'place',
