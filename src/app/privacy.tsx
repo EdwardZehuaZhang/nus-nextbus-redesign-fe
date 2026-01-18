@@ -10,76 +10,171 @@ export default function PrivacyPage() {
           Privacy Policy
         </Text>
         <Text className="mt-2 text-sm text-[#6B7280]">
-          Last updated: 2026-01-17
+          Effective date: 18 January 2026
+        </Text>
+        <Text className="mt-1 text-sm text-[#6B7280]">
+          Developer: Zehua Zhang ("we", "us")
+        </Text>
+        <Text className="mt-1 text-sm text-[#6B7280]">
+          Contact: edward.zehua.zhang@gmail.com
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Information We Collect
+          1) Overview
         </Text>
         <Text className="mt-2 text-base text-[#374151]">
-          • Location (foreground only) to show nearby bus stops and help with
-          navigation.
+          NUS-Maps is a campus navigation app for the National University of Singapore. This Privacy Policy explains what information we collect, how we use it, and your choices. Apple requires a privacy policy URL for all apps in App Store Connect.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          2) Information we collect
+        </Text>
+        <Text className="mt-4 text-base font-semibold text-[#111827]">
+          A. Location (Precise Location — optional)
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          If you allow Location Services, we access precise location to show your position on the map and provide navigation/routing. Precise location generally means latitude/longitude-level accuracy.
+        </Text>
+
+        <Text className="mt-4 text-base font-semibold text-[#111827]">
+          B. Diagnostics and device information
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          We may collect (or receive) limited technical data to keep the app reliable, such as:
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • Crash data and performance/diagnostic information
         </Text>
         <Text className="mt-1 text-base text-[#374151]">
-          • Diagnostic and performance data (e.g., crash reports) to improve
-          stability.
+          • Basic device and app information (e.g., device model, iOS version)
         </Text>
 
-        <Text className="mt-6 text-base font-semibold text-[#111827]">
-          How We Use Information
+        <Text className="mt-4 text-base font-semibold text-[#111827]">
+          C. Notifications (optional)
         </Text>
         <Text className="mt-2 text-base text-[#374151]">
-          We use location to power proximity-based features and navigation.
+          If you enable reminders, NUS-Maps can schedule notifications (for example, a "time to leave" reminder). iOS requires you to grant permission for notifications.
+        </Text>
+
+        <Text className="mt-4 text-base font-semibold text-[#111827]">
+          What we do not collect:
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • No account creation, no names, no phone numbers, no emails inside the app
         </Text>
         <Text className="mt-1 text-base text-[#374151]">
-          Diagnostic data is used to monitor app performance and fix crashes.
-        </Text>
-
-        <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Third-Party Services
-        </Text>
-        <Text className="mt-2 text-base text-[#374151]">
-          We use service providers (e.g., crash reporting and map services) to
-          operate the app. These providers process data only on our behalf and
-          only for app functionality and stability.
-        </Text>
-
-        <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Data Sharing
-        </Text>
-        <Text className="mt-2 text-base text-[#374151]">
-          We do not sell personal data. Diagnostic data may be processed by
-          service providers (e.g., crash reporting) solely to operate and
-          improve the app.
-        </Text>
-
-        <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Your Choices
-        </Text>
-        <Text className="mt-2 text-base text-[#374151]">
-          You can disable location access in device settings, which may limit
-          some features.
+          • No payments
         </Text>
         <Text className="mt-1 text-base text-[#374151]">
-          The app does not require an account. If you contact support, we use
-          your email only to respond to your request.
+          • No user-generated content
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Data Retention
+          3) How we use information
         </Text>
         <Text className="mt-2 text-base text-[#374151]">
-          Diagnostic data is retained only as long as needed to troubleshoot and
-          improve reliability. Location data is used in real time and is not
-          stored as part of your profile.
+          We use the information above to:
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • Provide navigation features (maps, routing, live position on campus)
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          • Improve stability and performance (debug crashes, fix bugs)
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          • Deliver notifications only when you enable them in-app
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">
-          Tracking and Advertising
+          4) Third-party services (Google Maps SDK)
         </Text>
         <Text className="mt-2 text-base text-[#374151]">
-          We do not use data for advertising and do not track you across apps
-          or websites owned by other companies.
+          NUS-Maps uses Google Maps SDK / Google Maps Platform to display maps and provide map functionality. The Google Maps Platform Terms note that Google may collect and receive data such as search terms, IP addresses, and latitude/longitude coordinates to provide and improve services, subject to Google's Privacy Policy.
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          Google Privacy Policy: https://policies.google.com/privacy
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          Google Maps Platform Terms: https://cloud.google.com/maps-platform/terms
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          5) Data sharing
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • We do not sell your personal data.
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • We share information only as needed to operate the app:
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+            - With Google Maps Platform as part of providing map features (see section 4).
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+            - With service providers involved in crash reporting/diagnostics if you add them in the future (if you do, this policy should be updated).
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          6) Data retention
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • We do not maintain user accounts or a user database.
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          • Any on-device cache (e.g., map tiles or recent routes) is generally stored locally and can be removed by deleting the app.
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          • Third-party services (e.g., Google) may retain data according to their policies and terms.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          7) Your choices
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          You can control your data through iOS settings:
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          • Location: allow/deny precise location (or use approximate location where available)
+        </Text>
+        <Text className="mt-1 text-base text-[#374151]">
+          • Notifications: allow/deny notifications at any time
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          If you deny permissions, the app should still work with reduced functionality (e.g., manual browsing without "blue dot" live location).
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          8) Security
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          We take reasonable steps to protect information in our control. However, no method of transmission or storage is 100% secure.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          9) Children's privacy
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          NUS-Maps is not specifically directed to children under 13, and we do not knowingly collect personal data from children.
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          10) Singapore PDPA
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          If you are in Singapore, the Personal Data Protection Act (PDPA) generally governs how organizations collect, use, and disclose personal data.
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          If you have questions or requests about personal data relating to NUS-Maps, contact us at the email above.
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          More info: https://www.pdpc.gov.sg
+        </Text>
+
+        <Text className="mt-6 text-base font-semibold text-[#111827]">
+          11) Changes to this policy
+        </Text>
+        <Text className="mt-2 text-base text-[#374151]">
+          We may update this Privacy Policy from time to time. The "Effective date" will reflect the latest version.
         </Text>
 
         <Text className="mt-6 text-base font-semibold text-[#111827]">

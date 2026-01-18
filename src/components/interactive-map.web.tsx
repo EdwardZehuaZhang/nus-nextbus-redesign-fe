@@ -525,6 +525,7 @@ const createMapInstance = (
     },
     // Increase default zoom to show a campus-centered view (matches screenshot)
     zoom: 16,
+    disableDefaultUI: true, // Disable all default UI controls
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
@@ -532,6 +533,7 @@ const createMapInstance = (
     rotateControl: false, // disables camera control
     tiltControl: false, // disables camera tilt
     gestureHandling: 'greedy',
+    clickableIcons: false, // Disable clicking on POI icons
     styles: [
       // Light mode by default - only hide POIs and transit labels
       {
@@ -6198,7 +6200,25 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           overflow: visible !important;
         }
         .google-map-container .gm-style > div > div > div > div {
-          overflow: visible !important;
+          overflall default Google Maps controls */
+        .google-map-container .gmnoprint,
+        .google-map-container .gm-bundled-control,
+        .google-map-container .gm-control-active,
+        .google-map-container button[draggable="false"],
+        .google-map-container div[role="button"],
+        .google-map-container .gm-svpc,
+        .google-map-container .gm-style-mtc,
+        .google-map-container button[aria-label*="Rotate"],
+        .google-map-container button[aria-label*="Tilt"],
+        .google-map-container button[aria-label*="Zoom"],
+        .google-map-container button[aria-label*="compass"] {
+          display: none !important;
+        }
+        /* Specifically target bottom-right controls container */
+        .google-map-container .gm-style > div:not([class]) > div:last-child
+        }
+        .google-map-container .gm-control-active {
+          display: none !important;
         }
       `}</style>
       {/* Always show controls, not just when map is loaded */}

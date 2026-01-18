@@ -460,27 +460,19 @@ const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
   );
 };
 
-const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
+const SearchBar = ({ onSearchPress, disabled }: { onSearchPress?: () => void; disabled?: boolean }) => {
   const [searchText, setSearchText] = React.useState('');
   const textInputRef = React.useRef<any>(null);
 
-  const handleFocus = () => {
-    // Trigger search mode when user focuses on search
+  const handleTouchStart = () => {
+    if (disabled) {
+      console.log('[TRANSIT SEARCH] ⛔️ Touch ignored (exiting)');
+      return;
+    }
     if (onSearchPress) {
+      console.log('[TRANSIT SEARCH] 👆 Touch -> enter search');
       onSearchPress();
     }
-  };
-
-  const handleContainerPress = () => {
-    if (onSearchPress) {
-      onSearchPress();
-    }
-    // Delay focus slightly to ensure search mode animation completes
-    setTimeout(() => {
-      if (textInputRef.current) {
-        textInputRef.current.focus();
-      }
-    }, 100);
   };
 
   return (
@@ -493,8 +485,8 @@ const SearchBar = ({ onSearchPress }: { onSearchPress?: () => void }) => {
           placeholderTextColor="#737373"
           value={searchText}
           onChangeText={setSearchText}
-          onFocus={handleFocus}
-          editable={true}
+          onTouchStart={handleTouchStart}
+          editable={!disabled}
           keyboardType="default"
           returnKeyType="search"
           autoCapitalize="none"
@@ -1366,6 +1358,7 @@ const BottomSheetContent = ({
   onCancelSearch,
   selectedRoute,
   onRouteClick,
+  isSearchModeExiting,
 }: {
   isCollapsed: boolean;
   isSearchMode: boolean;
@@ -1378,6 +1371,7 @@ const BottomSheetContent = ({
   onCancelSearch: () => void;
   selectedRoute: string | null;
   onRouteClick: (routeName: string) => void;
+  isSearchModeExiting?: boolean;
 }) => {
   const detailScrollRef = React.useRef<any>(null);
 
@@ -1404,7 +1398,7 @@ const BottomSheetContent = ({
   return (
     <>
       <Pressable onPress={isCollapsed ? onExpandSheet : undefined}>
-        <SearchBar onSearchPress={onSearchPress} />
+        <SearchBar onSearchPress={onSearchPress} disabled={isSearchModeExiting} />
       </Pressable>
 
       {!isCollapsed && (
@@ -1437,6 +1431,16 @@ const useDragHandlers = () => {
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
   const isDragging = React.useRef(false);
+  const [isSearchModeExiting, setIsSearchModeExiting] = React.useState(false);
+  const exitSearchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSearchModeRef = React.useRef(false);
+  const isForceResettingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    isSearchModeRef.current = isSearchMode;
+  }, [isSearchMode]);
+  const ignoreSearchPressRef = React.useRef(false);
+  const ignoreSearchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const MIN_HEIGHT = 10; // Minimum height - just search bar visible
   const MAX_HEIGHT = 92; // Maximum height - allow nearly full screen expansion for small devices
@@ -1475,6 +1479,40 @@ const useDragHandlers = () => {
     return () => {
       keyboardWillShow.remove();
       keyboardWillHide.remove();
+      if (exitSearchTimeoutRef.current) {
+        clearTimeout(exitSearchTimeoutRef.current);
+        exitSearchTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const listenerId = heightAnimation.addListener(({ value }) => {
+      if (!isSearchModeRef.current && value > DEFAULT_HEIGHT + 5) {
+        console.log('[TRANSIT SEARCH] 📈 Height increased while not in search:', value.toFixed(2));
+        if (!isForceResettingRef.current) {
+          isForceResettingRef.current = true;
+          heightAnimation.stopAnimation();
+          heightAnimation.setValue(DEFAULT_HEIGHT);
+          setContainerHeight(DEFAULT_HEIGHT);
+          setTimeout(() => {
+            isForceResettingRef.current = false;
+          }, 200);
+        }
+      }
+    });
+
+    return () => {
+      heightAnimation.removeListener(listenerId);
+    };
+  }, [DEFAULT_HEIGHT, heightAnimation]);
+
+  React.useEffect(() => {
+    return () => {
+      if (ignoreSearchTimeoutRef.current) {
+        clearTimeout(ignoreSearchTimeoutRef.current);
+        ignoreSearchTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -1627,6 +1665,15 @@ const useDragHandlers = () => {
   };
 
   const handleEnterSearchMode = () => {
+    if (isSearchModeExiting) {
+      console.log('[TRANSIT SEARCH] ⛔️ Enter blocked (exiting)');
+      return;
+    }
+    if (ignoreSearchPressRef.current) {
+      console.log('[TRANSIT SEARCH] ⛔️ Enter blocked (guard)');
+      return;
+    }
+    console.log('[TRANSIT SEARCH] ✅ Enter search mode');
     // Check current panel height
     const currentHeight = (heightAnimation as any)._value;
     
@@ -1666,6 +1713,35 @@ const useDragHandlers = () => {
   };
 
   const handleExitSearchMode = () => {
+    Keyboard.dismiss();
+    console.log('[TRANSIT SEARCH] 🚪 Exit search mode');
+    console.log('[TRANSIT SEARCH] 📍 Height before exit:', (heightAnimation as any)._value);
+    setIsSearchModeExiting(true);
+    if (exitSearchTimeoutRef.current) {
+      clearTimeout(exitSearchTimeoutRef.current);
+    }
+    exitSearchTimeoutRef.current = setTimeout(() => {
+      setIsSearchModeExiting(false);
+    }, 450);
+    ignoreSearchPressRef.current = true;
+    if (ignoreSearchTimeoutRef.current) {
+      clearTimeout(ignoreSearchTimeoutRef.current);
+    }
+    ignoreSearchTimeoutRef.current = setTimeout(() => {
+      ignoreSearchPressRef.current = false;
+    }, 400);
+    setIsSearchMode(false);
+    setIsCollapsed(false);
+    setTempHeight(null);
+    setKeyboardHeight(0);
+    setContainerHeight(DEFAULT_HEIGHT);
+    heightAnimation.stopAnimation();
+    backdropOpacity.stopAnimation();
+    translateY.stopAnimation();
+    heightAnimation.setValue(DEFAULT_HEIGHT);
+    backdropOpacity.setValue(0);
+    translateY.setValue(0);
+    console.log('[TRANSIT SEARCH] 📍 Height reset to default');
     // Animate backdrop fade out
     Animated.timing(backdropOpacity, {
       toValue: 0,
@@ -1679,7 +1755,6 @@ const useDragHandlers = () => {
       tension: 50,
       friction: 8,
     }).start(() => {
-      setIsSearchMode(false); // Set after animation completes
       setContainerHeight(DEFAULT_HEIGHT);
     });
     Animated.spring(translateY, {
@@ -1738,6 +1813,7 @@ const useDragHandlers = () => {
   return {
     isCollapsed,
     isSearchMode,
+    isSearchModeExiting,
     containerHeight,
     handleDrag,
     handleDragMove,
@@ -2271,6 +2347,7 @@ export default function TransitPage() {
   const {
     isCollapsed,
     isSearchMode,
+    isSearchModeExiting,
     containerHeight,
     handleDrag,
     handleDragMove,
@@ -2427,6 +2504,7 @@ export default function TransitPage() {
         <BottomSheetContent
           isCollapsed={isCollapsed}
           isSearchMode={isSearchMode}
+          isSearchModeExiting={isSearchModeExiting}
           mapSelection={mapSelection}
           onCloseSelection={() => setMapSelection(null)}
           activeTab={activeTab}
@@ -2447,7 +2525,7 @@ export default function TransitPage() {
             right: 0,
             bottom: 0,
             left: 0,
-            zIndex: 50,
+            zIndex: 9999,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -2570,9 +2648,9 @@ export default function TransitPage() {
       <View
         style={{
           position: 'absolute' as any,
-          top: insets.top + 8,
+          top: insets.top + 2,
           left: 20,
-          zIndex: 1,
+          zIndex: 10000,
         }}
       >
         <Pressable
