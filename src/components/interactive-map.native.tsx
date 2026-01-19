@@ -10,16 +10,16 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Text as SvgText, SvgXml } from 'react-native-svg';
 import debounce from 'lodash.debounce';
-import { simplifyPolyline } from '@/lib/polyline-optimization';
 import { useMapClustering } from '@/lib/hooks/use-map-clustering';
 import { ClusterCircle } from '@/components/map/cluster-circle';
 
 import type { RouteCode } from '@/api/bus';
-import { useBusStops } from '@/api/bus';
+import { useBusStops, useActiveBuses, useCheckpoints } from '@/api/bus';
 // Removed getRouteColor import; using explicit mapping to match web
 import type { LatLng } from '@/api/google-maps';
+import { createBusMarkerSVG } from '@/components/bus-marker-icon';
 import { useLocation } from '@/lib/hooks/use-location';
 import { getTransitLineColor } from '@/lib/transit-colors';
 import { getPlaceDetails } from '@/api/google-maps/places';
@@ -28,6 +28,78 @@ import { NUS_PRINTERS, type Printer as PrinterLocation } from '@/data/printer-lo
 import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
 import { CANTEENS, type CanteenVenue, getCanteenColor } from '@/data/canteens';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
+
+/**
+ * Calculate bearing between two coordinates
+ * @param from - Starting coordinate {lat, lng}
+ * @param to - Ending coordinate {lat, lng}
+ * @returns Bearing in degrees (0-360, where 0 is North, 90 is East, 180 is South, 270 is West)
+ */
+const calculateBearing = (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+): number => {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
+
+  const lat1 = toRadians(from.lat);
+  const lat2 = toRadians(to.lat);
+  const dLng = toRadians(to.lng - from.lng);
+
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+
+  const bearing = toDegrees(Math.atan2(y, x));
+  return (bearing + 360) % 360;
+};
+
+/**
+ * Find the nearest upcoming checkpoint for a bus
+ * @param busPos - Current bus position {lat, lng}
+ * @param checkpoints - Array of route checkpoints
+ * @param direction - Bus direction (1 = forward, 2 = reverse)
+ * @returns Next checkpoint or null
+ */
+const findNextCheckpoint = (
+  busPos: { lat: number; lng: number },
+  checkpoints: { latitude: number; longitude: number }[],
+  direction: 1 | 2
+): { lat: number; lng: number } | null => {
+  if (!checkpoints || checkpoints.length === 0) return null;
+
+  const orderedCheckpoints =
+    direction === 2 ? [...checkpoints].reverse() : checkpoints;
+
+  let minDistance = Infinity;
+  let closestIndex = -1;
+
+  orderedCheckpoints.forEach((checkpoint, index) => {
+    const distance = Math.sqrt(
+      Math.pow(checkpoint.latitude - busPos.lat, 2) +
+        Math.pow(checkpoint.longitude - busPos.lng, 2)
+    );
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestIndex = index;
+    }
+  });
+
+  if (closestIndex !== -1 && closestIndex < orderedCheckpoints.length - 1) {
+    const nextCheckpoint = orderedCheckpoints[closestIndex + 1];
+    return { lat: nextCheckpoint.latitude, lng: nextCheckpoint.longitude };
+  }
+
+  if (closestIndex === orderedCheckpoints.length - 1) {
+    const checkpoint = orderedCheckpoints[closestIndex];
+    return { lat: checkpoint.latitude, lng: checkpoint.longitude };
+  }
+
+  return null;
+};
+
 import {
   BLUE_AREA_BOUNDARY,
   CAPT_BOUNDARY,
@@ -408,6 +480,21 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [internalMapType, setInternalMapType] = useState<
     'standard' | 'satellite' | 'hybrid' | 'terrain'
   >('standard');
+
+  // State tracking refs for route selection sync (prevents infinite loops)
+  const previousActiveRouteRef = useRef<RouteCode | null>(null);
+  const isSyncingFromActiveRouteRef = useRef(false);
+  const savedFilterStateRef = useRef<Record<string, boolean> | null>(null);
+
+  // Calculate effective active route (priority: filter panel > nearest stops prop)
+  const selectedFilterRoute = React.useMemo(() => {
+    const codes = Object.entries(mapFilters)
+      .filter(([key, value]) => key.startsWith('bus-route-') && !!value)
+      .map(([key]) => key.replace('bus-route-', '').toUpperCase());
+    return codes.length === 1 ? (codes[0] as RouteCode) : null;
+  }, [mapFilters]);
+
+  const effectiveActiveRoute = selectedFilterRoute || _activeRoute;
   const safeInitialRegion = React.useMemo(
     () => (isValidInitialRegion(initialRegion) ? initialRegion : DEFAULT_REGION),
     [initialRegion]
@@ -664,21 +751,34 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Build segment polylines for transit routes (Google steps) or internal routes
   const transitSegments = React.useMemo(() => {
     if (internalRoutePolylines) {
-      const toStop = (internalRoutePolylines.walkToStop || []).map((p) => ({
-        latitude: p.lat,
-        longitude: p.lng,
-      }));
-      const busSeg = (internalRoutePolylines.busSegment || []).map((p) => ({
-        latitude: p.lat,
-        longitude: p.lng,
-      }));
-      const fromStop = (internalRoutePolylines.walkFromStop || []).map((p) => ({
-        latitude: p.lat,
-        longitude: p.lng,
-      }));
+      const toStop = (internalRoutePolylines.walkToStop || [])
+        .filter((p) => p && typeof p.lat === 'number' && typeof p.lng === 'number')
+        .map((p) => ({
+          latitude: p.lat,
+          longitude: p.lng,
+        }));
+      const busSeg = (internalRoutePolylines.busSegment || [])
+        .filter((p) => p && typeof p.lat === 'number' && typeof p.lng === 'number')
+        .map((p) => ({
+          latitude: p.lat,
+          longitude: p.lng,
+        }));
+      const fromStop = (internalRoutePolylines.walkFromStop || [])
+        .filter((p) => p && typeof p.lat === 'number' && typeof p.lng === 'number')
+        .map((p) => ({
+          latitude: p.lat,
+          longitude: p.lng,
+        }));
 
       const walkColor = '#274F9C';
       const busColor = internalRoutePolylines.busRouteColor || '#274F9C';
+
+      console.log('🗺️ [ROUTE_COORDS_NATIVE] Internal route polylines:', {
+        walkToStopPoints: toStop.length > 0 ? `${toStop.length} points - First: ${toStop[0]?.latitude},${toStop[0]?.longitude}` : 'empty',
+        busSegmentPoints: busSeg.length > 0 ? `${busSeg.length} points - First: ${busSeg[0]?.latitude},${busSeg[0]?.longitude}` : 'empty',
+        walkFromStopPoints: fromStop.length > 0 ? `${fromStop.length} points - First: ${fromStop[0]?.latitude},${fromStop[0]?.longitude}` : 'empty',
+        busColor: busColor,
+      });
 
       return [
         toStop.length > 1
@@ -798,6 +898,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     []
   );
 
+  // Fetch live bus locations for the active route
+  const { data: activeBusesData } = useActiveBuses(
+    effectiveActiveRoute as RouteCode,
+    !!effectiveActiveRoute
+  );
+  const activeBuses = activeBusesData?.ActiveBusResult?.activebus || [];
+  const routeColor = effectiveActiveRoute ? routeColors[effectiveActiveRoute] : '#274F9C';
+
+  // Fetch checkpoints for bearing calculation
+  const { data: checkpointsData } = useCheckpoints(
+    effectiveActiveRoute as RouteCode
+  );
+  const checkpoints = effectiveActiveRoute
+    ? checkpointsData?.CheckPointResult?.CheckPoint || []
+    : [];
+
   // Derive active bus route codes from mapFilters (e.g. keys: bus-route-a1)
   const activeBusRouteCodes = React.useMemo(() => {
     const codes = Object.entries(mapFilters)
@@ -828,9 +944,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const routeStopMembershipRef = useRef<Map<string, Set<string>>>(new Map());
   useEffect(() => {
     const allStops = busStopsData?.BusStopsResult?.busstops;
-    if (!allStops) return;
+    if (!allStops) {
+      console.log('🗺️ [MEMBERSHIP] No bus stops data available');
+      return;
+    }
     
-    // Only compute for routes we haven't seen yet
+    console.log(`🗺️ [MEMBERSHIP] Computing for ${Object.keys(routeColors).length} routes with ${allStops.length} stops`);
+    
     const LAT_THRESHOLD = 0.0005;
     const LNG_THRESHOLD = 0.0005;
     Object.keys(routeColors).forEach((routeCode) => {
@@ -848,20 +968,92 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         if (match) set.add(stop.name);
       });
       routeStopMembershipRef.current.set(routeCode, set);
-      logRoute(`Computed stops for route ${routeCode}`, {
-        stopCount: set.size,
-      });
+      console.log(`🗺️ [MEMBERSHIP] Route ${routeCode}: ${set.size} stops`);
     });
   }, [busStopsData, routeColors]);
 
+  // Sync activeRoute prop changes to mapFilters (when route selected from nearest stops)
+  React.useEffect(() => {
+    if (isSyncingFromActiveRouteRef.current) {
+      return; // Prevent infinite loop
+    }
+
+    const previousActiveRoute = previousActiveRouteRef.current;
+
+    if (_activeRoute && _activeRoute !== previousActiveRoute) {
+      // Route was selected from nearest stops - update filter panel
+      const routeFilterKey = `bus-route-${_activeRoute.toLowerCase()}`;
+      const updatedFilters = { ...mapFilters };
+
+      // Deselect all bus-route filters
+      Object.keys(updatedFilters).forEach((key) => {
+        if (key === 'bus-stops' || key.startsWith('bus-route-')) {
+          updatedFilters[key] = false;
+        }
+      });
+
+      // Select the active route
+      updatedFilters[routeFilterKey] = true;
+
+      // Hide landmarks, academic, residences when route selected
+      updatedFilters['important'] = false;
+      updatedFilters['academic'] = false;
+      updatedFilters['residences'] = false;
+
+      isSyncingFromActiveRouteRef.current = true;
+      _onMapFiltersChange?.(updatedFilters);
+      setTimeout(() => {
+        isSyncingFromActiveRouteRef.current = false;
+      }, 100);
+
+      previousActiveRouteRef.current = _activeRoute;
+    } else if (!_activeRoute && previousActiveRoute) {
+      // Route was deselected - restore saved filter state if available
+      if (savedFilterStateRef.current) {
+        isSyncingFromActiveRouteRef.current = true;
+        _onMapFiltersChange?.(savedFilterStateRef.current);
+        setTimeout(() => {
+          isSyncingFromActiveRouteRef.current = false;
+        }, 100);
+        savedFilterStateRef.current = null;
+      }
+      previousActiveRouteRef.current = null;
+    }
+  }, [_activeRoute, mapFilters, _onMapFiltersChange]);
+
+  // Sync filter changes back to activeRoute (when route selected from filter panel)
+  React.useEffect(() => {
+    if (isSyncingFromActiveRouteRef.current) {
+      return; // Prevent infinite loop
+    }
+
+    if (selectedFilterRoute && selectedFilterRoute !== _activeRoute) {
+      // Filter panel selection changed - notify parent
+      _onActiveRouteChange?.(selectedFilterRoute);
+    } else if (!selectedFilterRoute && _activeRoute) {
+      // All routes deselected in filter panel
+      _onActiveRouteChange?.(null);
+    }
+  }, [selectedFilterRoute, _activeRoute, _onActiveRouteChange]);
+
   const isStopVisibleForActiveRoutes = React.useCallback(
     (stop: any): boolean => {
+      // If effectiveActiveRoute is set, only show stops on that route
+      if (effectiveActiveRoute) {
+        const membership = routeStopMembershipRef.current.get(effectiveActiveRoute);
+        const isVisible = membership?.has(stop.name) || false;
+        if (stop.name === 'Central Library' || stop.name === 'KE7') {
+          console.log(`🗺️ [VISIBLE] ${stop.name}: ${isVisible} (${effectiveActiveRoute} members: ${membership?.size || 0})`);
+        }
+        return isVisible;
+      }
+      // Otherwise use filter-based codes
       if (activeBusRouteCodes.length === 0) return true;
       return activeBusRouteCodes.some((code) =>
         routeStopMembershipRef.current.get(code)?.has(stop.name)
       );
     },
-    [activeBusRouteCodes]
+    [effectiveActiveRoute, activeBusRouteCodes]
   );
 
   // Always render ALL bus stops; control visibility via opacity to keep children count/order stable
@@ -1540,24 +1732,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const opacity = showCircle && visibleByRoute ? 1 : 0;
           const stopId = stop.name || stop.ShortName || stop.caption;
           const isCircleClickable = showCircle && visibleByRoute;
+          
           // Choose circle color: if multiple routes active, color by first matching route membership
           let circleColor = '#274F9C';
-          if (visibleByRoute) {
-            // Try primary active route first
-            if (
-              _activeRoute &&
-              routeStopMembershipRef.current
-                .get(_activeRoute)
-                ?.has(stop.name)
-            ) {
-              circleColor = routeColors[_activeRoute] || circleColor;
-            } else {
-              // Fallback: first filtered active route that includes this stop
-              const matchCode = activeBusRouteCodes.find((code) =>
-                routeStopMembershipRef.current.get(code)?.has(stop.name)
-              );
-              if (matchCode)
-                circleColor = routeColors[matchCode] || circleColor;
+          if (visibleByRoute && effectiveActiveRoute) {
+            // When a route is active, always use its color for visible stops
+            circleColor = routeColors[effectiveActiveRoute] || circleColor;
+            // Debug sample stops
+            if (stop.name === 'Central Library' || stop.name === 'KE7') {
+              console.log(`🗺️ [CIRCLE] ${stop.name}: color=${circleColor} (route=${effectiveActiveRoute})`);
+            }
+          } else if (visibleByRoute) {
+            // Multiple filters active - color by first matching route
+            const matchCode = activeBusRouteCodes.find((code) =>
+              routeStopMembershipRef.current.get(code)?.has(stop.name)
+            );
+            if (matchCode) {
+              circleColor = routeColors[matchCode] || circleColor;
             }
           }
 
@@ -1606,19 +1797,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const isLabelClickable = isLabelVisible;
           // Choose label color: per-route membership (same logic as circle)
           let labelColor = '#274F9C';
-          if (visibleByRoute) {
-            if (
-              _activeRoute &&
-              routeStopMembershipRef.current
-                .get(_activeRoute)
-                ?.has(stop.name)
-            ) {
-              labelColor = routeColors[_activeRoute] || labelColor;
-            } else {
-              const matchCode = activeBusRouteCodes.find((code) =>
-                routeStopMembershipRef.current.get(code)?.has(stop.name)
-              );
-              if (matchCode) labelColor = routeColors[matchCode] || labelColor;
+          if (visibleByRoute && effectiveActiveRoute) {
+            // When a route is active, always use its color for visible stops
+            labelColor = routeColors[effectiveActiveRoute] || labelColor;
+            // Debug sample stops
+            if (stop.name === 'Central Library' || stop.name === 'KE7') {
+              console.log(`🗺️ [LABEL] ${stop.name}: color=${labelColor} (route=${effectiveActiveRoute})`);
+            }
+          } else if (visibleByRoute) {
+            // Multiple filters active - color by first matching route
+            const matchCode = activeBusRouteCodes.find((code) =>
+              routeStopMembershipRef.current.get(code)?.has(stop.name)
+            );
+            if (matchCode) {
+              labelColor = routeColors[matchCode] || labelColor;
             }
           }
           if (selectedBusStopId && selectedBusStopId !== stopId) {
@@ -1765,19 +1957,76 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             lineJoin="round"
           />
         )}
+        {/* Live Bus Location Markers - Using SVG icons matching web version */}
+        {activeBuses.map((bus: any, idx: number) => {
+          if (!bus.lat || !bus.lng) return null;
+          
+          // Calculate bearing using proper checkpoint data
+          let bearing = 0; // Default to pointing right (East)
+          const nextCheckpoint = findNextCheckpoint(
+            { lat: bus.lat, lng: bus.lng },
+            checkpoints,
+            bus.direction
+          );
+          
+          if (nextCheckpoint) {
+            bearing = calculateBearing(
+              { lat: bus.lat, lng: bus.lng },
+              nextCheckpoint
+            );
+          }
+
+          // Create SVG marker matching web version (28x28)
+          const flipHorizontal = bus.direction === 2;
+          const arrowRotation = bearing - 90; // Convert bearing to SVG rotation
+          const svgXml = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
+
+          // Debug first bus bearing
+          if (idx === 0 && effectiveActiveRoute) {
+            console.log(`🚌 [BUS] Route ${effectiveActiveRoute}: bearing=${bearing.toFixed(1)}°, arrow=${arrowRotation.toFixed(1)}°, dir=${bus.direction}`);
+          }
+
+          return (
+            <Marker
+              key={`bus-${bus.veh_plate || `${effectiveActiveRoute}-${idx}`}`}
+              coordinate={{
+                latitude: bus.lat,
+                longitude: bus.lng,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={100}
+            >
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <SvgXml
+                  xml={svgXml}
+                  width={28}
+                  height={28}
+                />
+              </View>
+            </Marker>
+          );
+        })}
+
         {/* Bus Route Polylines - normal visibility using filters/active route */}
         {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
           if (coordinates.length === 0) return null;
-          const isPrimaryActive = _activeRoute === routeCode;
+          const isPrimaryActive = effectiveActiveRoute === routeCode;
           const isFilteredActive = activeBusRouteCodes.includes(routeCode);
           // Show only when an active route or filters are set, and this route matches
-          const hasAnyRouteActive = !!_activeRoute || activeBusRouteCodes.length > 0;
+          const hasAnyRouteActive = !!effectiveActiveRoute || activeBusRouteCodes.length > 0;
           const isVisible = hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
 
           // Use canonical palette but render via RGBA for iOS reliability
           const paletteColor = routeColors[routeCode] || '#000000';
           const rgbaColor = hexToRgba(paletteColor, 1);
-          const strokeWidth = isVisible ? (isPrimaryActive ? 5 : 4) : 0;
+          const strokeWidth = isVisible ? (isPrimaryActive ? 3 : 2) : 0;
           const zIndex = 100 + idx;
 
           logRoute(`Render ${routeCode}`, {
@@ -1788,7 +2037,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             strokeWidth,
           });
 
-          const effectiveCoordinates = currentZoom < 16 ? simplifyPolyline(coordinates, currentZoom) : coordinates;
+          // Disable simplification to maintain accurate route coordinates matching web version
+          const effectiveCoordinates = coordinates;
           return (
             <Polyline
               key={`bus-route-${routeCode}`}

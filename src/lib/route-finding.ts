@@ -187,7 +187,6 @@ async function routeConnectsStops(
   arrivalStopCode: string
 ): Promise<{ connects: boolean; estimatedTravelTime: number; intermediateStops: string[] }> {
   try {
-    // console.log(`🚌 Checking if route ${routeCode} connects ${departureStopCode} → ${arrivalStopCode}`);
     const pickupPoints = await getPickupPoints(routeCode);
     const stops = pickupPoints.PickupPointResult.pickuppoint;
     

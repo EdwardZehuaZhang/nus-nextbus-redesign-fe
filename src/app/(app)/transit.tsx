@@ -93,7 +93,7 @@ const parseBusTimeForSort = (time: string): number => {
 };
 
 const buildBusRoutes = (
-  shuttles: Array<any>,
+  shuttles: any[],
   colorMap: Record<string, string>
 ): BusRoute[] => {
   const routeMap = new Map<string, BusRoute>();
@@ -136,6 +136,7 @@ const buildBusRoutes = (
     }
   });
 
+
   return Array.from(routeMap.values())
     .map((route) => {
       const sortedTimes = route.times
@@ -149,6 +150,7 @@ const buildBusRoutes = (
           ...timeItem,
           textColor: index === 0 ? '#211F26' : '#737373',
         }));
+
 
       return {
         ...route,
@@ -386,7 +388,7 @@ const BusRouteCard = ({
               left: 0,
               right: 0,
               bottom: 0,
-              borderWidth: 3,
+              borderWidth: 1.5,
               borderColor: route.color,
               borderRadius: 6,
               pointerEvents: 'none',
@@ -423,6 +425,7 @@ const BusRouteCard = ({
 const BusTimingRows = ({ times }: { times: BusRoute['times'] }) => {
   // Filter out N/A times to hide entire rows
   const validTimes = times.filter((timeItem) => timeItem.time !== 'N/A');
+  
   
   return (
     <View
@@ -2227,7 +2230,9 @@ const MapSelectionDetails = ({
             </Text>
             <Text style={{ fontSize: 14, color: '#111827', marginBottom: 12 }}>
               {selection.canteen.hours.term
-                .map((h) => (h.closed ? `${h.days}: Closed` : `${h.days}: ${h.open} - ${h.close}`))
+                .map((h: { closed?: boolean; days: string; open?: string; close?: string }) =>
+                  h.closed ? `${h.days}: Closed` : `${h.days}: ${h.open} - ${h.close}`
+                )
                 .join('\n')}
             </Text>
             {selection.canteen.notes && selection.canteen.notes.length > 0 && (
@@ -2316,6 +2321,14 @@ export default function TransitPage() {
   const [activeTab, setActiveTab] = React.useState<string>('CLB');
   const [selectedRoute, setSelectedRoute] = React.useState<string | null>(null);
   const [mapSelection, setMapSelection] = React.useState<MapSelection | null>(null);
+  
+  // Track previous state for toggling route selection
+  const [previousState, setPreviousState] = React.useState<{
+    selectedRoute: string | null;
+    activeTab: string;
+    mapFilters: Record<string, boolean>;
+  } | null>(null);
+
   const [mapFilters, setMapFilters] = React.useState<Record<string, boolean>>(
     () => {
       const defaultFilters = {
@@ -2370,8 +2383,31 @@ export default function TransitPage() {
     resetToDefault,
   } = useDragHandlers();
 
+  const handleRouteToggle = React.useCallback((routeName: string) => {
+    // If clicking the same route that's already selected, restore previous state
+    if (selectedRoute === routeName && previousState) {
+      setSelectedRoute(previousState.selectedRoute);
+      setActiveTab(previousState.activeTab);
+      setMapFilters(previousState.mapFilters);
+      setPreviousState(null);
+      // Also sync the map filters back to storage
+      storage.set('map-filters', JSON.stringify(previousState.mapFilters));
+    } else if (selectedRoute === routeName) {
+      // If no previous state exists, just deselect
+      setSelectedRoute(null);
+    } else {
+      // If selecting a different route, save current state before updating
+      setPreviousState({
+        selectedRoute,
+        activeTab,
+        mapFilters,
+      });
+      setSelectedRoute(routeName);
+    }
+  }, [selectedRoute, previousState, activeTab, mapFilters]);
+
   const handleRouteClick = (routeName: string) => {
-    setSelectedRoute((prev) => (prev === routeName ? null : routeName));
+    handleRouteToggle(routeName);
   };
 
   React.useEffect(() => {
@@ -2410,6 +2446,51 @@ export default function TransitPage() {
 
   const handleFilterChange = (filters: Record<string, boolean>) => {
     console.log('Filter changes:', filters);
+    
+    // Check if a bus route was selected/deselected in the filter panel
+    const busRouteFilters = [
+      'bus-route-a1',
+      'bus-route-a2',
+      'bus-route-d1',
+      'bus-route-d2',
+      'bus-route-k',
+      'bus-route-r1',
+      'bus-route-r2',
+      'bus-route-p',
+    ];
+    
+    let newSelectedRoute: string | null = null;
+    for (const routeFilter of busRouteFilters) {
+      if (filters[routeFilter]) {
+        // Extract route name from filter id (e.g., 'bus-route-d1' -> 'D1')
+        newSelectedRoute = routeFilter.replace('bus-route-', '').toUpperCase();
+        break;
+      }
+    }
+    
+    // If the selected route from filters is different from current selectedRoute,
+    // use the toggle logic to update state and save previous state
+    if (newSelectedRoute !== selectedRoute) {
+      // Save previous state before changing selection
+      if (newSelectedRoute && !selectedRoute) {
+        // Selecting a new route from filter panel
+        setPreviousState({
+          selectedRoute,
+          activeTab,
+          mapFilters,
+        });
+      } else if (!newSelectedRoute && selectedRoute) {
+        // Deselecting route from filter panel - restore to previous state if available
+        if (previousState) {
+          setActiveTab(previousState.activeTab);
+          setMapFilters(previousState.mapFilters);
+          setPreviousState(null);
+        }
+      }
+      
+      setSelectedRoute(newSelectedRoute);
+    }
+    
     setMapFilters(filters);
     storage.set('map-filters', JSON.stringify(filters));
   };
@@ -2432,16 +2513,16 @@ export default function TransitPage() {
         <InteractiveMap
           style={{ width: '100%', height: '100%' }}
           showD1Route={selectedRoute === 'D1'}
-          activeRoute={selectedRoute?.toUpperCase() as any} // Pass selected route to show real-time buses (ensure uppercase)
-          onActiveRouteChange={(route) => setSelectedRoute(route)} // Sync filter selection back to transit page
+          activeRoute={(selectedRoute?.toUpperCase() ?? null) as any} // Pass selected route to show real-time buses (ensure uppercase)
+          onActiveRouteChange={(route: any) => setSelectedRoute(route)} // Sync filter selection back to transit page
           showBusStops={true} // Show bus stop markers with labels
           showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
           showMapControls={false} // Disable map controls in InteractiveMap, we'll render them at top level
           mapFilters={mapFilters} // Pass filters from parent
           onMapFiltersChange={handleFilterChange} // Handle filter changes
-          onMapItemSelect={(selection) => setMapSelection(selection)}
+          onMapItemSelect={(selection: MapSelection | null) => setMapSelection(selection)}
           selectedMapItem={mapSelection}
-          onMapTypeChangeReady={(handler) => {
+          onMapTypeChangeReady={(handler: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) => {
             mapTypeChangeHandlerRef.current = handler;
           }}
         />
@@ -2484,7 +2565,7 @@ export default function TransitPage() {
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
             marginTop: 'auto',
             position: 'relative',
-            zIndex: 100,
+            zIndex: 10001,
           },
           animatedStyle,
         ]}
@@ -2525,7 +2606,7 @@ export default function TransitPage() {
             right: 0,
             bottom: 0,
             left: 0,
-            zIndex: 9999,
+            zIndex: 20000,
             alignItems: 'center',
             justifyContent: 'center',
           }}

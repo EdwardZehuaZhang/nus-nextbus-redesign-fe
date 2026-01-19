@@ -24,7 +24,7 @@ const LayersIcon = () => (
     height="20"
     viewBox="0 0 24 24"
     fill="#274F9C"
-    strokeWidth="2"
+    strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
@@ -41,7 +41,7 @@ const MapIcon = () => (
     height="20"
     viewBox="0 0 24 24"
     fill="#274F9C"
-    strokeWidth="2"
+    strokeWidth="1.5"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
