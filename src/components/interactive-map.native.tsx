@@ -1732,11 +1732,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const opacity = showCircle && visibleByRoute ? 1 : 0;
           const stopId = stop.name || stop.ShortName || stop.caption;
           const isCircleClickable = showCircle && visibleByRoute;
+          const stopKey = stop.name || stop.ShortName || stop.caption;
+          const isRouteStop = effectiveActiveRoute
+            ? routeStopMembershipRef.current.get(effectiveActiveRoute)?.has(stopKey)
+            : false;
           
           // Choose circle color: if multiple routes active, color by first matching route membership
           let circleColor = '#274F9C';
-          if (visibleByRoute && effectiveActiveRoute) {
-            // When a route is active, always use its color for visible stops
+          if (effectiveActiveRoute && isRouteStop) {
+            // When a route is active, use its color for member stops
             circleColor = routeColors[effectiveActiveRoute] || circleColor;
             // Debug sample stops
             if (stop.name === 'Central Library' || stop.name === 'KE7') {
@@ -1745,7 +1749,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           } else if (visibleByRoute) {
             // Multiple filters active - color by first matching route
             const matchCode = activeBusRouteCodes.find((code) =>
-              routeStopMembershipRef.current.get(code)?.has(stop.name)
+              routeStopMembershipRef.current.get(code)?.has(stopKey)
             );
             if (matchCode) {
               circleColor = routeColors[matchCode] || circleColor;
@@ -1764,7 +1768,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: stop.longitude,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={selectedBusStopId !== null}
+              tracksViewChanges={true}
               opacity={opacity}
               onPress={isCircleClickable ? handleBusStopPress(stop) : undefined}
               zIndex={50}
@@ -1789,6 +1793,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const labelBelow = shouldLabelBelow(stop, allStops);
           const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
           const stopId = stop.name || stopName;
+          const stopKey = stop.name || stop.ShortName || stop.caption;
 
           // Determine if label should be visible based on zoom and filters
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
@@ -1797,8 +1802,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const isLabelClickable = isLabelVisible;
           // Choose label color: per-route membership (same logic as circle)
           let labelColor = '#274F9C';
-          if (visibleByRoute && effectiveActiveRoute) {
-            // When a route is active, always use its color for visible stops
+          const isRouteStop = effectiveActiveRoute
+            ? routeStopMembershipRef.current.get(effectiveActiveRoute)?.has(stopKey)
+            : false;
+          if (effectiveActiveRoute && isRouteStop) {
+            // When a route is active, use its color for member stops
             labelColor = routeColors[effectiveActiveRoute] || labelColor;
             // Debug sample stops
             if (stop.name === 'Central Library' || stop.name === 'KE7') {
@@ -1807,7 +1815,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           } else if (visibleByRoute) {
             // Multiple filters active - color by first matching route
             const matchCode = activeBusRouteCodes.find((code) =>
-              routeStopMembershipRef.current.get(code)?.has(stop.name)
+              routeStopMembershipRef.current.get(code)?.has(stopKey)
             );
             if (matchCode) {
               labelColor = routeColors[matchCode] || labelColor;
@@ -1839,7 +1847,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: stop.longitude,
               }}
               anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
-              tracksViewChanges={selectedBusStopId !== null}
+              tracksViewChanges={true}
               opacity={isLabelVisible ? 1 : 0}
               onPress={isLabelClickable ? handleBusStopPress(stop) : undefined}
               zIndex={60}

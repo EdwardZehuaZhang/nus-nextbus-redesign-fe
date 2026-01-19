@@ -4182,7 +4182,6 @@ const useBusMarkers = (
         arrowRotation = bearing - 90;
       }
 
-      // Create SVG icon for bus marker with route color and rotation
       const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
       const iconUrl = svgToDataURL(iconSvg);
 
@@ -4430,7 +4429,7 @@ const useFilteredBusRoutes = (
           const bearing = calculateBearing({ lat, lng }, nextCheckpoint);
           arrowRotation = bearing - 90;
         }
-        
+
         const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
         const iconUrl = svgToDataURL(iconSvg);
 
