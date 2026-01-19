@@ -1437,8 +1437,7 @@ const useDragHandlers = () => {
   const [isSearchModeExiting, setIsSearchModeExiting] = React.useState(false);
   const exitSearchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSearchModeRef = React.useRef(false);
-  const isDragLockedRef = React.useRef(false);
-  const dragStartStateRef = React.useRef<'MIN' | 'DEFAULT' | 'MAX'>('DEFAULT');
+  const isForceResettingRef = React.useRef(false);
 
   React.useEffect(() => {
     isSearchModeRef.current = isSearchMode;
@@ -1491,6 +1490,27 @@ const useDragHandlers = () => {
   }, []);
 
   React.useEffect(() => {
+    const listenerId = heightAnimation.addListener(({ value }) => {
+      if (!isSearchModeRef.current && !isDragging.current && value > DEFAULT_HEIGHT + 5) {
+        console.log('[TRANSIT SEARCH] 📈 Height increased while not in search:', value.toFixed(2));
+        if (!isForceResettingRef.current) {
+          isForceResettingRef.current = true;
+          heightAnimation.stopAnimation();
+          heightAnimation.setValue(DEFAULT_HEIGHT);
+          setContainerHeight(DEFAULT_HEIGHT);
+          setTimeout(() => {
+            isForceResettingRef.current = false;
+          }, 200);
+        }
+      }
+    });
+
+    return () => {
+      heightAnimation.removeListener(listenerId);
+    };
+  }, [DEFAULT_HEIGHT, heightAnimation]);
+
+  React.useEffect(() => {
     return () => {
       if (ignoreSearchTimeoutRef.current) {
         clearTimeout(ignoreSearchTimeoutRef.current);
@@ -1500,26 +1520,13 @@ const useDragHandlers = () => {
   }, []);
 
   const handleDragMove = (dy: number) => {
-    // Don't allow dragging while search mode is exiting
-    if (isDragLockedRef.current) {
-      console.log('[DRAG] 🔒 Drag locked during search exit');
-      return;
-    }
-    // Store the starting height and state when drag begins
+    // Store the starting height when drag begins
     if (tempHeight === null) {
       startHeight.current = containerHeight;
-      // Determine which state we're starting from
-      if (Math.abs(containerHeight - MIN_HEIGHT) < 5) {
-        dragStartStateRef.current = 'MIN';
-      } else if (Math.abs(containerHeight - MAX_HEIGHT) < 5) {
-        dragStartStateRef.current = 'MAX';
-      } else {
-        dragStartStateRef.current = 'DEFAULT';
-      }
-      console.log('[DRAG] 📍 Starting from:', dragStartStateRef.current);
     }
 
     // Convert dy (pixels) to percentage of screen height
+    // Assuming average screen height ~800px, so 1% = 8px
     const screenHeight = Platform.OS === 'web' 
       ? (typeof window !== 'undefined' ? window.innerHeight : 800)
       : Dimensions.get('window').height;
@@ -1527,6 +1534,7 @@ const useDragHandlers = () => {
 
     // Calculate new height (dragging down increases dy, so we subtract)
     let newHeight = startHeight.current - heightChange;
+
 
     // Clamp between MIN and MAX
     newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
@@ -1539,78 +1547,65 @@ const useDragHandlers = () => {
   };
 
   const handleDrag = (gestureState: { dy: number; vy: number }) => {
-    // Don't snap while locked
-    if (isDragLockedRef.current) {
-      console.log('[DRAG] 🔒 Snap locked during search exit');
-      return;
-    }
-
+    // This is called on drag end with velocity
     const currentHeight = tempHeight ?? containerHeight;
-    const { vy } = gestureState;
-    const dragDirection = vy < 0 ? 'UP' : 'DOWN'; // negative = up, positive = down
+    const { dy, vy } = gestureState;
 
-    let targetHeight: number;
+    let targetHeight = DEFAULT_HEIGHT;
     let collapsed = false;
 
-    console.log('[DRAG] 🎯 Direction:', dragDirection, 'From state:', dragStartStateRef.current, 'Current height:', currentHeight.toFixed(1));
 
-    // Hard-coded state transition logic based on starting state and direction
-    if (dragStartStateRef.current === 'DEFAULT') {
-      if (dragDirection === 'UP') {
-        targetHeight = MAX_HEIGHT;
-        collapsed = false;
-        console.log('[DRAG] DEFAULT + UP → MAX');
+    // Smart snapping based on current position and velocity
+    // Consider both where we are and where we're going
+    // Three states: MIN (10%) -> DEFAULT (45%) -> MAX (70%)
+    
+    if (Math.abs(vy) > 0.5) {
+      // Fast swipe detected
+      if (vy < 0) {
+        // Fast upward swipe
+        if (currentHeight < DEFAULT_HEIGHT - 5) {
+          // From collapsed/below DEFAULT - snap to DEFAULT
+          targetHeight = DEFAULT_HEIGHT;
+          collapsed = false;
+        } else if (currentHeight <= DEFAULT_HEIGHT + 5) {
+          // From around DEFAULT - snap to MAX
+          targetHeight = MAX_HEIGHT;
+          collapsed = false;
+        } else {
+          // Already above DEFAULT - snap to MAX
+          targetHeight = MAX_HEIGHT;
+          collapsed = false;
+        }
       } else {
-        targetHeight = MIN_HEIGHT;
-        collapsed = true;
-        console.log('[DRAG] DEFAULT + DOWN → MIN');
-      }
-    } else if (dragStartStateRef.current === 'MAX') {
-      if (dragDirection === 'DOWN') {
-        targetHeight = DEFAULT_HEIGHT;
-        collapsed = false;
-        console.log('[DRAG] MAX + DOWN → DEFAULT');
-      } else {
-        // Dragging up from MAX, stay at MAX or go higher
-        targetHeight = MAX_HEIGHT;
-        collapsed = false;
-        console.log('[DRAG] MAX + UP → MAX (stay)');
-      }
-    } else if (dragStartStateRef.current === 'MIN') {
-      if (dragDirection === 'UP') {
-        targetHeight = DEFAULT_HEIGHT;
-        collapsed = false;
-        console.log('[DRAG] MIN + UP → DEFAULT');
-      } else {
-        // Dragging down from MIN, stay at MIN
-        targetHeight = MIN_HEIGHT;
-        collapsed = true;
-        console.log('[DRAG] MIN + DOWN → MIN (stay)');
+        // Fast downward swipe
+        if (currentHeight > DEFAULT_HEIGHT + 10) {
+          // From well above DEFAULT - snap to DEFAULT
+          targetHeight = DEFAULT_HEIGHT;
+          collapsed = false;
+        } else {
+          // From DEFAULT or below - snap to MIN
+          targetHeight = MIN_HEIGHT;
+          collapsed = true;
+        }
       }
     } else {
-      // Fallback: snap to nearest state for pass-through cases
-      const distToMin = Math.abs(currentHeight - MIN_HEIGHT);
-      const distToDefault = Math.abs(currentHeight - DEFAULT_HEIGHT);
-      const distToMax = Math.abs(currentHeight - MAX_HEIGHT);
-      const minDist = Math.min(distToMin, distToDefault, distToMax);
-
-      if (minDist === distToMin) {
+      // Slow drag - snap based on position
+      if (currentHeight < 30) {
         targetHeight = MIN_HEIGHT;
         collapsed = true;
-      } else if (minDist === distToDefault) {
-        targetHeight = DEFAULT_HEIGHT;
-        collapsed = false;
-      } else {
+      } else if (currentHeight > 55) {
         targetHeight = MAX_HEIGHT;
         collapsed = false;
+      } else {
+        targetHeight = DEFAULT_HEIGHT;
+        collapsed = false;
       }
-      console.log('[DRAG] Fallback: snapping to nearest, target:', targetHeight);
     }
 
     setContainerHeight(targetHeight);
     setIsCollapsed(collapsed);
     setTempHeight(null);
-
+    
     // Smoothly animate to target height
     Animated.spring(heightAnimation, {
       toValue: targetHeight,
@@ -1618,6 +1613,7 @@ const useDragHandlers = () => {
       tension: 50,
       friction: 8,
     }).start();
+    
   };
 
   const handleDragEnd = () => {
@@ -1723,17 +1719,13 @@ const useDragHandlers = () => {
     Keyboard.dismiss();
     console.log('[TRANSIT SEARCH] 🚪 Exit search mode');
     console.log('[TRANSIT SEARCH] 📍 Height before exit:', (heightAnimation as any)._value);
-    // Lock dragging during exit transition
-    isDragLockedRef.current = true;
     setIsSearchModeExiting(true);
     if (exitSearchTimeoutRef.current) {
       clearTimeout(exitSearchTimeoutRef.current);
     }
     exitSearchTimeoutRef.current = setTimeout(() => {
       setIsSearchModeExiting(false);
-      isDragLockedRef.current = false;
-      console.log('[TRANSIT SEARCH] 🔓 Drag unlocked');
-    }, 500);
+    }, 450);
     ignoreSearchPressRef.current = true;
     if (ignoreSearchTimeoutRef.current) {
       clearTimeout(ignoreSearchTimeoutRef.current);
