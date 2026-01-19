@@ -495,6 +495,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [mapFilters]);
 
   const effectiveActiveRoute = selectedFilterRoute || _activeRoute;
+  const [deferredActiveRoute, setDeferredActiveRoute] = useState<RouteCode | null>(
+    effectiveActiveRoute
+  );
   const safeInitialRegion = React.useMemo(
     () => (isValidInitialRegion(initialRegion) ? initialRegion : DEFAULT_REGION),
     [initialRegion]
@@ -510,6 +513,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     },
     [onMapItemSelect]
   );
+
+  // Defer heavy map updates (bus stops/labels/polylines) to keep live buses responsive
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDeferredActiveRoute(effectiveActiveRoute);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [effectiveActiveRoute]);
 
   // Get user's current location from hook
   const { coords: userLocation } = useLocation();
@@ -552,6 +564,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     internalRoutePolylines,
     safeInitialRegion,
   ]);
+
+  // Fallback: mark map ready shortly after mount to avoid blocking live markers
+  useEffect(() => {
+    if (mapReady) return;
+    const timeout = setTimeout(() => {
+      if (mapRef.current) {
+        setMapReady(true);
+      }
+    }, 800);
+    return () => clearTimeout(timeout);
+  }, [mapReady]);
 
   // Calculate Google Maps zoom level from latitudeDelta
   // Formula: zoom = ln(360 / latitudeDelta) / ln(2)
@@ -1038,12 +1061,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   const isStopVisibleForActiveRoutes = React.useCallback(
     (stop: any): boolean => {
-      // If effectiveActiveRoute is set, only show stops on that route
-      if (effectiveActiveRoute) {
-        const membership = routeStopMembershipRef.current.get(effectiveActiveRoute);
+      // If deferredActiveRoute is set, only show stops on that route
+      if (deferredActiveRoute) {
+        const membership = routeStopMembershipRef.current.get(deferredActiveRoute);
         const isVisible = membership?.has(stop.name) || false;
         if (stop.name === 'Central Library' || stop.name === 'KE7') {
-          console.log(`🗺️ [VISIBLE] ${stop.name}: ${isVisible} (${effectiveActiveRoute} members: ${membership?.size || 0})`);
+          console.log(`🗺️ [VISIBLE] ${stop.name}: ${isVisible} (${deferredActiveRoute} members: ${membership?.size || 0})`);
         }
         return isVisible;
       }
@@ -1053,7 +1076,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         routeStopMembershipRef.current.get(code)?.has(stop.name)
       );
     },
-    [effectiveActiveRoute, activeBusRouteCodes]
+    [deferredActiveRoute, activeBusRouteCodes]
   );
 
   // Always render ALL bus stops; control visibility via opacity to keep children count/order stable
@@ -1335,6 +1358,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         onRegionChangeComplete={handleRegionChangeDebounced}
         onMapReady={() => {
           console.log('[NATIVE MAP] mapReady fired with safeInitialRegion:', safeInitialRegion);
+          setMapReady(true);
+        }}
+        onMapLoaded={() => {
+          console.log('[NATIVE MAP] mapLoaded fired with safeInitialRegion:', safeInitialRegion);
           setMapReady(true);
         }}
         onPoiClick={handlePoiClick}
@@ -1733,18 +1760,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const stopId = stop.name || stop.ShortName || stop.caption;
           const isCircleClickable = showCircle && visibleByRoute;
           const stopKey = stop.name || stop.ShortName || stop.caption;
-          const isRouteStop = effectiveActiveRoute
-            ? routeStopMembershipRef.current.get(effectiveActiveRoute)?.has(stopKey)
+          const isRouteStop = deferredActiveRoute
+            ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
             : false;
           
           // Choose circle color: if multiple routes active, color by first matching route membership
           let circleColor = '#274F9C';
-          if (effectiveActiveRoute && isRouteStop) {
+          if (deferredActiveRoute && isRouteStop) {
             // When a route is active, use its color for member stops
-            circleColor = routeColors[effectiveActiveRoute] || circleColor;
+            circleColor = routeColors[deferredActiveRoute] || circleColor;
             // Debug sample stops
             if (stop.name === 'Central Library' || stop.name === 'KE7') {
-              console.log(`🗺️ [CIRCLE] ${stop.name}: color=${circleColor} (route=${effectiveActiveRoute})`);
+              console.log(`🗺️ [CIRCLE] ${stop.name}: color=${circleColor} (route=${deferredActiveRoute})`);
             }
           } else if (visibleByRoute) {
             // Multiple filters active - color by first matching route
@@ -1802,15 +1829,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           const isLabelClickable = isLabelVisible;
           // Choose label color: per-route membership (same logic as circle)
           let labelColor = '#274F9C';
-          const isRouteStop = effectiveActiveRoute
-            ? routeStopMembershipRef.current.get(effectiveActiveRoute)?.has(stopKey)
+          const isRouteStop = deferredActiveRoute
+            ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
             : false;
-          if (effectiveActiveRoute && isRouteStop) {
+          if (deferredActiveRoute && isRouteStop) {
             // When a route is active, use its color for member stops
-            labelColor = routeColors[effectiveActiveRoute] || labelColor;
+            labelColor = routeColors[deferredActiveRoute] || labelColor;
             // Debug sample stops
             if (stop.name === 'Central Library' || stop.name === 'KE7') {
-              console.log(`🗺️ [LABEL] ${stop.name}: color=${labelColor} (route=${effectiveActiveRoute})`);
+              console.log(`🗺️ [LABEL] ${stop.name}: color=${labelColor} (route=${deferredActiveRoute})`);
             }
           } else if (visibleByRoute) {
             // Multiple filters active - color by first matching route
@@ -1996,12 +2023,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
           return (
             <Marker
-              key={`bus-${bus.veh_plate || `${effectiveActiveRoute}-${idx}`}`}
+              key={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
               coordinate={{
                 latitude: bus.lat,
                 longitude: bus.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={true}
               zIndex={100}
             >
               <View
@@ -2025,10 +2053,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Bus Route Polylines - normal visibility using filters/active route */}
         {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
           if (coordinates.length === 0) return null;
-          const isPrimaryActive = effectiveActiveRoute === routeCode;
+          const isPrimaryActive = deferredActiveRoute === routeCode;
           const isFilteredActive = activeBusRouteCodes.includes(routeCode);
           // Show only when an active route or filters are set, and this route matches
-          const hasAnyRouteActive = !!effectiveActiveRoute || activeBusRouteCodes.length > 0;
+          const hasAnyRouteActive = !!deferredActiveRoute || activeBusRouteCodes.length > 0;
           const isVisible = hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
 
           // Use canonical palette but render via RGBA for iOS reliability

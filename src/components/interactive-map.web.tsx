@@ -4137,6 +4137,7 @@ const useDestinationMarker = (
 // Hook to render real-time bus location markers
 const useBusMarkers = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
+  isMapCreated: boolean,
   activeBuses: ActiveBus[],
   routeColor: string = '#274F9C',
   activeRoute?: RouteCode | null
@@ -4145,7 +4146,7 @@ const useBusMarkers = (
   const { data: checkpointsData } = useCheckpoints(activeRoute ?? 'A1');
 
   useEffect(() => {
-    if (!mapRef.current || typeof window === 'undefined' || !window.google) {
+    if (!isMapCreated || !mapRef.current || typeof window === 'undefined' || !window.google) {
       return;
     }
 
@@ -4222,7 +4223,7 @@ const useBusMarkers = (
 
       busMarkersRef.current.push(marker);
     });
-  }, [mapRef, activeBuses, routeColor]);
+  }, [mapRef, isMapCreated, activeBuses, routeColor, activeRoute]);
 
   return busMarkersRef;
 };
@@ -6019,7 +6020,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useConnectorLines(mapRef, internalRoutePolylines ? undefined : origin, internalRoutePolylines ? undefined : destination, internalRoutePolylines ? undefined : routePolyline); // Draw dotted lines from user to route start and route end to destination
   
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
-  useBusMarkers(mapRef, activeBuses, routeColor, effectiveActiveRoute);
+  useBusMarkers(mapRef, isMapCreated, activeBuses, routeColor, effectiveActiveRoute);
   // Don't render full route checkpoints when showing internal route polylines (which shows only the segment)
   useRouteCheckpoints(mapRef, internalRoutePolylines ? null : effectiveActiveRoute, routeColor);
   // Only show filtered bus routes if a filter route is selected (not when "Bus Stops" is selected)

@@ -5,6 +5,7 @@ import { Animated, TextInput, Keyboard, Platform, Dimensions, Linking, useWindow
 import { showMessage } from 'react-native-flash-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Info } from 'phosphor-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { storage } from '@/lib/storage';
 
@@ -19,6 +20,7 @@ import {
   useServiceDescriptions,
   useShuttleService,
 } from '@/api';
+import { getActiveBuses } from '@/api/bus/api';
 
 import { getPlaceDetails } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
@@ -992,6 +994,30 @@ const NearestStopsSection = ({
 
     return buildBusRoutes(sortedShuttles, colorMap);
   }, [shuttleData, colorMap]);
+
+  // Prefetch bus data for all routes in nearest stops after they're loaded
+  const queryClient = useQueryClient();
+  React.useEffect(() => {
+    if (currentBusRoutes.length === 0) {
+      return;
+    }
+
+    // Extract route codes from currentBusRoutes
+    const routeCodes = currentBusRoutes.map(route => route.route as any);
+
+    // Prefetch bus data for each route
+    routeCodes.forEach((routeCode) => {
+      queryClient.prefetchQuery({
+        queryKey: ['activeBuses', routeCode],
+        queryFn: () => getActiveBuses(routeCode),
+        staleTime: 1 * 1000, // 1 second
+      }).then(() => {
+        console.log(`[🚌 BUS PREFETCH] ✅ Prefetched bus data for route: ${routeCode}`);
+      }).catch((error) => {
+        console.error(`[🚌 BUS PREFETCH] ❌ Failed to prefetch bus data for route ${routeCode}:`, error);
+      });
+    });
+  }, [currentBusRoutes, queryClient]);
 
   return (
     <View className="mb-6">

@@ -121,7 +121,7 @@ export const useActiveBuses = (routeCode: RouteCode, enabled = true) => {
     queryKey: ['activeBuses', routeCode],
     queryFn: () => getActiveBuses(routeCode),
     enabled: enabled && !!routeCode,
-    staleTime: 5 * 1000, // 5 seconds
+    staleTime: 1 * 1000, // 1 second - faster cache invalidation on first route selection
     refetchInterval: 20 * 1000, // Refetch every 20 seconds for live bus tracking
   });
 };
