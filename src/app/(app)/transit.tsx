@@ -1800,7 +1800,15 @@ const useDragHandlers = () => {
       const duration = Date.now() - dragStartTime.current;
       const velocity = dy / Math.max(duration, 16); // Prevent division by zero
       isDragging.current = false;
-      handleDrag({ dy, vy: velocity });
+      
+      // Only snap if drag distance is significant (> 20px)
+      // This prevents content resizing (like selection borders) from triggering snaps
+      if (Math.abs(dy) > 20) {
+        console.log('[DRAG] 📏 Drag distance:', Math.abs(dy), '- Snapping');
+        handleDrag({ dy, vy: velocity });
+      } else {
+        console.log('[DRAG] 📏 Drag distance:', Math.abs(dy), '- Too small, ignoring');
+      }
       handleDragEnd();
     }
   };
@@ -2445,10 +2453,14 @@ export default function TransitPage() {
   >(null);
 
   const handleMapTypeChange = (
-    mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain'
+    mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain' | 'dark' | 'light' | any
   ) => {
     if (mapTypeChangeHandlerRef.current) {
-      mapTypeChangeHandlerRef.current(mapType);
+      // On native, pass through standard/satellite/hybrid/terrain types
+      // The interactive-map native version will handle these
+      if (['standard', 'satellite', 'hybrid', 'terrain'].includes(mapType)) {
+        mapTypeChangeHandlerRef.current(mapType);
+      }
     }
   };
 
