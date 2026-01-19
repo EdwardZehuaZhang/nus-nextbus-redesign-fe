@@ -518,7 +518,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useEffect(() => {
     const timeout = setTimeout(() => {
       setDeferredActiveRoute(effectiveActiveRoute);
-    }, 300);
+    }, 0);
 
     return () => clearTimeout(timeout);
   }, [effectiveActiveRoute]);
@@ -2053,10 +2053,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Bus Route Polylines - normal visibility using filters/active route */}
         {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
           if (coordinates.length === 0) return null;
-          const isPrimaryActive = deferredActiveRoute === routeCode;
+          const isPrimaryActive = effectiveActiveRoute === routeCode;
           const isFilteredActive = activeBusRouteCodes.includes(routeCode);
           // Show only when an active route or filters are set, and this route matches
-          const hasAnyRouteActive = !!deferredActiveRoute || activeBusRouteCodes.length > 0;
+          const hasAnyRouteActive = !!effectiveActiveRoute || activeBusRouteCodes.length > 0;
           const isVisible = hasAnyRouteActive && (isPrimaryActive || isFilteredActive);
 
           // Use canonical palette but render via RGBA for iOS reliability
