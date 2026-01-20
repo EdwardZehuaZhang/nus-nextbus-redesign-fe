@@ -842,37 +842,3 @@ export const LAW_AREA_BOUNDARY = toNative([
   { lat: 1.3198689468304363, lng: 103.81747672101133 },
   { lat: 1.3199493917504048, lng: 103.81764301797025 },
 ]);
-
-export interface LandmarkData {
-  name: string;
-  address: string;
-  coordinates: Coordinate;
-  type: 'hospital' | 'mrt' | 'library' | 'bus-terminal';
-}
-
-export const NUS_LANDMARKS: LandmarkData[] = [
-  {
-    name: 'University Health Centre',
-    address: '20 Lower Kent Ridge Rd, Singapore 119080',
-    coordinates: { latitude: 1.2988168610190092, longitude: 103.77612356096506 },
-    type: 'hospital',
-  },
-  {
-    name: 'Kent Ridge MRT Station (CC24)',
-    address: '301 South Buona Vista Rd, Singapore 118177',
-    coordinates: { latitude: 1.2934291, longitude: 103.7846561 },
-    type: 'mrt',
-  },
-  {
-    name: 'NUS Central Library',
-    address: '12 Kent Ridge Cres, Singapore 119275',
-    coordinates: { latitude: 1.2965727630608201, longitude: 103.77256829291584 },
-    type: 'library',
-  },
-  {
-    name: 'Kent Ridge Bus Terminal',
-    address: '37B Clementi Rd, Singapore 129762',
-    coordinates: { latitude: 1.2945307830256754, longitude: 103.78441125154495 },
-    type: 'bus-terminal',
-  },
-];

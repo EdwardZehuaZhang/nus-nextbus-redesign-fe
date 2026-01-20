@@ -109,6 +109,7 @@ export const useShuttleService = (busStopName: string, enabled = true) => {
         return 30 * 1000; // 30 seconds for distant arrivals
       }
     },
+    refetchIntervalInBackground: false, // PERFORMANCE: Pause polling when app backgrounded
   });
 };
 
@@ -122,7 +123,8 @@ export const useActiveBuses = (routeCode: RouteCode, enabled = true) => {
     queryFn: () => getActiveBuses(routeCode),
     enabled: enabled && !!routeCode,
     staleTime: 1 * 1000, // 1 second - faster cache invalidation on first route selection
-    refetchInterval: 20 * 1000, // Refetch every 20 seconds for live bus tracking
+    refetchInterval: 25 * 1000, // PERFORMANCE: Reduced from 20s to 25s to decrease render frequency
+    refetchIntervalInBackground: false, // PERFORMANCE: Pause polling when app backgrounded
   });
 };
 
@@ -136,6 +138,7 @@ export const useBusLocation = (vehiclePlate: string, enabled = true) => {
     enabled: enabled && !!vehiclePlate,
     staleTime: 5 * 1000, // 5 seconds
     refetchInterval: 10 * 1000, // Refetch every 10 seconds
+    refetchIntervalInBackground: false, // PERFORMANCE: Pause polling when app backgrounded
   });
 };
 

@@ -494,6 +494,18 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
   const textY = Math.round(labelHeight * 0.7);
 
+  // Ensure label color changes are rendered even with tracksViewChanges optimization
+  const [trackChanges, setTrackChanges] = React.useState(false);
+  const prevColorRef = React.useRef(labelColor);
+  React.useEffect(() => {
+    if (prevColorRef.current !== labelColor || isLabelVisible) {
+      setTrackChanges(true);
+      const t = setTimeout(() => setTrackChanges(false), 250);
+      prevColorRef.current = labelColor;
+      return () => clearTimeout(t);
+    }
+  }, [labelColor, isLabelVisible]);
+
   return (
     <Marker
       key={`bus-stop-label-${stop.name}`}
@@ -502,7 +514,7 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
         longitude: stop.longitude,
       }}
       anchor={{ x: 0.5, y: shouldLabelBelow ? 0 : 1 }}
-      tracksViewChanges={true}
+      tracksViewChanges={trackChanges}
       opacity={isLabelVisible ? 1 : 0}
       onPress={isLabelClickable ? onPress : undefined}
       zIndex={60}
@@ -1338,7 +1350,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
       const isLabelClickable = isLabelVisible;
       // Choose label color: per-route membership (same logic as circle)
-      let labelColor = '#274F9C';
+      let labelColor = '#6B21A8';
       const isRouteStop = deferredActiveRoute
         ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
         : false;
@@ -1377,6 +1389,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     currentZoom,
     visibleBusStops,
     routeColors,
+    shouldShowStop,
   ]);
 
   // Fit map to show all markers ONLY on initial route load (not on every render)
@@ -2025,7 +2038,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             : false;
           
           // Choose circle color: if multiple routes active, color by first matching route membership
-          let circleColor = '#274F9C';
+          let circleColor = '#6B21A8';
           if (deferredActiveRoute && isRouteStop) {
             // When a route is active, use its color for member stops
             circleColor = routeColors[deferredActiveRoute] || circleColor;
@@ -2159,75 +2172,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             lineJoin="round"
           />
         )}
-        {/* Live Bus Location Markers - Using SVG icons matching web version */}
-        {activeBuses.map((bus: any, idx: number) => {
-          if (!bus.lat || !bus.lng) return null;
-          
-          // Calculate bearing using proper checkpoint data with memoization
-          let bearing = 0; // Default to pointing right (East)
-          const nextCheckpoint = findNextCheckpoint(
-            { lat: bus.lat, lng: bus.lng },
-            checkpoints,
-            bus.direction
-          );
-          
-          if (nextCheckpoint) {
-            const cacheKey = createBearingCacheKey(
-              { lat: bus.lat, lng: bus.lng },
-              nextCheckpoint
-            );
-            
-            // Check cache first to avoid recalculating
-            if (bearingCacheRef.current.has(cacheKey)) {
-              bearing = bearingCacheRef.current.get(cacheKey)!;
-            } else {
-              // Calculate and cache the bearing
-              bearing = calculateBearing(
-                { lat: bus.lat, lng: bus.lng },
-                nextCheckpoint
-              );
-              bearingCacheRef.current.set(cacheKey, bearing);
-            }
-          }
-
-          // Create SVG marker matching web version (28x28)
-          const flipHorizontal = bus.direction === 2;
-          const arrowRotation = bearing - 90; // Convert bearing to SVG rotation
-          const svgXml = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
-
-          // Debug first bus bearing
-          if (idx === 0 && effectiveActiveRoute) {
-            console.log(`🚌 [BUS] Route ${effectiveActiveRoute}: bearing=${bearing.toFixed(1)}°, arrow=${arrowRotation.toFixed(1)}°, dir=${bus.direction}`);
-          }
-
-          return (
-            <Marker
-              key={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
-              coordinate={{
-                latitude: bus.lat,
-                longitude: bus.lng,
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
-              zIndex={100}
-            >
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <SvgXml
-                  xml={svgXml}
-                  width={28}
-                  height={28}
-                />
-              </View>
-            </Marker>
-          );
-        })}
+        {/* Live bus markers moved after polylines to minimize index shifts */}
 
         {/* Bus Route Polylines - normal visibility using filters/active route */}
         {allRoutesPrecomputed.map(({ routeCode, coordinates }, idx) => {
@@ -2267,6 +2212,74 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               zIndex={zIndex}
               tappable={false}
             />
+          );
+        })}
+
+        {/* Live Bus Location Markers - Using SVG icons matching web version */}
+        {activeBuses.map((bus: any, idx: number) => {
+          if (!bus.lat || !bus.lng) return null;
+
+          // Calculate bearing using proper checkpoint data with memoization
+          let bearing = 0; // Default to pointing right (East)
+          const nextCheckpoint = findNextCheckpoint(
+            { lat: bus.lat, lng: bus.lng },
+            checkpoints,
+            bus.direction
+          );
+
+          if (nextCheckpoint) {
+            const cacheKey = createBearingCacheKey(
+              { lat: bus.lat, lng: bus.lng },
+              nextCheckpoint
+            );
+
+            // Check cache first to avoid recalculating
+            if (bearingCacheRef.current.has(cacheKey)) {
+              bearing = bearingCacheRef.current.get(cacheKey)!;
+            } else {
+              // Calculate and cache the bearing
+              bearing = calculateBearing(
+                { lat: bus.lat, lng: bus.lng },
+                nextCheckpoint
+              );
+              bearingCacheRef.current.set(cacheKey, bearing);
+            }
+          }
+
+          // Create SVG marker matching web version (28x28)
+          const flipHorizontal = bus.direction === 2;
+          const arrowRotation = bearing - 90; // Convert bearing to SVG rotation
+          const svgXml = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
+
+          // Debug first bus bearing
+          if (idx === 0 && effectiveActiveRoute) {
+            console.log(
+              `🚌 [BUS] Route ${effectiveActiveRoute}: bearing=${bearing.toFixed(1)}°, arrow=${arrowRotation.toFixed(1)}°, dir=${bus.direction}`
+            );
+          }
+
+          return (
+            <Marker
+              key={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
+              coordinate={{
+                latitude: bus.lat,
+                longitude: bus.lng,
+              }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
+              zIndex={100}
+            >
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <SvgXml xml={svgXml} width={28} height={28} />
+              </View>
+            </Marker>
           );
         })}
       </MapView>
