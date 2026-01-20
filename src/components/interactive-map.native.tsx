@@ -1681,7 +1681,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           ]}
           strokeWidth={0}
           strokeColor="transparent"
-          fillColor="rgba(0, 0, 0, 0.4)"
+          fillColor="rgba(0, 0, 0, 0.222)"
           tappable={false}
         />
 
