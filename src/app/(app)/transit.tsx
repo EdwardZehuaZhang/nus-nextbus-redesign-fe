@@ -69,6 +69,11 @@ import {
   getRecentSearches,
 } from '@/lib/storage/recent-searches';
 
+// Initialize location permissions early
+const LocationInitializer = () => {
+  useLocation();
+  return null;
+};
 
 type BusRoute = {
   route: string;
@@ -2004,8 +2009,8 @@ const MapSelectionDetails = ({
           onPress={onClose}
           style={{
             position: 'absolute',
-            top: 0,
-            right: 0,
+            top: -2,
+            right: 2,
             width: 32,
             height: 32,
             borderRadius: 16,
@@ -2311,6 +2316,9 @@ const MapSelectionDetails = ({
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
+  // Initialize location permissions on mount
+  useLocation();
+  
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
   const githubUrl = 'https://github.com/EdwardZehuaZhang';
   const supportMailto =

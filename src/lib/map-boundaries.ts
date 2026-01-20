@@ -854,7 +854,7 @@ export const NUS_LANDMARKS: LandmarkData[] = [
   {
     name: 'University Health Centre',
     address: '20 Lower Kent Ridge Rd, Singapore 119080',
-    coordinates: { latitude: 1.2984648, longitude: 103.7760358 },
+    coordinates: { latitude: 1.2988168610190092, longitude: 103.77612356096506 },
     type: 'hospital',
   },
   {
@@ -866,13 +866,13 @@ export const NUS_LANDMARKS: LandmarkData[] = [
   {
     name: 'NUS Central Library',
     address: '12 Kent Ridge Cres, Singapore 119275',
-    coordinates: { latitude: 1.2966106, longitude: 103.7722558 },
+    coordinates: { latitude: 1.2965727630608201, longitude: 103.77256829291584 },
     type: 'library',
   },
   {
     name: 'Kent Ridge Bus Terminal',
     address: '37B Clementi Rd, Singapore 129762',
-    coordinates: { latitude: 1.2946866, longitude: 103.7700484 },
+    coordinates: { latitude: 1.2945307830256754, longitude: 103.78441125154495 },
     type: 'bus-terminal',
   },
 ];

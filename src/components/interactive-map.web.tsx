@@ -5158,6 +5158,14 @@ const usePlaceDetailsClick = (
           latLng: event.latLng?.toJSON(),
         });
 
+        // Log coordinates for any map click
+        if (event.latLng) {
+          console.log('[InteractiveMap] Map pressed at coordinates:', {
+            latitude: event.latLng.lat(),
+            longitude: event.latLng.lng(),
+          });
+        }
+
         if (event.placeId) {
           // User clicked on a POI (Point of Interest)
           console.log('[PlaceDetailsClick] POI clicked, place ID:', event.placeId);

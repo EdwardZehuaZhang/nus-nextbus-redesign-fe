@@ -58,6 +58,7 @@
     "adhoc": {
       "channel": "adhoc",
       "distribution": "internal",
+      "environment": "production",
       "pnpm": "9.12.3",
       "ios": {
         "simulator": false,

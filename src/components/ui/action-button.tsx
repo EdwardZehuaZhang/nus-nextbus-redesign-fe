@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   icon: {
     justifyContent: 'center',

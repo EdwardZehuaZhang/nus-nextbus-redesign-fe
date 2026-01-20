@@ -1058,7 +1058,7 @@ export default function NavigationPage() {
           setLocations((prev) => prev.map((loc) => loc.type === 'origin' ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords } : loc));
           console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
           // Update origin
-          router.push({
+          router.replace({
             pathname: '/navigation' as any,
             params: {
               destination,
@@ -1077,9 +1077,10 @@ export default function NavigationPage() {
           setActiveStopId(null);
         }
         
+        // Dismiss keyboard immediately for instant feedback
+        Keyboard.dismiss();
         // Close the search panel
         resetEditingState();
-        Keyboard.dismiss();
         setPanelState('closed');
         setSearchText('');
       } else {
@@ -1848,9 +1849,10 @@ export default function NavigationPage() {
       setActiveStopId(null);
     }
     
+    // Dismiss keyboard immediately for instant feedback
+    Keyboard.dismiss();
     // Close search panel and clear selection state
     resetEditingState();
-    Keyboard.dismiss();
     setPanelState('closed');
     setSearchText('');
   };
@@ -2325,6 +2327,7 @@ export default function NavigationPage() {
             showsVerticalScrollIndicator={containerHeight > 50}
             style={{ marginTop: 12, paddingHorizontal: 12, marginHorizontal: -12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
+            keyboardShouldPersistTaps="always"
           >
             {(panelState === 'animating' || panelState === 'expanded') ? (
               // SEARCH PANEL

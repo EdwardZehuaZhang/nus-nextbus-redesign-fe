@@ -56,6 +56,18 @@ const calculateBearing = (
 };
 
 /**
+ * Create a cache key for bearing calculations to memoize results
+ * Rounds coordinates to 4 decimal places (~11 meters precision)
+ */
+const createBearingCacheKey = (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number }
+): string => {
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+  return `${round(from.lat)},${round(from.lng)}-${round(to.lat)},${round(to.lng)}`;
+};
+
+/**
  * Find the nearest upcoming checkpoint for a bus
  * @param busPos - Current bus position {lat, lng}
  * @param checkpoints - Array of route checkpoints
@@ -404,7 +416,7 @@ const CircularMarker: React.FC<{
     canteen: BowlFood,
   }[type];
 
-  const iconSize = 16 * scale;
+  const iconSize = 16; // Fixed size in viewBox units, no scaling
 
   return (
     <View
@@ -442,6 +454,113 @@ const getCircularMarkerScale = (zoom: number): number => {
   else return 1.3;
 };
 
+/**
+ * Memoized Bus Stop Label Marker Component
+ * Prevents unnecessary re-renders during map pans/zooms by isolating label rendering logic
+ */
+interface BusStopLabelProps {
+  stop: any;
+  isLabelVisible: boolean;
+  isLabelClickable: boolean;
+  labelColor: string;
+  currentZoom: number;
+  onPress: (e: MarkerPressEvent) => void;
+  shouldLabelBelow: boolean;
+}
+
+const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
+  stop,
+  isLabelVisible,
+  isLabelClickable,
+  labelColor,
+  currentZoom,
+  onPress,
+  shouldLabelBelow,
+}) => {
+  const stopName = stop.ShortName || stop.caption || stop.name;
+  const labelOffsetLat = shouldLabelBelow ? -0.0001 : 0.0001;
+
+  // Calculate font size based on zoom level (matching web version)
+  let fontSize = 12;
+  let strokeWidth = 3;
+  if (currentZoom >= 17) {
+    fontSize = Math.min(18, 12 + (currentZoom - 16) * 2);
+    strokeWidth = Math.min(4, 3 + (currentZoom - 16) * 0.3);
+  }
+  const labelWidth = Math.min(
+    200,
+    Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
+  );
+  const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
+  const textY = Math.round(labelHeight * 0.7);
+
+  return (
+    <Marker
+      key={`bus-stop-label-${stop.name}`}
+      coordinate={{
+        latitude: stop.latitude + labelOffsetLat,
+        longitude: stop.longitude,
+      }}
+      anchor={{ x: 0.5, y: shouldLabelBelow ? 0 : 1 }}
+      tracksViewChanges={true}
+      opacity={isLabelVisible ? 1 : 0}
+      onPress={isLabelClickable ? onPress : undefined}
+      zIndex={60}
+    >
+      <View
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Svg
+          width={labelWidth}
+          height={labelHeight}
+          viewBox={`0 0 ${labelWidth} ${labelHeight}`}
+        >
+          {/* White stroke outline - rendered first (behind) */}
+          <SvgText
+            x={labelWidth / 2}
+            y={textY}
+            fontSize={fontSize}
+            fontWeight="600"
+            fill="none"
+            textAnchor="middle"
+            stroke="#FFFFFF"
+            strokeWidth={strokeWidth}
+          >
+            {stopName}
+          </SvgText>
+          {/* Route-colored text on top */}
+          <SvgText
+            x={labelWidth / 2}
+            y={textY}
+            fontSize={fontSize}
+            fontWeight="600"
+            fill={labelColor}
+            textAnchor="middle"
+          >
+            {stopName}
+          </SvgText>
+        </Svg>
+      </View>
+    </Marker>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if key props change
+  return (
+    prevProps.isLabelVisible === nextProps.isLabelVisible &&
+    prevProps.labelColor === nextProps.labelColor &&
+    prevProps.currentZoom === nextProps.currentZoom &&
+    prevProps.shouldLabelBelow === nextProps.shouldLabelBelow &&
+    prevProps.stop.latitude === nextProps.stop.latitude &&
+    prevProps.stop.longitude === nextProps.stop.longitude &&
+    prevProps.stop.name === nextProps.stop.name
+  );
+});
+
+BusStopLabelMarker.displayName = 'BusStopLabelMarker';
+
 // Debug logging for route rendering
 const DEBUG_ROUTES = false;
 const logRoute = (message: string, data?: any) => {
@@ -450,7 +569,7 @@ const logRoute = (message: string, data?: any) => {
   }
 };
 
-export const InteractiveMap: React.FC<InteractiveMapProps> = ({
+export const InteractiveMap = React.memo<InteractiveMapProps>(({
   origin,
   destination,
   waypoints = [],
@@ -480,6 +599,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [internalMapType, setInternalMapType] = useState<
     'standard' | 'satellite' | 'hybrid' | 'terrain'
   >('standard');
+
+  // Bearing calculation cache to avoid recalculating every 20 seconds
+  const bearingCacheRef = useRef<Map<string, number>>(new Map());
 
   // State tracking refs for route selection sync (prevents infinite loops)
   const previousActiveRouteRef = useRef<RouteCode | null>(null);
@@ -547,15 +669,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useEffect(() => {
     if (!forceResetCenter || !mapReady || !mapRef.current) {
       if (forceResetCenter) {
-        console.log('[NATIVE MAP] forceResetCenter blocked - mapReady:', mapReady, 'mapRef:', !!mapRef.current);
       }
       return;
     }
     if (routePolyline || internalRoutePolylines) {
-      console.log('[NATIVE MAP] forceResetCenter blocked - has route polylines');
       return;
     }
-    console.log('[NATIVE MAP] forceResetCenter firing - animating to:', safeInitialRegion);
     mapRef.current.animateToRegion(safeInitialRegion, 100);
   }, [
     forceResetCenter,
@@ -602,13 +721,54 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const customMapStyle = React.useMemo(() => {
     const showDetails = currentZoom >= 16;
 
+    // Always hide region/locality labels (Clementi, Queenstown, Holland Village, etc.)
+    // and country/geographic labels (Singapore, Malaysia, Sentosa, Bukom Island, etc.)
+    const baseStyles = [
+      {
+        featureType: 'administrative.locality',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'administrative.neighborhood',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'administrative.country',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'administrative.province',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'administrative.land_parcel',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'landscape',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+      {
+        featureType: 'water',
+        elementType: 'labels',
+        stylers: [{ visibility: 'off' }],
+      },
+    ];
+
     if (showDetails) {
-      // Show all details at zoom 16+
-      return [];
+      // Show all other details at zoom 16+ but keep region labels hidden
+      return baseStyles;
     }
 
-    // Hide POI labels and road labels when zoomed out
+    // Hide POI labels and road labels when zoomed out, plus region labels
     return [
+      ...baseStyles,
       {
         featureType: 'poi',
         elementType: 'labels',
@@ -649,13 +809,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Log zoom level changes for debugging
   useEffect(() => {
-    
-  }, [
-    currentRegion.latitudeDelta,
-    currentZoom,
-    currentRegion.latitude,
-    currentRegion.longitude,
-  ]);
+    let stopVisibilityMode = '';
+    if (currentZoom <= 13) {
+      stopVisibilityMode = 'HIDE ALL STOPS';
+    } else if (currentZoom === 14) {
+      stopVisibilityMode = 'Show only 4 key stops';
+    } else if (currentZoom >= 15 && currentZoom <= 16) {
+      stopVisibilityMode = 'Show priority stops';
+    } else if (currentZoom >= 17) {
+      stopVisibilityMode = 'Show all stops';
+    } else {
+      stopVisibilityMode = 'HIDE ALL STOPS';
+    }
+    console.log(`[MapZoomLevel] Zoom ${currentZoom}: ${stopVisibilityMode}`);
+  }, [currentZoom]);
 
   // Priority stops shown at zoom level 14 (minimal set of key locations)
   const zoom14PriorityStops = [
@@ -673,12 +840,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     'TCOMS',
   ];
 
+  // Key stops to show at zoom 18 (very zoomed out)
+  const zoom18KeyStops = [
+    'UTown',
+    'UHC',
+    'KR Bus Ter',
+    'KR MRT',
+    'TCOMS',
+  ];
+
   // Priority stops that should be shown at zoom level 15-16 (expanded key locations)
   const priorityStops = [
-    'BIZ 2',
     'COM 3',
     'TCOMS',
-    'PGP',
     'PGP Foyer',
     'KR MRT',
     'S 17',
@@ -691,7 +865,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     'UTown',
     'SDE3',
     'KR Bus Ter',
-    'Ventus',
     'CLB',
     'Opp NUSS',
     'College Gr',
@@ -727,20 +900,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return visibleBusStops.includes(stopName);
     }
 
-    // Show based on zoom level (now aligned with web):
-    // - Zoom 17+: Show all stops
+    // Show based on zoom level:
+    // - Zoom 13 and below: Hide all stops
+    // - Zoom 14: Show only 4 key stops
     // - Zoom 15-16: Show priority stops
-    // - Zoom 14 and below: Show only zoom14 priority stops (minimal set)
-    if (currentZoom >= 17) {
-      return true; // Show all stops at zoom 17 and above
-    } else if (currentZoom >= 15) {
+    // - Zoom 17+: Show all stops
+    
+    if (currentZoom <= 13) {
+      return false; // Hide all stops at zoom 13 and below
+    } else if (currentZoom === 14) {
+      const isKeyStop = zoom18KeyStops.some((p) => stopName === p || stopName.trim() === p);
+      return isKeyStop; // Show only 4 key stops at zoom 14
+    } else if (currentZoom >= 15 && currentZoom <= 16) {
       // Show priority stops at zoom 15-16
-      return priorityStops.some((p) => stopName === p || stopName.trim() === p);
+      const isPriority = priorityStops.some((p) => stopName === p || stopName.trim() === p);
+      return isPriority;
+    } else if (currentZoom >= 17) {
+      // Show all stops at zoom 17+
+      return true;
     } else {
-      // Show only minimal priority stops at zoom 14 and below
-      return zoom14PriorityStops.some(
-        (p) => stopName === p || stopName.trim() === p
-      );
+      // Default: hide
+      return false;
     }
   };
 
@@ -1010,13 +1190,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       // Deselect all bus-route filters
       Object.keys(updatedFilters).forEach((key) => {
-        if (key === 'bus-stops' || key.startsWith('bus-route-')) {
+        if (key.startsWith('bus-route-')) {
           updatedFilters[key] = false;
         }
       });
 
       // Select the active route
       updatedFilters[routeFilterKey] = true;
+  // Auto-enable bus stops when a route is selected so they're visible
+  updatedFilters['bus-stops'] = true;
 
       // Hide landmarks, academic, residences when route selected
       updatedFilters['important'] = false;
@@ -1086,6 +1268,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   const clusteredInputMarkers = React.useMemo(() => {
     if (!allBusStops || allBusStops.length === 0) return [] as { id: string; name: string; latitude: number; longitude: number }[];
+    // PERFORMANCE OPTIMIZATION: Pre-filter markers to only include visible stops before passing to Supercluster
+    // This reduces O(n log n) clustering computation on unfiltered data
+    // Filter by: route membership, zoom level visibility, and custom filters
     return allBusStops
       .filter((stop: any) => isStopVisibleForActiveRoutes(stop) && shouldShowStop(stop.name))
       .map((stop: any) => ({
@@ -1114,9 +1299,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const shouldShowPrinters = mapFilters?.printers ?? false;
   const shouldShowSports = mapFilters?.sports ?? false;
   const shouldShowCanteens = mapFilters?.canteens ?? false;
-  const shouldShowBusStops = showBusStops || filterBusStops;
+  // Fix: Only show bus stops if BOTH showBusStops prop AND filterBusStops are true
+  const shouldShowBusStops = showBusStops && filterBusStops;
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
+
+  // Log bus stop visibility summary
+  useEffect(() => {
+    if (shouldShowBusStops && clusteredInputMarkers.length > 0) {
+      console.log(`[BusStopsVisibility] Zoom ${currentZoom}: ${clusteredInputMarkers.length} stops visible (out of ${allBusStops.length} total)`);
+      console.log(`[BusStopsVisibility] Visible stops: ${clusteredInputMarkers.map((m) => m.name).join(', ')}`);
+    }
+  }, [clusteredInputMarkers, currentZoom, shouldShowBusStops, allBusStops.length]);
 
   const selectedPrinterId =
     selectedMapItem?.type === 'printer' ? selectedMapItem.printer.id : null;
@@ -1129,6 +1323,61 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       ? selectedMapItem.place.stopId || selectedMapItem.place.name
       : null;
 
+  // PERFORMANCE: Memoize label properties to only recalculate on zoom/filter changes, not on every active bus update
+  const busStopLabelProps = React.useMemo(() => {
+    const allStops = allBusStops;
+    return allBusStops.map((stop: any) => {
+      const stopName = stop.ShortName || stop.caption || stop.name;
+      const labelBelow = shouldLabelBelow(stop, allStops);
+      const stopId = stop.name || stopName;
+      const stopKey = stop.name || stop.ShortName || stop.caption;
+
+      // Determine if label should be visible based on zoom and filters
+      const visibleByRoute = isStopVisibleForActiveRoutes(stop);
+      const isLabelVisible =
+        shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
+      const isLabelClickable = isLabelVisible;
+      // Choose label color: per-route membership (same logic as circle)
+      let labelColor = '#274F9C';
+      const isRouteStop = deferredActiveRoute
+        ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
+        : false;
+      if (deferredActiveRoute && isRouteStop) {
+        // When a route is active, use its color for member stops
+        labelColor = routeColors[deferredActiveRoute] || labelColor;
+      } else if (visibleByRoute) {
+        // Multiple filters active - color by first matching route
+        const matchCode = activeBusRouteCodes.find((code) =>
+          routeStopMembershipRef.current.get(code)?.has(stopKey)
+        );
+        if (matchCode) {
+          labelColor = routeColors[matchCode] || labelColor;
+        }
+      }
+      if (selectedBusStopId && selectedBusStopId !== stopId) {
+        labelColor = '#D1D5DB';
+      }
+
+      return {
+        stop,
+        isLabelVisible,
+        isLabelClickable,
+        labelColor,
+        shouldLabelBelow: labelBelow,
+      };
+    });
+  }, [
+    allBusStops,
+    deferredActiveRoute,
+    shouldShowBusStops,
+    activeBusRouteCodes,
+    routeStopMembershipRef,
+    selectedBusStopId,
+    isStopVisibleForActiveRoutes,
+    currentZoom,
+    visibleBusStops,
+    routeColors,
+  ]);
 
   // Fit map to show all markers ONLY on initial route load (not on every render)
   useEffect(() => {
@@ -1275,6 +1524,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   };
 
   // Handle Google Places POI clicks
+  // Handle map press to log coordinates
+  const handleMapPress = (event: any) => {
+    const { coordinate } = event.nativeEvent;
+    if (coordinate) {
+      console.log('[InteractiveMap] Map pressed at coordinates:', {
+        latitude: coordinate.latitude,
+        longitude: coordinate.longitude,
+      });
+    }
+  };
+
   const handlePoiClick = async (event: any) => {
     const { placeId, name, coordinate } = event.nativeEvent;
 
@@ -1357,13 +1617,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapType={externalMapType ?? internalMapType}
         onRegionChangeComplete={handleRegionChangeDebounced}
         onMapReady={() => {
-          console.log('[NATIVE MAP] mapReady fired with safeInitialRegion:', safeInitialRegion);
           setMapReady(true);
         }}
         onMapLoaded={() => {
-          console.log('[NATIVE MAP] mapLoaded fired with safeInitialRegion:', safeInitialRegion);
           setMapReady(true);
         }}
+        onPress={handleMapPress}
         onPoiClick={handlePoiClick}
         customMapStyle={customMapStyle}
         showsIndoors={currentZoom >= 17}
@@ -1678,7 +1937,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: printer.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
+              tracksViewChanges={false}
               opacity={shouldShowPrinters ? 1 : 0}
               onPress={isPrinterClickable ? handlePrinterPress(printer) : undefined}
               zIndex={20}
@@ -1703,7 +1962,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: facility.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
+              tracksViewChanges={false}
               opacity={shouldShowSports ? 1 : 0}
               onPress={isSportsClickable ? handleSportsFacilityPress(facility) : undefined}
               zIndex={20}
@@ -1727,7 +1986,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: canteen.coords.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
+              tracksViewChanges={false}
               opacity={shouldShowCanteens ? 1 : 0}
               onPress={isCanteenClickable ? handleCanteenPress(canteen) : undefined}
               zIndex={20}
@@ -1736,7 +1995,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </Marker>
           );
         })}
-        {/* Cluster markers at low zoom to reduce marker count */}
+        {/* Cluster markers disabled - removed red circles with numbers per user request
         {shouldShowBusStops && currentZoom < 17 && clusteredMarkers
           .filter((m) => m.isCluster)
           .map((cluster) => (
@@ -1745,12 +2004,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               coordinate={{ latitude: cluster.latitude, longitude: cluster.longitude }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
-              opacity={1}
+              opacity={shouldShowBusStops ? 1 : 0}
               zIndex={45}
             >
               <ClusterCircle count={cluster.clusterCount || 0} />
             </Marker>
           ))}
+        */}
 
         {/* Bus Stop Circle Markers - Blue dots, visible only at zoom 17+ (filtered by route if active) */}
         {allBusStops.map((stop: any) => {
@@ -1795,7 +2055,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 longitude: stop.longitude,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={true}
+              tracksViewChanges={false}
               opacity={opacity}
               onPress={isCircleClickable ? handleBusStopPress(stop) : undefined}
               zIndex={50}
@@ -1814,111 +2074,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           );
         })}
         {/* Bus Stop Label Markers - Text labels with dynamic positioning (filtered by route if active) */}
-        {allBusStops.map((stop: any) => {
-          const stopName = stop.ShortName || stop.caption || stop.name;
-          const allStops = allBusStops;
-          const labelBelow = shouldLabelBelow(stop, allStops);
-          const labelOffsetLat = labelBelow ? -0.0001 : 0.0001;
-          const stopId = stop.name || stopName;
-          const stopKey = stop.name || stop.ShortName || stop.caption;
-
-          // Determine if label should be visible based on zoom and filters
-          const visibleByRoute = isStopVisibleForActiveRoutes(stop);
-          const isLabelVisible =
-            shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
-          const isLabelClickable = isLabelVisible;
-          // Choose label color: per-route membership (same logic as circle)
-          let labelColor = '#274F9C';
-          const isRouteStop = deferredActiveRoute
-            ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
-            : false;
-          if (deferredActiveRoute && isRouteStop) {
-            // When a route is active, use its color for member stops
-            labelColor = routeColors[deferredActiveRoute] || labelColor;
-            // Debug sample stops
-            if (stop.name === 'Central Library' || stop.name === 'KE7') {
-              console.log(`🗺️ [LABEL] ${stop.name}: color=${labelColor} (route=${deferredActiveRoute})`);
-            }
-          } else if (visibleByRoute) {
-            // Multiple filters active - color by first matching route
-            const matchCode = activeBusRouteCodes.find((code) =>
-              routeStopMembershipRef.current.get(code)?.has(stopKey)
-            );
-            if (matchCode) {
-              labelColor = routeColors[matchCode] || labelColor;
-            }
-          }
-          if (selectedBusStopId && selectedBusStopId !== stopId) {
-            labelColor = '#D1D5DB';
-          }
-
-          // Calculate font size based on zoom level (matching web version)
-          let fontSize = 12;
-          let strokeWidth = 3;
-          if (currentZoom >= 17) {
-            fontSize = Math.min(18, 12 + (currentZoom - 16) * 2);
-            strokeWidth = Math.min(4, 3 + (currentZoom - 16) * 0.3);
-          }
-          const labelWidth = Math.min(
-            200,
-            Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
-          );
-          const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
-          const textY = Math.round(labelHeight * 0.7);
-
-          return (
-            <Marker
-              key={`bus-stop-label-${stop.name}`}
-              coordinate={{
-                latitude: stop.latitude + labelOffsetLat,
-                longitude: stop.longitude,
-              }}
-              anchor={{ x: 0.5, y: labelBelow ? 0 : 1 }}
-              tracksViewChanges={true}
-              opacity={isLabelVisible ? 1 : 0}
-              onPress={isLabelClickable ? handleBusStopPress(stop) : undefined}
-              zIndex={60}
-            >
-              <View
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Svg
-                  width={labelWidth}
-                  height={labelHeight}
-                  viewBox={`0 0 ${labelWidth} ${labelHeight}`}
-                >
-                  {/* White stroke outline - rendered first (behind) */}
-                  <SvgText
-                    x={labelWidth / 2}
-                    y={textY}
-                    fontSize={fontSize}
-                    fontWeight="600"
-                    fill="none"
-                    textAnchor="middle"
-                    stroke="#FFFFFF"
-                    strokeWidth={strokeWidth}
-                  >
-                    {stopName}
-                  </SvgText>
-                  {/* Route-colored text on top */}
-                  <SvgText
-                    x={labelWidth / 2}
-                    y={textY}
-                    fontSize={fontSize}
-                    fontWeight="600"
-                    fill={labelColor}
-                    textAnchor="middle"
-                  >
-                    {stopName}
-                  </SvgText>
-                </Svg>
-              </View>
-            </Marker>
-          );
-        })}
+        {busStopLabelProps.map((props) => (
+          <BusStopLabelMarker
+            key={`bus-stop-label-${props.stop.name}`}
+            stop={props.stop}
+            isLabelVisible={props.isLabelVisible}
+            isLabelClickable={props.isLabelClickable}
+            labelColor={props.labelColor}
+            currentZoom={currentZoom}
+            onPress={handleBusStopPress(props.stop)}
+            shouldLabelBelow={props.shouldLabelBelow}
+          />
+        ))}
         {/* Custom User Location Marker - Shows with heading if available */}
         {userLocation &&
           typeof userLocation.latitude === 'number' &&
@@ -1996,7 +2163,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {activeBuses.map((bus: any, idx: number) => {
           if (!bus.lat || !bus.lng) return null;
           
-          // Calculate bearing using proper checkpoint data
+          // Calculate bearing using proper checkpoint data with memoization
           let bearing = 0; // Default to pointing right (East)
           const nextCheckpoint = findNextCheckpoint(
             { lat: bus.lat, lng: bus.lng },
@@ -2005,10 +2172,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           );
           
           if (nextCheckpoint) {
-            bearing = calculateBearing(
+            const cacheKey = createBearingCacheKey(
               { lat: bus.lat, lng: bus.lng },
               nextCheckpoint
             );
+            
+            // Check cache first to avoid recalculating
+            if (bearingCacheRef.current.has(cacheKey)) {
+              bearing = bearingCacheRef.current.get(cacheKey)!;
+            } else {
+              // Calculate and cache the bearing
+              bearing = calculateBearing(
+                { lat: bus.lat, lng: bus.lng },
+                nextCheckpoint
+              );
+              bearingCacheRef.current.set(cacheKey, bearing);
+            }
           }
 
           // Create SVG marker matching web version (28x28)
@@ -2094,7 +2273,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
