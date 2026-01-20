@@ -1685,6 +1685,20 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           tappable={false}
         />
 
+        {/* Complementary overlay - covers the opposite side of Earth */}
+        <Polygon
+          coordinates={[
+            { latitude: 85.55, longitude: 31.65 },
+            { latitude: 85.55, longitude: -141.65 },
+            { latitude: -85.23, longitude: -141.65 },
+            { latitude: -85.23, longitude: 31.65 },
+          ]}
+          strokeWidth={0}
+          strokeColor="transparent"
+          fillColor="rgba(0, 0, 0, 0.222)"
+          tappable={false}
+        />
+
         {/* Academic Area Overlays - Always rendered, visibility controlled */}
         <Polygon
           key="academic-orange"
