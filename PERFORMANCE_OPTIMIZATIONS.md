@@ -11,6 +11,24 @@ Implemented performance optimizations to address laggy map navigation by focusin
 
 ## Changes Implemented
 
+### Crash-Safe Rendering Notes (iOS)
+**Files**: `src/components/interactive-map.native.tsx`
+
+- Avoid mass remounts/reordering of MapView children (can crash AIRGoogleMap on iOS):
+  - Keep stable keys for markers and labels (use stop name only; do NOT include colors/versions in keys).
+  - For bus stop labels, trigger a short `tracksViewChanges` pulse (~250ms) when label color or visibility changes so the cached texture refreshes without remounting.
+  - Render dynamic live-bus markers after polylines so new markers append to the end of the children list.
+- Do not conditionally mount/unmount academic/residence polygons during interaction; keep them mounted and control visibility via colors/width for stability.
+
+### Default Bus Stop Colors – Where to Change
+**Files**: `src/components/interactive-map.native.tsx`
+
+- Label default color (fallback when no route color applies):
+  - In `busStopLabelProps` useMemo, look for comment `DEFAULT bus stop label color` and change the `labelColor` assignment there.
+- Dot (circle) default color (fallback when no route color applies):
+  - In the bus stop circle rendering block, look for comment `DEFAULT bus stop circle color` and change the `circleColor` assignment there.
+- Do not change other `#274F9C` usages if your intent is only to update bus stop label/dot defaults.
+
 ### 1. **Bearing Calculation Memoization** 🎯
 **File**: `src/components/interactive-map.native.tsx`
 

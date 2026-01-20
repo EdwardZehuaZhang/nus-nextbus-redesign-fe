@@ -468,7 +468,11 @@ interface BusStopLabelProps {
   shouldLabelBelow: boolean;
 }
 
-const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
+// Crash-safe label rendering strategy:
+// - Stable keys: key uses stop.name only (no color/version in key)
+// - Color updates: a short tracksViewChanges pulse (~250ms) when labelColor/visibility changes
+// - This avoids mass remounts/reordering that can trigger AIRGoogleMap insertReactSubview crashes on iOS
+const BusStopLabelMarker = React.memo<BusStopLabelProps>(({ 
   stop,
   isLabelVisible,
   isLabelClickable,
@@ -1350,7 +1354,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
       const isLabelClickable = isLabelVisible;
       // Choose label color: per-route membership (same logic as circle)
-      let labelColor = '#6B21A8';
+      // DEFAULT bus stop label color.
+      // Change here if you want a different fallback (when no route color applies).
+      // Note: Labels update color via useMemo + a short tracksViewChanges pulse in BusStopLabelMarker.
+      // Do NOT change other '#274F9C' occurrences for this purpose.
+      let labelColor = '#274F9C';
       const isRouteStop = deferredActiveRoute
         ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
         : false;
@@ -2038,7 +2046,10 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             : false;
           
           // Choose circle color: if multiple routes active, color by first matching route membership
-          let circleColor = '#6B21A8';
+          // DEFAULT bus stop circle color (small dot).
+          // Change here if you want a different fallback (when no route color applies).
+          // Circles do not remount on color change; avoid key changes to prevent native crashes.
+          let circleColor = '#274F9C';
           if (deferredActiveRoute && isRouteStop) {
             // When a route is active, use its color for member stops
             circleColor = routeColors[deferredActiveRoute] || circleColor;

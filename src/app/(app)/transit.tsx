@@ -2445,13 +2445,18 @@ export default function TransitPage() {
     } else if (selectedRoute === routeName) {
       // If no previous state exists, just deselect
       setSelectedRoute(null);
-    } else {
-      // If selecting a different route, save current state before updating
+    } else if (selectedRoute === null) {
+      // Only save previous state when no route is currently selected
+      // This keeps the state frozen until the selected route is toggled off
       setPreviousState({
         selectedRoute,
         activeTab,
-        mapFilters,
+        mapFilters: JSON.parse(JSON.stringify(mapFilters)), // Deep copy to prevent mutation
       });
+      setSelectedRoute(routeName);
+    } else {
+      // If a route is already selected and user clicks a different route, just change the selection
+      // without updating previousState (keeping it frozen)
       setSelectedRoute(routeName);
     }
   }, [selectedRoute, previousState, activeTab, mapFilters]);
@@ -2524,29 +2529,37 @@ export default function TransitPage() {
     
     // If the selected route from filters is different from current selectedRoute,
     // use the toggle logic to update state and save previous state
+    let isRestoringPreviousState = false;
     if (newSelectedRoute !== selectedRoute) {
-      // Save previous state before changing selection
+      // Save previous state before changing selection, but only if no route is currently selected
       if (newSelectedRoute && !selectedRoute) {
-        // Selecting a new route from filter panel
+        // Selecting a new route from filter panel - only save state if none is currently selected
         setPreviousState({
           selectedRoute,
           activeTab,
-          mapFilters,
+          mapFilters: JSON.parse(JSON.stringify(mapFilters)), // Deep copy to prevent mutation
         });
       } else if (!newSelectedRoute && selectedRoute) {
         // Deselecting route from filter panel - restore to previous state if available
         if (previousState) {
           setActiveTab(previousState.activeTab);
           setMapFilters(previousState.mapFilters);
+          storage.set('map-filters', JSON.stringify(previousState.mapFilters));
           setPreviousState(null);
+          isRestoringPreviousState = true;
         }
       }
+      // If a route is already selected and user selects a different route via filter,
+      // just change the selection without updating previousState (keeping it frozen)
       
       setSelectedRoute(newSelectedRoute);
     }
     
-    setMapFilters(filters);
-    storage.set('map-filters', JSON.stringify(filters));
+    // Only update mapFilters if we're not restoring from previousState
+    if (!isRestoringPreviousState) {
+      setMapFilters(filters);
+      storage.set('map-filters', JSON.stringify(filters));
+    }
   };
 
   return (
