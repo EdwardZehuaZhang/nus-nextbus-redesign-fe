@@ -1282,6 +1282,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     return busStopsData?.BusStopsResult?.busstops || [];
   }, [busStopsData]);
 
+  
+
   const clusteredInputMarkers = React.useMemo(() => {
     if (!allBusStops || allBusStops.length === 0) return [] as { id: string; name: string; latitude: number; longitude: number }[];
     // PERFORMANCE OPTIMIZATION: Pre-filter markers to only include visible stops before passing to Supercluster
@@ -1312,13 +1314,16 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
   // Determine what to show based on filters
   const shouldShowLandmarks = showLandmarks && filterImportant;
-  const shouldShowPrinters = mapFilters?.printers ?? false;
-  const shouldShowSports = mapFilters?.sports ?? false;
-  const shouldShowCanteens = mapFilters?.canteens ?? false;
+  const shouldShowPrinters = (mapFilters?.printers ?? false) && currentZoom !== 14;
+  const shouldShowSports = (mapFilters?.sports ?? false) && currentZoom !== 14;
+  const shouldShowCanteens = (mapFilters?.canteens ?? false) && currentZoom !== 14;
   // Fix: Only show bus stops if BOTH showBusStops prop AND filterBusStops are true
   const shouldShowBusStops = showBusStops && filterBusStops;
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
+
+  // NOTE: Keep circles/labels mounted; control visibility via opacity
+  // This avoids AIRGoogleMap insertReactSubview crash from child reordering on iOS.
 
   // Log bus stop visibility summary
   useEffect(() => {
@@ -2227,7 +2232,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
 
         {/* Live Bus Location Markers - Using SVG icons matching web version */}
-        {activeBuses.map((bus: any, idx: number) => {
+        {effectiveActiveRoute && activeBuses.map((bus: any, idx: number) => {
           if (!bus.lat || !bus.lng) return null;
 
           // Calculate bearing using proper checkpoint data with memoization
