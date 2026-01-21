@@ -59,11 +59,8 @@ import {
   getBusStationById,
 } from '@/lib/bus-stations';
 import { type LocationCoords, useLocation } from '@/lib/hooks/use-location';
-import {
-  type FavoriteRoute,
-  getFavorites,
-  updateFavoriteLabel,
-} from '@/lib/storage/favorites';
+import { useFavoritesContext } from '@/lib/contexts/favorites-context';
+import { type FavoriteRoute } from '@/lib/storage/favorites';
 import {
   addRecentSearch,
   getRecentSearches,
@@ -649,7 +646,7 @@ const FavoriteButton = ({
 }: {
   item: FavoriteRoute;
   userLocation: LocationCoords | null;
-  onUpdate: () => void;
+  onUpdate: (id: string, from: string, to: string) => void;
 }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editText, setEditText] = React.useState(
@@ -696,6 +693,9 @@ const FavoriteButton = ({
   const handlePress = () => {
     // Don't navigate if we're editing
     if (isEditing) {
+      inputRef.current?.blur();
+      handleSaveEdit();
+      Keyboard.dismiss();
       return;
     }
     // Navigate to navigation page with the route and user location
@@ -741,6 +741,10 @@ const FavoriteButton = ({
   }, [isEditing]);
 
   const handleSaveEdit = () => {
+    if (!isEditing) {
+      return;
+    }
+
     if (!editText.trim()) {
       // If empty, just cancel edit
       setIsEditing(false);
@@ -756,21 +760,19 @@ const FavoriteButton = ({
       // Has a dash separator - split into from and to
       const from = trimmedText.substring(0, dashIndex).trim();
       const to = trimmedText.substring(dashIndex + 1).trim();
-      updateFavoriteLabel(item.id, from, to || item.to);
+      onUpdate(item.id, from, to || item.to);
     } else {
       // No dash - use entire text as "from" and empty string as "to"
-      updateFavoriteLabel(item.id, trimmedText, '');
+      onUpdate(item.id, trimmedText, '');
     }
     
     setIsEditing(false);
-    onUpdate(); // Refresh the favorites list
   };
 
   return (
     <Pressable
       className="min-w-[64px] max-w-[140px] flex-col items-center justify-center gap-0.5 rounded-md border border-neutral-200 bg-white px-3 py-2 shadow-sm"
       onPress={handlePress}
-      disabled={isEditing}
     >
       {renderIcons()}
       {isEditing ? (
@@ -781,6 +783,7 @@ const FavoriteButton = ({
             onChangeText={setEditText}
             onBlur={handleSaveEdit}
             onSubmitEditing={handleSaveEdit}
+            blurOnSubmit
             autoFocus
             multiline
             numberOfLines={2}
@@ -830,25 +833,16 @@ const AddButton = ({ onSearchPress }: { onSearchPress: () => void }) => {
 };
 
 const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
-  const [favorites, setFavorites] = React.useState<FavoriteRoute[]>([]);
+  // Get favorites from context - updates automatically when favorites change
+  const { favorites, updateFavoriteLabel } = useFavoritesContext();
   
   // Get user's current location to pass to navigation
   const { coords: userLocation } = useLocation();
 
-  // Load favorites from storage
-  const loadFavorites = React.useCallback(() => {
-    const stored = getFavorites();
-    setFavorites(stored);
-  }, []);
-
+  // Log favorites changes for debugging
   React.useEffect(() => {
-    loadFavorites();
-
-    // Set up an interval to refresh favorites (in case they're added from another screen)
-    const interval = setInterval(loadFavorites, 1000);
-
-    return () => clearInterval(interval);
-  }, [loadFavorites]);
+    console.log('🔄 [Transit] Favorites updated:', favorites.length);
+  }, [favorites]);
 
   return (
     <View>
@@ -872,7 +866,7 @@ const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
               key={item.id}
               item={item}
               userLocation={userLocation}
-              onUpdate={loadFavorites}
+              onUpdate={updateFavoriteLabel}
             />
           ))}
           <AddButton onSearchPress={onSearchPress} />
@@ -2010,7 +2004,8 @@ const MapSelectionDetails = ({
           style={{
             position: 'absolute',
             top: -2,
-            right: 2,
+            right: 4,
+            transform: [{ translateX: 6 }],
             width: 32,
             height: 32,
             borderRadius: 16,
@@ -2563,7 +2558,7 @@ export default function TransitPage() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F9F9F9' }}>
+    <Pressable style={{ flex: 1, backgroundColor: '#F9F9F9' }} onPress={() => Keyboard.dismiss()}>
       <FocusAwareStatusBar />
 
       <View
@@ -2812,6 +2807,6 @@ export default function TransitPage() {
           <Info size={22} color="rgba(0, 0, 0, 0.4)" />
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }

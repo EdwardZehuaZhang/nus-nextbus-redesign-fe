@@ -1550,16 +1550,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   };
 
   // Handle Google Places POI clicks
-  // Handle map press to log coordinates
-  const handleMapPress = (event: any) => {
-    const { coordinate } = event.nativeEvent;
-    if (coordinate) {
-      console.log('[InteractiveMap] Map pressed at coordinates:', {
-        latitude: coordinate.latitude,
-        longitude: coordinate.longitude,
-      });
-    }
-  };
+  // Handle map press to allow normal press detection
+  const handleMapPress = (_event: any) => {};
 
   const handlePoiClick = async (event: any) => {
     const { placeId, name, coordinate } = event.nativeEvent;

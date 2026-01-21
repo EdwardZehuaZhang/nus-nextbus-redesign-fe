@@ -37,7 +37,7 @@ import { XIcon } from '@/components/ui/icons/x-icon';
 import { Search as SearchIcon, Van } from '@/components/ui/icons';
 import { NavigationArrowIcon } from '@/components/ui/icons/navigation-arrow';
 import { useLocation } from '@/lib/hooks/use-location';
-import { addFavorite, isFavorite, removeFavorite, getFavorites } from '@/lib/storage/favorites';
+import { useFavoritesContext } from '@/lib/contexts/favorites-context';
 import {
   cancelLeaveReminderNotification,
   clearLeaveReminderState,
@@ -1122,6 +1122,19 @@ export default function NavigationPage() {
   const fromLocation = originName;
   const toLocation = typeof to === 'string' ? to : currentDestination;
 
+  // Use favorites context
+  const { addFavorite, removeFavorite, isFavorite, favorites } = useFavoritesContext();
+
+  // Debug: Log context availability
+  useEffect(() => {
+    console.log('🎬 [Navigation] Component mounted with favorites context:', {
+      hasAddFavorite: !!addFavorite,
+      hasRemoveFavorite: !!removeFavorite,
+      hasIsFavorite: !!isFavorite,
+      favoritesCount: favorites?.length || 0,
+    });
+  }, []);
+
   // Check if this route is already favorited - use the names consistently
   const [favorited, setFavorited] = useState(() =>
     isFavorite(fromLocation, toLocation)
@@ -1130,31 +1143,50 @@ export default function NavigationPage() {
   // Update favorited state when routes change or location changes
   useEffect(() => {
     setFavorited(isFavorite(fromLocation, toLocation));
-  }, [fromLocation, toLocation]);
+  }, [fromLocation, toLocation, isFavorite]);
 
   const handleSaveFavorite = () => {
-    // Use the same names for consistency - fromLocation and toLocation
-    // These are what we check against in isFavorite()
-    
-    if (!favorited) {
-      // Save the favorite
-      addFavorite({
-        from: fromLocation,
-        to: toLocation,
-        fromId: fromLocation,
-        toId: toLocation,
+    try {
+      console.log('🔘 [Navigation] handleSaveFavorite CALLED');
+      console.log('💾 [Navigation] Save/Remove favorite:', { fromLocation, toLocation, favorited });
+      console.log('📋 [Navigation] Context functions available:', {
+        hasAddFavorite: !!addFavorite,
+        hasRemoveFavorite: !!removeFavorite,
+        hasIsFavorite: !!isFavorite,
+        favoritesCount: favorites?.length || 0,
       });
-      setFavorited(true);
-    } else {
-      // Remove the favorite
-      const favorites = getFavorites();
-      const existingFavorite = favorites.find(
-        (f) => f.fromId === fromLocation && f.toId === toLocation
-      );
-      if (existingFavorite) {
-        removeFavorite(existingFavorite.id);
-        setFavorited(false);
+      
+      // Use the same names for consistency - fromLocation and toLocation
+      // These are what we check against in isFavorite()
+      
+      if (!favorited) {
+        // Save the favorite
+        console.log('➕ [Navigation] Adding favorite...');
+        addFavorite({
+          from: fromLocation,
+          to: toLocation,
+          fromId: fromLocation,
+          toId: toLocation,
+        });
+        setFavorited(true);
+        console.log('✅ [Navigation] Favorite added successfully');
+      } else {
+        // Remove the favorite
+        console.log('➖ [Navigation] Removing favorite...');
+        const existingFavorite = favorites.find(
+          (f) => f.fromId === fromLocation && f.toId === toLocation
+        );
+        console.log('🔍 [Navigation] Found existing favorite:', existingFavorite);
+        if (existingFavorite) {
+          removeFavorite(existingFavorite.id);
+          setFavorited(false);
+          console.log('✅ [Navigation] Favorite removed successfully');
+        } else {
+          console.warn('⚠️ [Navigation] No existing favorite found to remove');
+        }
       }
+    } catch (error) {
+      console.error('❌ [Navigation] Error in handleSaveFavorite:', error);
     }
   };
 

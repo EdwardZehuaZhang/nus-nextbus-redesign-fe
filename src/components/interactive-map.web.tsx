@@ -5158,14 +5158,6 @@ const usePlaceDetailsClick = (
           latLng: event.latLng?.toJSON(),
         });
 
-        // Log coordinates for any map click
-        if (event.latLng) {
-          console.log('[InteractiveMap] Map pressed at coordinates:', {
-            latitude: event.latLng.lat(),
-            longitude: event.latLng.lng(),
-          });
-        }
-
         if (event.placeId) {
           // User clicked on a POI (Point of Interest)
           console.log('[PlaceDetailsClick] POI clicked, place ID:', event.placeId);
@@ -5487,7 +5479,7 @@ const PlaceDetailsCompact: React.FC<{
         style={{
           position: 'absolute',
           top: '10px',
-          right: '10px',
+          right: '8px',
           zIndex: 999999,
           background: 'rgba(255, 255, 255, 0.95)',
           border: 'none',

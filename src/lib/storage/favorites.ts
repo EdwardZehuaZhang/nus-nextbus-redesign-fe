@@ -17,13 +17,20 @@ export type FavoriteRoute = {
  */
 export const getFavorites = (): FavoriteRoute[] => {
   try {
+    console.log('📖 [Storage] getFavorites called');
     const favoritesJson = storage.getString(FAVORITES_KEY);
+    console.log('📖 [Storage] Raw storage value:', favoritesJson ? `${favoritesJson.length} chars` : 'NULL');
+    
     if (!favoritesJson) {
+      console.log('📖 [Storage] No favorites found, returning empty array');
       return [];
     }
-    return JSON.parse(favoritesJson);
+    
+    const parsed = JSON.parse(favoritesJson);
+    console.log('📖 [Storage] Parsed favorites count:', parsed.length);
+    return parsed;
   } catch (error) {
-    console.error('Error getting favorites:', error);
+    console.error('❌ [Storage] Error getting favorites:', error);
     return [];
   }
 };
@@ -35,7 +42,9 @@ export const addFavorite = (
   favorite: Omit<FavoriteRoute, 'id' | 'savedAt'>
 ): void => {
   try {
+    console.log('📥 [Storage] addFavorite called with:', favorite);
     const favorites = getFavorites();
+    console.log('📚 [Storage] Current favorites count:', favorites.length);
 
     // Check if this route already exists
     const exists = favorites.some(
@@ -43,6 +52,7 @@ export const addFavorite = (
     );
 
     if (exists) {
+      console.log('⚠️ [Storage] Favorite already exists, skipping');
       return; // Don't add duplicates
     }
 
@@ -52,10 +62,23 @@ export const addFavorite = (
       savedAt: Date.now(),
     };
 
+    console.log('📝 [Storage] New favorite object:', newFavorite);
     favorites.unshift(newFavorite); // Add to beginning
-    storage.set(FAVORITES_KEY, JSON.stringify(favorites));
+    console.log('📚 [Storage] Favorites array after unshift:', favorites.length);
+    
+    const jsonString = JSON.stringify(favorites);
+    console.log('📄 [Storage] JSON string length:', jsonString.length);
+    console.log('📄 [Storage] JSON preview:', jsonString.substring(0, 200));
+    
+    storage.set(FAVORITES_KEY, jsonString);
+    console.log('✅ [Storage] storage.set() completed');
+    
+    // Verify write
+    const verification = storage.getString(FAVORITES_KEY);
+    console.log('🔍 [Storage] Verification read:', verification ? `${verification.length} chars` : 'NULL');
+    
   } catch (error) {
-    console.error('Error adding favorite:', error);
+    console.error('❌ [Storage] Error adding favorite:', error);
   }
 };
 

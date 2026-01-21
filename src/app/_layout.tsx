@@ -13,6 +13,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { APIProvider } from '@/api';
 import { hydrateAuth, loadSelectedTheme } from '@/lib';
+import { FavoritesProvider } from '@/lib/contexts/favorites-context';
 import '@/lib/sentry';
 import { useThemeConfig } from '@/lib/use-theme-config';
 
@@ -43,17 +44,19 @@ export default function RootLayout() {
       <KeyboardProvider>
         <ThemeProvider value={theme}>
           <APIProvider>
-            <BottomSheetModalProvider>
-              <Stack screenOptions={{ headerBackTitle: 'Back' }}>
-                <Stack.Screen name="(app)" options={{ headerShown: false }} />
-                <Stack.Screen name="demo" options={{ headerShown: false }} />
-                <Stack.Screen name="investor" options={{ headerShown: false }} />
-                {/* Explicitly configure Privacy & Terms headers */}
-                <Stack.Screen name="privacy" options={{ headerTitle: '' }} />
-                <Stack.Screen name="terms" options={{ headerTitle: '' }} />
-              </Stack>
-              <FlashMessage position="top" />
-            </BottomSheetModalProvider>
+            <FavoritesProvider>
+              <BottomSheetModalProvider>
+                <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+                  <Stack.Screen name="(app)" options={{ headerShown: false }} />
+                  <Stack.Screen name="demo" options={{ headerShown: false }} />
+                  <Stack.Screen name="investor" options={{ headerShown: false }} />
+                  {/* Explicitly configure Privacy & Terms headers */}
+                  <Stack.Screen name="privacy" options={{ headerTitle: '' }} />
+                  <Stack.Screen name="terms" options={{ headerTitle: '' }} />
+                </Stack>
+                <FlashMessage position="top" />
+              </BottomSheetModalProvider>
+            </FavoritesProvider>
           </APIProvider>
         </ThemeProvider>
       </KeyboardProvider>
