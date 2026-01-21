@@ -96,6 +96,7 @@ export const NUS_LANDMARKS: Landmark[] = [
     coordinates: { lat: 1.2951009420947077, lng: 103.77000879496335 },
     type: 'bus-terminal',
     placeId: 'ChIJbQOuVPka2jERT0AKxPVa-NU',
+    googleMapsUrl: 'https://maps.app.goo.gl/TaS2ZPzHrDfNm3iRA',
   },
 ];
 

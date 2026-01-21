@@ -1974,7 +1974,7 @@ const MapSelectionDetails = ({
       }}
     >
       <ActionButton
-        label="Open in Google Maps"
+        label="Open in Maps"
         onPress={onOpenMaps}
         variant="secondary"
         labelOffsetY={0}

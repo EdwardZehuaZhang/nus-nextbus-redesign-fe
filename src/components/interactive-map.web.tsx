@@ -5119,13 +5119,60 @@ const useUserLocationMarker = (
   return userMarkerRef;
 };
 
+// Utility function to debounce click handling
+const createClickDebouncer = (delayMs: number = 300) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastClickTime = 0;
+  
+  return {
+    execute: (callback: () => void) => {
+      const now = Date.now();
+      const timeSinceLastClick = now - lastClickTime;
+      
+      console.log(`[ClickDebouncer] Click detected. Time since last: ${timeSinceLastClick}ms`);
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        console.log('[ClickDebouncer] Cleared pending debounce timeout');
+      }
+      
+      lastClickTime = now;
+      
+      if (timeSinceLastClick < delayMs) {
+        console.log(`[ClickDebouncer] Click too rapid (${timeSinceLastClick}ms < ${delayMs}ms), debouncing...`);
+        timeoutId = setTimeout(() => {
+          console.log('[ClickDebouncer] Debounce delay passed, executing callback');
+          callback();
+          timeoutId = null;
+        }, delayMs - timeSinceLastClick);
+      } else {
+        console.log('[ClickDebouncer] Sufficient time passed, executing immediately');
+        callback();
+        timeoutId = null;
+      }
+    },
+    cancel: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+        console.log('[ClickDebouncer] Cancelled pending callback');
+      }
+    }
+  };
+};
+
 // Hook to handle place details when clicking on POIs
 const usePlaceDetailsClick = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   isMapCreated: boolean,
   onPlaceSelected: (placeId: string | null) => void,
-  enabled: boolean = true
+  enabled: boolean = true,
+  isSearching: boolean = false
 ) => {
+  const debounceRef = React.useRef(createClickDebouncer(400));
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const pendingClickRef = React.useRef<boolean>(false);
+
   useEffect(() => {
     if (
       !enabled ||
@@ -5151,96 +5198,162 @@ const usePlaceDetailsClick = (
     const clickListener = map.addListener(
       'click',
       async (event: google.maps.MapMouseEvent & { placeId?: string }) => {
-        console.log('[PlaceDetailsClick] Map clicked:', {
+        const clickTimestamp = Date.now();
+        console.log(`[PlaceDetailsClick] Map clicked at ${clickTimestamp}:`, {
           hasPlaceId: !!event.placeId,
           placeId: event.placeId,
           hasLatLng: !!event.latLng,
           latLng: event.latLng?.toJSON(),
+          isSearching,
+          pendingClick: pendingClickRef.current,
         });
 
-        if (event.placeId) {
-          // User clicked on a POI (Point of Interest)
-          console.log('[PlaceDetailsClick] POI clicked, place ID:', event.placeId);
-          event.stop(); // Prevent default info window
-          onPlaceSelected(event.placeId);
-        } else if (event.latLng) {
-          // User clicked on a location without a POI - search for nearby places
-          console.log('[PlaceDetailsClick] Empty location clicked, searching nearby places');
+        // Guard: prevent clicks while already searching
+        if (isSearching) {
+          console.log('[PlaceDetailsClick] Search already in progress, queuing click instead of processing immediately');
+        }
+
+        // Guard: prevent duplicate simultaneous clicks
+        if (pendingClickRef.current) {
+          console.log('[PlaceDetailsClick] Click already pending, ignoring duplicate');
+          return;
+        }
+
+        // Use debouncer to prevent rapid successive clicks
+        debounceRef.current.execute(async () => {
+          console.log(`[PlaceDetailsClick] Debounce callback executing for click at ${clickTimestamp}`);
+          pendingClickRef.current = true;
+
+          // Cancel any pending async operations
+          if (abortControllerRef.current) {
+            console.log('[PlaceDetailsClick] Aborting previous async operation');
+            abortControllerRef.current.abort();
+          }
+          abortControllerRef.current = new AbortController();
+
           try {
-            // Import the places library if not already loaded
-            console.log('[PlaceDetailsClick] Importing places library...');
-            const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
-            console.log('[PlaceDetailsClick] Places library imported, Place class:', Place);
+            if (event.placeId) {
+              // User clicked on a POI (Point of Interest)
+              console.log('[PlaceDetailsClick] POI clicked, place ID:', event.placeId);
+              event.stop(); // Prevent default info window
+              onPlaceSelected(event.placeId);
+              pendingClickRef.current = false;
+            } else if (event.latLng) {
+              // User clicked on a location without a POI - search for nearby places
+              console.log('[PlaceDetailsClick] Empty location clicked, searching nearby places');
+              try {
+                // Import the places library if not already loaded
+                console.log('[PlaceDetailsClick] Importing places library...');
+                const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
+                console.log('[PlaceDetailsClick] Places library imported');
 
-            // Use searchNearby to find places at the clicked location
-            console.log('[PlaceDetailsClick] Calling searchNearby with:', {
-              center: event.latLng.toJSON(),
-              radius: 50,
-            });
-            
-            const { places } = await Place.searchNearby({
-              locationRestriction: {
-                center: event.latLng,
-                radius: 50, // Search within 50 meters of the clicked point
-              },
-              maxResultCount: 1, // Only get the closest place
-              fields: ['id', 'displayName', 'location'], // Required fields
-            });
+                // Check if this request was aborted before proceeding
+                if (abortControllerRef.current?.signal.aborted) {
+                  console.log('[PlaceDetailsClick] Request was aborted, skipping searchNearby');
+                  pendingClickRef.current = false;
+                  return;
+                }
 
-            console.log('[PlaceDetailsClick] searchNearby results:', {
-              placesCount: places?.length || 0,
-              firstPlaceId: places?.[0]?.id,
-            });
-
-            if (places && places.length > 0 && places[0].id) {
-              // Get the first (closest) place
-              console.log('[PlaceDetailsClick] Found nearby place, ID:', places[0].id);
-              onPlaceSelected(places[0].id);
-            } else {
-              // If no place found nearby, try geocoding the location
-              console.log('[PlaceDetailsClick] No nearby places, trying geocoding');
-              const geocoder = new google.maps.Geocoder();
-              geocoder.geocode({ location: event.latLng }, (geocodeResults, geocodeStatus) => {
-                console.log('[PlaceDetailsClick] Geocode results:', {
-                  status: geocodeStatus,
-                  resultsCount: geocodeResults?.length || 0,
-                  firstPlaceId: geocodeResults?.[0]?.place_id,
+                // Use searchNearby to find places at the clicked location
+                console.log('[PlaceDetailsClick] Calling searchNearby with:', {
+                  center: event.latLng.toJSON(),
+                  radius: 50,
+                });
+                
+                const { places } = await Place.searchNearby({
+                  locationRestriction: {
+                    center: event.latLng,
+                    radius: 50, // Search within 50 meters of the clicked point
+                  },
+                  maxResultCount: 1, // Only get the closest place
+                  fields: ['id', 'displayName', 'location'], // Required fields
                 });
 
-                if (geocodeStatus === 'OK' && geocodeResults && geocodeResults.length > 0) {
-                  const result = geocodeResults[0];
-                  if (result.place_id) {
-                    console.log('[PlaceDetailsClick] Found place via geocoding, ID:', result.place_id);
-                    onPlaceSelected(result.place_id);
-                  }
+                // Check if aborted after async operation completes
+                if (abortControllerRef.current?.signal.aborted) {
+                  console.log('[PlaceDetailsClick] Request was aborted after searchNearby completed, ignoring results');
+                  pendingClickRef.current = false;
+                  return;
+                }
+
+                console.log('[PlaceDetailsClick] searchNearby results:', {
+                  placesCount: places?.length || 0,
+                  firstPlaceId: places?.[0]?.id,
+                });
+
+                if (places && places.length > 0 && places[0].id) {
+                  // Get the first (closest) place
+                  console.log('[PlaceDetailsClick] Found nearby place, ID:', places[0].id);
+                  onPlaceSelected(places[0].id);
+                  pendingClickRef.current = false;
                 } else {
-                  // No place found - close place details
-                  console.log('[PlaceDetailsClick] No place found, closing details');
+                  // If no place found nearby, try geocoding the location
+                  console.log('[PlaceDetailsClick] No nearby places, trying geocoding');
+                  const geocoder = new google.maps.Geocoder();
+                  geocoder.geocode({ location: event.latLng }, (geocodeResults, geocodeStatus) => {
+                    // Check if aborted before processing geocode results
+                    if (abortControllerRef.current?.signal.aborted) {
+                      console.log('[PlaceDetailsClick] Request was aborted, ignoring geocode results');
+                      pendingClickRef.current = false;
+                      return;
+                    }
+
+                    console.log('[PlaceDetailsClick] Geocode results:', {
+                      status: geocodeStatus,
+                      resultsCount: geocodeResults?.length || 0,
+                      firstPlaceId: geocodeResults?.[0]?.place_id,
+                    });
+
+                    if (geocodeStatus === 'OK' && geocodeResults && geocodeResults.length > 0) {
+                      const result = geocodeResults[0];
+                      if (result.place_id) {
+                        console.log('[PlaceDetailsClick] Found place via geocoding, ID:', result.place_id);
+                        onPlaceSelected(result.place_id);
+                      }
+                    } else {
+                      // No place found - close place details
+                      console.log('[PlaceDetailsClick] No place found, closing details');
+                      onPlaceSelected(null);
+                    }
+                    pendingClickRef.current = false;
+                  });
+                }
+              } catch (error) {
+                if ((error as any)?.name === 'AbortError') {
+                  console.log('[PlaceDetailsClick] Async operation was aborted');
+                } else {
+                  console.error('[PlaceDetailsClick] Error handling map click:', error);
                   onPlaceSelected(null);
                 }
-              });
+                pendingClickRef.current = false;
+              }
+            } else {
+              // No location data - close place details
+              console.log('[PlaceDetailsClick] No location data, closing details');
+              onPlaceSelected(null);
+              pendingClickRef.current = false;
             }
           } catch (error) {
-            console.error('[PlaceDetailsClick] Error handling map click:', error);
-            onPlaceSelected(null);
+            console.error('[PlaceDetailsClick] Unexpected error in click handler:', error);
+            pendingClickRef.current = false;
           }
-        } else {
-          // No location data - close place details
-          console.log('[PlaceDetailsClick] No location data, closing details');
-          onPlaceSelected(null);
-        }
+        });
       }
     );
 
     console.log('[PlaceDetailsClick] Click listener added successfully');
 
     return () => {
-      console.log('[PlaceDetailsClick] Removing click listener');
+      console.log('[PlaceDetailsClick] Removing click listener and cleanup');
       if (clickListener) {
         google.maps.event.removeListener(clickListener);
       }
+      debounceRef.current.cancel();
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     };
-  }, [mapRef, isMapCreated, onPlaceSelected, enabled]);
+  }, [mapRef, isMapCreated, onPlaceSelected, enabled, isSearching]);
 };
 
 // PlaceDetailsCompact Component using Google Places UI Kit
@@ -6064,7 +6177,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   ); // Control bus stops with filter, but always show when route selected
   useUserLocationMarker(mapRef, isMapCreated); // Add user location with directional arrow
   useDestinationMarker(mapRef, isMapCreated, destination, effectiveActiveRoute); // Add destination pin marker (hidden when route selected)
-  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceIdWithLogging, enablePlaceDetails); // Handle place clicks
+  usePlaceDetailsClick(mapRef, isMapCreated, setSelectedPlaceIdWithLogging, enablePlaceDetails, isPlaceLoading); // Handle place clicks with debouncing and abort control
   usePOIVisibilityControl(mapRef, isMapCreated); // Dynamically show/hide Google Maps POIs based on zoom
   useTiltControl(mapRef, isMapCreated); // Control 45-degree tilt in satellite/hybrid view based on zoom level
 

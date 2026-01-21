@@ -30,6 +30,63 @@ import { CANTEENS, type CanteenVenue, getCanteenColor } from '@/data/canteens';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
 
 /**
+ * Utility function to debounce click handling
+ * Prevents rapid successive clicks from being processed
+ */
+const createClickDebouncer = (delayMs: number = 300) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastClickTime = 0;
+  
+  return {
+    execute: (callback: () => void) => {
+      try {
+        const now = Date.now();
+        const timeSinceLastClick = now - lastClickTime;
+        
+        console.log(`[ClickDebouncer] Click detected. Time since last: ${timeSinceLastClick}ms`);
+        
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          console.log('[ClickDebouncer] Cleared pending debounce timeout');
+        }
+        
+        lastClickTime = now;
+        
+        if (timeSinceLastClick < delayMs) {
+          console.log(`[ClickDebouncer] Click too rapid (${timeSinceLastClick}ms < ${delayMs}ms), debouncing...`);
+          timeoutId = setTimeout(() => {
+            console.log('[ClickDebouncer] Debounce delay passed, executing callback');
+            try {
+              callback();
+            } catch (error) {
+              console.error('[ClickDebouncer] Error in callback:', error);
+            }
+            timeoutId = null;
+          }, delayMs - timeSinceLastClick);
+        } else {
+          console.log('[ClickDebouncer] Sufficient time passed, executing immediately');
+          try {
+            callback();
+          } catch (error) {
+            console.error('[ClickDebouncer] Error in callback:', error);
+          }
+          timeoutId = null;
+        }
+      } catch (error) {
+        console.error('[ClickDebouncer] Error in execute:', error);
+      }
+    },
+    cancel: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+        console.log('[ClickDebouncer] Cancelled pending callback');
+      }
+    }
+  };
+};
+
+/**
  * Calculate bearing between two coordinates
  * @param from - Starting coordinate {lat, lng}
  * @param to - Ending coordinate {lat, lng}
@@ -466,13 +523,14 @@ interface BusStopLabelProps {
   currentZoom: number;
   onPress: (e: MarkerPressEvent) => void;
   shouldLabelBelow: boolean;
+  markerId?: string;
 }
 
 // Crash-safe label rendering strategy:
 // - Stable keys: key uses stop.name only (no color/version in key)
 // - Color updates: a short tracksViewChanges pulse (~250ms) when labelColor/visibility changes
 // - This avoids mass remounts/reordering that can trigger AIRGoogleMap insertReactSubview crashes on iOS
-const BusStopLabelMarker = React.memo<BusStopLabelProps>(({ 
+const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   stop,
   isLabelVisible,
   isLabelClickable,
@@ -480,6 +538,7 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   currentZoom,
   onPress,
   shouldLabelBelow,
+  markerId,
 }) => {
   const stopName = stop.ShortName || stop.caption || stop.name;
   const labelOffsetLat = shouldLabelBelow ? -0.0001 : 0.0001;
@@ -513,6 +572,7 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   return (
     <Marker
       key={`bus-stop-label-${stop.name}`}
+      identifier={markerId}
       coordinate={{
         latitude: stop.latitude + labelOffsetLat,
         longitude: stop.longitude,
@@ -521,6 +581,7 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
       tracksViewChanges={trackChanges}
       opacity={isLabelVisible ? 1 : 0}
       onPress={isLabelClickable ? onPress : undefined}
+      onSelect={isLabelClickable ? onPress : undefined}
       zIndex={60}
     >
       <View
@@ -645,6 +706,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
   const hasFitToCoordinates = useRef(false); // Guard to prevent repeated fitToCoordinates calls
+  
+  // Click debouncing and request tracking to prevent double-click issues
+  const clickDebouncerRef = useRef(createClickDebouncer(400));
+  const pendingClickRef = useRef<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const lastMarkerTriggerRef = useRef<{ id: string; ts: number } | null>(null);
+  
   const emitSelection = React.useCallback(
     (selection: MapSelection | null) => {
       onMapItemSelect?.(selection);
@@ -1445,78 +1513,143 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     onMarkerPress?.('waypoint', index);
   };
 
-  const handleLandmarkPress =
+  const handleLandmarkPress = React.useCallback(
     (landmark: (typeof NUS_LANDMARKS)[0]) => async (e: MarkerPressEvent) => {
+      // Log immediately to detect if handler is called at all
+      console.log(`[LandmarkPress:RAW] Handler function called for: ${landmark.name}`);
+      
+      const clickTimestamp = Date.now();
+      const landmarkName = landmark.name;
+      
+      console.log(`[LandmarkPress] Landmark pressed at ${clickTimestamp}:`, {
+        name: landmarkName,
+        hasPlaceId: !!landmark.placeId,
+        pendingClick: pendingClickRef.current,
+      });
+
       e.stopPropagation();
-      if (!enablePlaceDetails) return;
-
-      // If we have a Google Place ID, fetch full details (matching web behavior)
-      if (landmark.placeId) {
-        try {
-          const data = await getPlaceDetails(landmark.placeId);
-          if (data.result) {
-            const place: any = data.result;
-
-            // Build photo URL if available
-            let photoUrl: string | undefined;
-            if (place.photos && place.photos.length > 0) {
-              const photoReference = place.photos[0].photo_reference;
-              const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-              photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
-            }
-
-            emitSelection({
-              type: 'place',
-              place: {
-              name: place.name || landmark.name,
-              address: place.formatted_address || landmark.address,
-              coordinates: {
-                latitude:
-                  place.geometry?.location?.lat || landmark.coordinates.lat,
-                longitude:
-                  place.geometry?.location?.lng || landmark.coordinates.lng,
-              },
-              type: 'google-place',
-              photo: photoUrl,
-              rating: place.rating,
-              userRatingsTotal: place.user_ratings_total,
-              priceLevel: place.price_level,
-              openNow: place.opening_hours?.open_now,
-              },
-            });
-            return;
-          }
-        } catch (err) {
-          console.error(
-            '[Landmark] Failed to fetch place details for',
-            landmark.name,
-            err
-          );
-        }
+      if (!enablePlaceDetails) {
+        console.log('[LandmarkPress] Place details disabled, ignoring click');
+        return;
       }
 
-      // Fallback: just show basic landmark info
-      const safePlaceType: MapPlaceSelection['type'] =
-        landmark.type === 'hospital' ||
-        landmark.type === 'mrt' ||
-        landmark.type === 'library' ||
-        landmark.type === 'bus-terminal'
-          ? landmark.type
-          : 'location';
+      // Guard: prevent duplicate simultaneous clicks
+      if (pendingClickRef.current) {
+        console.log(`[LandmarkPress] Click already pending for ${landmarkName}, ignoring duplicate`);
+        return;
+      }
 
-      emitSelection({
-        type: 'place',
-        place: {
-          name: landmark.name,
-          address: landmark.address,
-          coordinates: {
-            latitude: landmark.coordinates.lat,
-            longitude: landmark.coordinates.lng,
-          },
-          type: safePlaceType,
-        },
+      // Use debouncer to prevent rapid successive clicks
+      console.log('[LandmarkPress] About to call debouncer.execute()', {
+        debouncer: !!clickDebouncerRef.current,
+        debounceExecute: !!clickDebouncerRef.current?.execute,
       });
-    };
+      clickDebouncerRef.current.execute(async () => {
+        console.log(`[LandmarkPress] Debounce callback executing for ${landmarkName}`);
+        pendingClickRef.current = true;
+
+        // Cancel any pending async operations
+        if (abortControllerRef.current) {
+          console.log('[LandmarkPress] Aborting previous async operation');
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
+        try {
+          // If we have a Google Place ID, fetch full details (matching web behavior)
+          if (landmark.placeId) {
+            console.log('[LandmarkPress] Fetching place details for:', landmark.placeId);
+            try {
+              const data = await getPlaceDetails(landmark.placeId);
+              
+              // Check if this request was aborted
+              if (abortControllerRef.current?.signal.aborted) {
+                console.log('[LandmarkPress] Request was aborted, skipping result processing');
+                pendingClickRef.current = false;
+                return;
+              }
+
+              if (data.result) {
+                const place: any = data.result;
+                console.log('[LandmarkPress] Place details fetched successfully:', {
+                  name: place.name,
+                  hasPhotos: !!place.photos?.length,
+                });
+
+                // Build photo URL if available
+                let photoUrl: string | undefined;
+                if (place.photos && place.photos.length > 0) {
+                  const photoReference = place.photos[0].photo_reference;
+                  const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+                  photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
+                }
+
+                emitSelection({
+                  type: 'place',
+                  place: {
+                  name: place.name || landmark.name,
+                  address: place.formatted_address || landmark.address,
+                  coordinates: {
+                    latitude:
+                      place.geometry?.location?.lat || landmark.coordinates.lat,
+                    longitude:
+                      place.geometry?.location?.lng || landmark.coordinates.lng,
+                  },
+                  type: 'google-place',
+                  photo: photoUrl,
+                  rating: place.rating,
+                  userRatingsTotal: place.user_ratings_total,
+                  priceLevel: place.price_level,
+                  openNow: place.opening_hours?.open_now,
+                  },
+                });
+                pendingClickRef.current = false;
+                return;
+              }
+            } catch (err) {
+              if ((err as any)?.name === 'AbortError') {
+                console.log('[LandmarkPress] Async operation was aborted');
+              } else {
+                console.error('[LandmarkPress] Failed to fetch place details for', landmark.name, err);
+              }
+            }
+          }
+
+          // Fallback: just show basic landmark info
+          const safePlaceType: MapPlaceSelection['type'] =
+            landmark.type === 'hospital' ||
+            landmark.type === 'mrt' ||
+            landmark.type === 'library' ||
+            landmark.type === 'bus-terminal'
+              ? landmark.type
+              : 'location';
+
+          console.log('[LandmarkPress] Emitting basic landmark selection:', {
+            name: landmark.name,
+            type: safePlaceType,
+          });
+
+          emitSelection({
+            type: 'place',
+            place: {
+              name: landmark.name,
+              address: landmark.address,
+              coordinates: {
+                latitude: landmark.coordinates.lat,
+                longitude: landmark.coordinates.lng,
+              },
+              type: safePlaceType,
+            },
+          });
+          pendingClickRef.current = false;
+        } catch (error) {
+          console.error('[LandmarkPress] Unexpected error in landmark handler:', error);
+          pendingClickRef.current = false;
+        }
+      });
+    },
+    [emitSelection]
+  );
 
   const handlePrinterPress = (printer: PrinterLocation) => (e: MarkerPressEvent) => {
     e.stopPropagation();
@@ -1533,89 +1666,293 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     emitSelection({ type: 'canteen', canteen });
   };
 
-  const handleBusStopPress = (stop: any) => (e: MarkerPressEvent) => {
-    e.stopPropagation();
-    if (!enablePlaceDetails) return;
-    const stopName = stop.ShortName || stop.caption || stop.name;
-    emitSelection({
-      type: 'place',
-      place: {
+  const handleBusStopPress = React.useCallback(
+    (stop: any) => (e: MarkerPressEvent) => {
+      // Log immediately to detect if handler is called at all
+      const stopName = stop.ShortName || stop.caption || stop.name;
+      console.log(`[BusStopPress:RAW] Handler function called for: ${stopName}`);
+      
+      const clickTimestamp = Date.now();
+      
+      console.log(`[BusStopPress] Bus stop pressed at ${clickTimestamp}:`, {
         name: stopName,
-        address: undefined,
-        coordinates: { latitude: stop.latitude, longitude: stop.longitude },
-        stopId: stop.name,
-        type: 'bus-stop',
-      },
-    });
-  };
-
-  // Handle Google Places POI clicks
-  // Handle map press to allow normal press detection
-  const handleMapPress = (_event: any) => {};
-
-  const handlePoiClick = async (event: any) => {
-    const { placeId, name, coordinate } = event.nativeEvent;
-
-    if (!placeId || !enablePlaceDetails) return;
-
-    try {
-      // Fetch place details from backend using the API helper
-      const data = await getPlaceDetails(placeId);
-
-      if (data.result) {
-        const place = data.result as any;
-
-        // Get photo URL if available - use Google's photo service directly
-        let photoUrl: string | undefined;
-        if (place.photos && place.photos.length > 0) {
-          const photoReference = place.photos[0].photo_reference;
-          const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-          // Use Google's Place Photo API directly
-          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
-        }
-
-        emitSelection({
-          type: 'place',
-          place: {
-            name: place.name || name,
-            address: place.formatted_address || place.vicinity,
-            coordinates: {
-              latitude: place.geometry?.location?.lat || coordinate.latitude,
-              longitude: place.geometry?.location?.lng || coordinate.longitude,
-            },
-            type: 'google-place',
-            photo: photoUrl,
-            rating: place.rating,
-            userRatingsTotal: place.user_ratings_total,
-            priceLevel: place.price_level,
-            openNow: place.opening_hours?.open_now,
-          },
-        });
-      } else {
-        // Fallback if API fails
-        emitSelection({
-          type: 'place',
-          place: {
-            name: name,
-            address: undefined,
-            coordinates: coordinate,
-            type: 'google-place',
-          },
-        });
-      }
-    } catch (error) {
-      // Fallback on error
-      emitSelection({
-        type: 'place',
-        place: {
-          name: name,
-          address: undefined,
-          coordinates: coordinate,
-          type: 'google-place',
-        },
+        pendingClick: pendingClickRef.current,
       });
-    }
-  };
+
+      e.stopPropagation();
+      if (!enablePlaceDetails) {
+        console.log('[BusStopPress] Place details disabled, ignoring click');
+        return;
+      }
+
+      // Guard: prevent duplicate simultaneous clicks
+      if (pendingClickRef.current) {
+        console.log(`[BusStopPress] Click already pending for ${stopName}, ignoring duplicate`);
+        return;
+      }
+
+      // Use debouncer to prevent rapid successive clicks
+      console.log('[BusStopPress] About to call debouncer.execute()', {
+        debouncer: !!clickDebouncerRef.current,
+        debounceExecute: !!clickDebouncerRef.current?.execute,
+      });
+      clickDebouncerRef.current.execute(() => {
+        console.log(`[BusStopPress] Debounce callback executing for ${stopName}`);
+        pendingClickRef.current = true;
+
+        try {
+          console.log('[BusStopPress] Emitting bus stop selection:', {
+            name: stopName,
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+          });
+
+          emitSelection({
+            type: 'place',
+            place: {
+              name: stopName,
+              address: undefined,
+              coordinates: { latitude: stop.latitude, longitude: stop.longitude },
+              stopId: stop.name,
+              type: 'bus-stop',
+            },
+          });
+          pendingClickRef.current = false;
+        } catch (error) {
+          console.error('[BusStopPress] Unexpected error in bus stop handler:', error);
+          pendingClickRef.current = false;
+        }
+      });
+    },
+    [enablePlaceDetails, emitSelection]
+  );
+
+  // Handle Google Places POI clicks (Google Maps native POI overlays)
+  const handlePoiClick = React.useCallback(
+    async (event: any) => {
+      // Log immediately to detect if handler is called at all
+      const { placeId, name, coordinate } = event.nativeEvent;
+      console.log(`[PoiClick:RAW] Handler function called for: ${name} (${placeId})`);
+      
+      const clickTimestamp = Date.now();
+
+      console.log(`[PoiClick] POI clicked at ${clickTimestamp}:`, {
+        placeId,
+        name,
+        coordinate,
+        enablePlaceDetails,
+        pendingClick: pendingClickRef.current,
+      });
+
+      if (!placeId || !enablePlaceDetails) {
+        console.log('[PoiClick] Missing placeId or place details disabled, ignoring');
+        return;
+      }
+
+      // Guard: prevent duplicate simultaneous clicks
+      if (pendingClickRef.current) {
+        console.log(`[PoiClick] Click already pending for ${name}, ignoring duplicate`);
+        return;
+      }
+
+      // Use debouncer to prevent rapid successive clicks
+      console.log('[PoiClick] About to call debouncer.execute()', {
+        debouncer: !!clickDebouncerRef.current,
+        debounceExecute: !!clickDebouncerRef.current?.execute,
+      });
+      clickDebouncerRef.current.execute(async () => {
+        console.log(`[PoiClick] Debounce callback executing for ${name}`);
+        pendingClickRef.current = true;
+
+        // Cancel any pending async operations
+        if (abortControllerRef.current) {
+          console.log('[PoiClick] Aborting previous async operation');
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
+        try {
+          // Fetch place details from backend using the API helper
+          console.log('[PoiClick] Fetching place details for:', placeId);
+          const data = await getPlaceDetails(placeId);
+
+          // Check if this request was aborted
+          if (abortControllerRef.current?.signal.aborted) {
+            console.log('[PoiClick] Request was aborted, skipping result processing');
+            pendingClickRef.current = false;
+            return;
+          }
+
+          if (data.result) {
+            const place = data.result as any;
+            console.log('[PoiClick] Place details fetched successfully:', {
+              name: place.name,
+              hasPhotos: !!place.photos?.length,
+            });
+
+            // Get photo URL if available - use Google's photo service directly
+            let photoUrl: string | undefined;
+            if (place.photos && place.photos.length > 0) {
+              const photoReference = place.photos[0].photo_reference;
+              const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+              // Use Google's Place Photo API directly
+              photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photoReference}&key=${apiKey}`;
+            }
+
+            emitSelection({
+              type: 'place',
+              place: {
+                name: place.name || name,
+                address: place.formatted_address || place.vicinity,
+                coordinates: {
+                  latitude: place.geometry?.location?.lat || coordinate.latitude,
+                  longitude: place.geometry?.location?.lng || coordinate.longitude,
+                },
+                type: 'google-place',
+                photo: photoUrl,
+                rating: place.rating,
+                userRatingsTotal: place.user_ratings_total,
+                priceLevel: place.price_level,
+                openNow: place.opening_hours?.open_now,
+              },
+            });
+          } else {
+            // Fallback if API fails
+            console.log('[PoiClick] No result data, using fallback');
+            emitSelection({
+              type: 'place',
+              place: {
+                name: name,
+                address: undefined,
+                coordinates: coordinate,
+                type: 'google-place',
+              },
+            });
+          }
+          pendingClickRef.current = false;
+        } catch (error) {
+          if ((error as any)?.name === 'AbortError') {
+            console.log('[PoiClick] Async operation was aborted');
+          } else {
+            console.error('[PoiClick] Error fetching place details:', error);
+            // Fallback on error
+            emitSelection({
+              type: 'place',
+              place: {
+                name: name,
+                address: undefined,
+                coordinates: coordinate,
+                type: 'google-place',
+              },
+            });
+          }
+          pendingClickRef.current = false;
+        }
+      });
+    },
+    [enablePlaceDetails, emitSelection]
+  );
+
+  const getBusStopKey = React.useCallback((stop: any) => {
+    return stop.name || stop.ShortName || stop.caption;
+  }, []);
+
+  const handleMapMarkerPress = React.useCallback(
+    (event: any) => {
+      const markerId: string | undefined = event?.nativeEvent?.id;
+      if (!markerId) {
+        return;
+      }
+
+      const now = Date.now();
+      const last = lastMarkerTriggerRef.current;
+      if (last && last.id === markerId && now - last.ts < 350) {
+        return;
+      }
+      lastMarkerTriggerRef.current = { id: markerId, ts: now };
+
+      if (markerId.startsWith('landmark:')) {
+        const index = Number(markerId.replace('landmark:', ''));
+        const landmark = NUS_LANDMARKS[index];
+        if (landmark) {
+          handleLandmarkPress(landmark)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId.startsWith('printer:')) {
+        const index = Number(markerId.replace('printer:', ''));
+        const printer = NUS_PRINTERS[index];
+        if (printer) {
+          handlePrinterPress(printer)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId.startsWith('sports:')) {
+        const index = Number(markerId.replace('sports:', ''));
+        const facility = NUS_SPORTS_FACILITIES[index];
+        if (facility) {
+          handleSportsFacilityPress(facility)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId.startsWith('canteen:')) {
+        const index = Number(markerId.replace('canteen:', ''));
+        const canteen = CANTEENS[index];
+        if (canteen) {
+          handleCanteenPress(canteen)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId.startsWith('bus-stop-circle:')) {
+        const stopKey = markerId.replace('bus-stop-circle:', '');
+        const stop = allBusStops.find((s: any) => getBusStopKey(s) === stopKey);
+        if (stop) {
+          handleBusStopPress(stop)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId.startsWith('bus-stop-label:')) {
+        const stopKey = markerId.replace('bus-stop-label:', '');
+        const stop = allBusStops.find((s: any) => getBusStopKey(s) === stopKey);
+        if (stop) {
+          handleBusStopPress(stop)(event as MarkerPressEvent);
+        }
+        return;
+      }
+
+      if (markerId === 'origin') {
+        handleOriginPress(event as MarkerPressEvent);
+        return;
+      }
+
+      if (markerId === 'destination') {
+        handleDestinationPress(event as MarkerPressEvent);
+        return;
+      }
+
+      if (markerId.startsWith('waypoint:')) {
+        const index = Number(markerId.replace('waypoint:', ''));
+        handleWaypointPress(index)(event as MarkerPressEvent);
+      }
+    },
+    [
+      allBusStops,
+      getBusStopKey,
+      handleBusStopPress,
+      handleCanteenPress,
+      handleDestinationPress,
+      handleLandmarkPress,
+      handleOriginPress,
+      handlePrinterPress,
+      handleSportsFacilityPress,
+      handleWaypointPress,
+    ]
+  );
 
   return (
     <View style={[styles.container, style]}>
@@ -1633,6 +1970,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         showsCompass
         showsScale
         mapType={externalMapType ?? internalMapType}
+        moveOnMarkerPress={false}
         onRegionChangeComplete={handleRegionChangeDebounced}
         onMapReady={() => {
           setMapReady(true);
@@ -1640,7 +1978,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         onMapLoaded={() => {
           setMapReady(true);
         }}
-        onPress={handleMapPress}
+        onMarkerPress={handleMapMarkerPress}
         onPoiClick={handlePoiClick}
         customMapStyle={customMapStyle}
         showsIndoors={currentZoom >= 17}
@@ -1714,7 +2052,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(255, 0, 0, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-blue"
@@ -1724,7 +2062,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(30, 144, 255, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-darkblue"
@@ -1734,7 +2072,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(0, 0, 139, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-yellow"
@@ -1744,7 +2082,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(250, 158, 13, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-darkorange"
@@ -1754,7 +2092,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(128, 0, 128, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-cde"
@@ -1764,7 +2102,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(215, 174, 99, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-fass"
@@ -1774,7 +2112,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(0, 100, 0, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-combiz"
@@ -1784,7 +2122,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(139, 0, 0, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         <Polygon
           key="academic-law"
@@ -1794,7 +2132,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowAcademic ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
           }
-          tappable={shouldShowAcademic}
+          tappable={false}
         />
         {/* Residence Overlays - Always rendered, visibility controlled */}
         <Polygon
@@ -1805,7 +2143,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(19, 98, 7, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-lighthouse"
@@ -1815,7 +2153,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(221, 180, 42, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-pioneer"
@@ -1825,7 +2163,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(47, 52, 135, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-helix"
@@ -1835,7 +2173,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(165, 28, 56, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-sheares"
@@ -1845,7 +2183,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(204, 85, 0, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-kentridge"
@@ -1855,7 +2193,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(30, 58, 138, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-temasek"
@@ -1865,7 +2203,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(74, 85, 104, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-eusoff"
@@ -1875,7 +2213,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(184, 134, 11, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-kingedward"
@@ -1885,7 +2223,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(139, 0, 0, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-raffles"
@@ -1895,7 +2233,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor={
             shouldShowResidences ? 'rgba(45, 80, 22, 0.2)' : 'transparent'
           }
-          tappable={shouldShowResidences}
+          tappable={false}
         />
         <Polygon
           key="residence-capt"
@@ -1954,6 +2292,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           return (
             <Marker
               key={`landmark-${index}`}
+              identifier={`landmark:${index}`}
               coordinate={{
                 latitude: landmark.coordinates.lat,
                 longitude: landmark.coordinates.lng,
@@ -1962,6 +2301,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               tracksViewChanges={false}
               opacity={shouldShowLandmarks ? 1 : 0}
               onPress={handleLandmarkPress(landmark)}
+              onSelect={(e) => handleLandmarkPress(landmark)(e as MarkerPressEvent)}
               zIndex={20}
             >
               <PinMarker type={landmark.type} scale={scale} />
@@ -1978,6 +2318,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           return (
             <Marker
               key={`printer-${index}`}
+              identifier={`printer:${index}`}
               coordinate={{
                 latitude: printer.coordinates.lat,
                 longitude: printer.coordinates.lng,
@@ -1986,6 +2327,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               tracksViewChanges={false}
               opacity={shouldShowPrinters ? 1 : 0}
               onPress={isPrinterClickable ? handlePrinterPress(printer) : undefined}
+              onSelect={
+                isPrinterClickable
+                  ? (e) => handlePrinterPress(printer)(e as MarkerPressEvent)
+                  : undefined
+              }
               zIndex={20}
             >
               <CircularMarker type="printer" scale={scale} isDimmed={isDimmed} />
@@ -2003,6 +2349,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           return (
             <Marker
               key={`sports-${index}`}
+              identifier={`sports:${index}`}
               coordinate={{
                 latitude: facility.coordinates.lat,
                 longitude: facility.coordinates.lng,
@@ -2011,6 +2358,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               tracksViewChanges={false}
               opacity={shouldShowSports ? 1 : 0}
               onPress={isSportsClickable ? handleSportsFacilityPress(facility) : undefined}
+              onSelect={
+                isSportsClickable
+                  ? (e) => handleSportsFacilityPress(facility)(e as MarkerPressEvent)
+                  : undefined
+              }
               zIndex={20}
             >
               <CircularMarker type={facility.type} scale={scale} isDimmed={isDimmed} />
@@ -2027,6 +2379,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           return (
             <Marker
               key={`canteen-${index}`}
+              identifier={`canteen:${index}`}
               coordinate={{
                 latitude: canteen.coords.lat,
                 longitude: canteen.coords.lng,
@@ -2035,6 +2388,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               tracksViewChanges={false}
               opacity={shouldShowCanteens ? 1 : 0}
               onPress={isCanteenClickable ? handleCanteenPress(canteen) : undefined}
+              onSelect={
+                isCanteenClickable
+                  ? (e) => handleCanteenPress(canteen)(e as MarkerPressEvent)
+                  : undefined
+              }
               zIndex={20}
             >
               <CircularMarker type="canteen" scale={scale} isDimmed={isDimmed} />
@@ -2099,6 +2457,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           return (
             <Marker
               key={`bus-stop-circle-${stop.name}`}
+              identifier={`bus-stop-circle:${stop.name || stop.ShortName || stop.caption}`}
               coordinate={{
                 latitude: stop.latitude,
                 longitude: stop.longitude,
@@ -2107,6 +2466,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               tracksViewChanges={false}
               opacity={opacity}
               onPress={isCircleClickable ? handleBusStopPress(stop) : undefined}
+              onSelect={
+                isCircleClickable
+                  ? (e) => handleBusStopPress(stop)(e as MarkerPressEvent)
+                  : undefined
+              }
               zIndex={50}
             >
               <View
@@ -2126,6 +2490,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         {busStopLabelProps.map((props) => (
           <BusStopLabelMarker
             key={`bus-stop-label-${props.stop.name}`}
+            markerId={`bus-stop-label:${props.stop.name || props.stop.ShortName || props.stop.caption}`}
             stop={props.stop}
             isLabelVisible={props.isLabelVisible}
             isLabelClickable={props.isLabelClickable}
@@ -2158,29 +2523,37 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         {/* Origin Marker */}
         {origin && (
           <Marker
+            key="origin"
+            identifier="origin"
             coordinate={{ latitude: origin.lat, longitude: origin.lng }}
             pinColor="#274F9C"
             onPress={handleOriginPress}
+            onSelect={(e) => handleOriginPress(e as MarkerPressEvent)}
           />
         )}
         {/* Waypoint Markers */}
         {waypoints.map((waypoint, index) => (
           <Marker
             key={`waypoint-${index}`}
+            identifier={`waypoint:${index}`}
             coordinate={{ latitude: waypoint.lat, longitude: waypoint.lng }}
             pinColor="#FF8C00"
             onPress={handleWaypointPress(index)}
+            onSelect={(e) => handleWaypointPress(index)(e as MarkerPressEvent)}
           />
         ))}
         {/* Destination Marker */}
         {destination && (
           <Marker
+            key="destination"
+            identifier="destination"
             coordinate={{
               latitude: destination.lat,
               longitude: destination.lng,
             }}
             pinColor="#D32F2F"
             onPress={handleDestinationPress}
+            onSelect={(e) => handleDestinationPress(e as MarkerPressEvent)}
           />
         )}
         {/* Transit/Internal Route Segments (colored per segment) */}
