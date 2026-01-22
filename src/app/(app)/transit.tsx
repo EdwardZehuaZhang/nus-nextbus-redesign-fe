@@ -2582,7 +2582,13 @@ export default function TransitPage() {
           showMapControls={false} // Disable map controls in InteractiveMap, we'll render them at top level
           mapFilters={mapFilters} // Pass filters from parent
           onMapFiltersChange={handleFilterChange} // Handle filter changes
-          onMapItemSelect={(selection: MapSelection | null) => setMapSelection(selection)}
+          onMapItemSelect={(selection: MapSelection | null) => {
+            // If the sheet is collapsed, expand back to default when a location is picked
+            if (selection && isCollapsed) {
+              resetToDefault();
+            }
+            setMapSelection(selection);
+          }}
           selectedMapItem={mapSelection}
           onMapTypeChangeReady={(handler: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) => {
             mapTypeChangeHandlerRef.current = handler;

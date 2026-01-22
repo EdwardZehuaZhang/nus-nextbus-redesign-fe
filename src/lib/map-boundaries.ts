@@ -842,3 +842,143 @@ export const LAW_AREA_BOUNDARY = toNative([
   { lat: 1.3198689468304363, lng: 103.81747672101133 },
   { lat: 1.3199493917504048, lng: 103.81764301797025 },
 ]);
+
+/**
+ * Academic area label metadata for both web and mobile map displays
+ * Contains name, centroid position, and color for each academic area
+ */
+export interface AreaLabel {
+  name: string;
+  position: Coordinate;
+  color: string;
+}
+
+export const ACADEMIC_AREA_LABELS: AreaLabel[] = [
+  {
+    name: 'SPORT',
+    position: { latitude: 1.2990960534214193, longitude: 103.77794624049213 },
+    color: '#FF0000',
+  },
+  {
+    name: 'UTR',
+    position: { latitude: 1.305695124008919, longitude: 103.77290615963199 },
+    color: '#1E90FF',
+  },
+  {
+    name: 'MED/SCI',
+    position: { latitude: 1.295951770530073, longitude: 103.78078478404082 },
+    color: '#00008B',
+  },
+  {
+    name: 'KR MRT',
+    position: { latitude: 1.2937457075873078, longitude: 103.78336899527181 },
+    color: '#FA9E0D',
+  },
+  {
+    name: 'YST',
+    position: { latitude: 1.3018492354213917, longitude: 103.77272979247682 },
+    color: '#800080',
+  },
+  {
+    name: 'CDE',
+    position: { latitude: 1.2990029724316363, longitude: 103.77161389712826 },
+    color: '#D7AE63',
+  },
+  {
+    name: 'FASS',
+    position: { latitude: 1.2949347901037016, longitude: 103.77176426036192 },
+    color: '#006400',
+  },
+  {
+    name: 'COM/BIZ',
+    position: { latitude: 1.2941306571549018, longitude: 103.77457744749852 },
+    color: '#8B0000',
+  },
+  {
+    name: 'LAW',
+    position: { latitude: 1.3188644513003345, longitude: 103.81741654343233 },
+    color: '#000000',
+  },
+];
+
+/**
+ * Residence hall label metadata for both web and mobile map displays
+ * Contains name, centroid position, and color for each residence
+ */
+export const RESIDENCE_LABELS: AreaLabel[] = [
+  {
+    name: 'PGPR',
+    position: { latitude: 1.2908564398572488, longitude: 103.78115242371081 },
+    color: '#136207',
+  },
+  {
+    name: 'Light\nHouse',
+    position: { latitude: 1.2903737647145226, longitude: 103.78176933178423 },
+    color: '#DDB42A',
+  },
+  {
+    name: 'Pioneer\nHouse',
+    position: { latitude: 1.2905329951204991, longitude: 103.78035117482061 },
+    color: '#2F3487',
+  },
+  {
+    name: 'Helix\nHouse',
+    position: { latitude: 1.2912349696754788, longitude: 103.77971375085811 },
+    color: '#A51C38',
+  },
+  {
+    name: 'King\nEdward VII\nHall',
+    position: { latitude: 1.2923996774032545, longitude: 103.78080979615915 },
+    color: '#8B0000',
+  },
+  {
+    name: 'Sheares\nHall',
+    position: { latitude: 1.2912160923055316, longitude: 103.77564572758939 },
+    color: '#CC5500',
+  },
+  {
+    name: 'Kent Ridge\nHall',
+    position: { latitude: 1.2916305737435196, longitude: 103.77455217105798 },
+    color: '#1E3A8A',
+  },
+  {
+    name: 'Temasek\nHall',
+    position: { latitude: 1.2927025650139552, longitude: 103.7712758453672 },
+    color: '#4A5568',
+  },
+  {
+    name: 'Eusoff\nHall',
+    position: { latitude: 1.2934533922859488, longitude: 103.77004202922035 },
+    color: '#B8860B',
+  },
+  {
+    name: 'Raffles\nHall',
+    position: { latitude: 1.3001223325818445, longitude: 103.77323746139996 },
+    color: '#2D5016',
+  },
+  {
+    name: 'CAPT',
+    position: { latitude: 1.3077614832236284, longitude: 103.77323095140937 },
+    color: '#7B123A',
+  },
+  {
+    name: 'RC4',
+    position: { latitude: 1.3082848566232612, longitude: 103.773192677322 },
+    color: '#219181',
+  },
+  {
+    name: 'RVRC',
+    position: { latitude: 1.2981, longitude: 103.77615 },
+    color: '#48256A',
+  },
+  {
+    name: 'Tembusu',
+    position: { latitude: 1.3059935426292466, longitude: 103.77373965317965 },
+    color: '#02522F',
+  },
+  {
+    name: 'Valour\nHouse',
+    position: { latitude: 1.300447491985533, longitude: 103.7750264300059 },
+    color: '#340860',
+  },
+];
