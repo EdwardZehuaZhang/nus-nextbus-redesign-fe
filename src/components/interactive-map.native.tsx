@@ -59,9 +59,9 @@
 
 import polyline from '@mapbox/polyline';
 import simplify from 'simplify-js';
-import { Barbell, BookOpen, BowlFood, Bus, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
+import { Barbell, BookOpen, BowlFood, Bus, Compass, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -969,6 +969,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   );
   const [currentRegion, setCurrentRegion] = useState<Region>(safeInitialRegion);
   const [mapReady, setMapReady] = useState(false);
+  const [mapHeading, setMapHeading] = useState(0);
+  const [isCompassVisible, setIsCompassVisible] = useState(false);
   const hasSetInitialRegion = useRef(false);
   const isInitializing = useRef(true);
   const hasFitToCoordinates = useRef(false); // Guard to prevent repeated fitToCoordinates calls
@@ -1218,15 +1220,49 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
   // onRegionChangeComplete: called when user finishes gesture + stops region from changing
   // Throttle this to avoid rapid successive updates that can queue up and cause jank
+  const updateCompassFromCamera = React.useCallback(async () => {
+    if (!mapRef.current) return;
+    try {
+      const camera = await mapRef.current.getCamera();
+      const heading = typeof camera.heading === 'number' ? camera.heading : 0;
+      const normalizedHeading = Math.abs(heading) < 1 ? 0 : heading;
+      setMapHeading(normalizedHeading);
+      setIsCompassVisible(Math.abs(normalizedHeading) > 1);
+    } catch {
+      // Ignore camera read errors
+    }
+  }, []);
+
   const handleRegionChangeDebounced = React.useMemo(
     () => debounce((region: Region) => {
       // This is a safety update to sync state if setCurrentRegion wasn't called during gesture
       // Usually the handleRegionChange callback fires during gesture, so this is rarely invoked
       console.log('[RegionChangeComplete] Gesture finished, syncing region if needed');
       setCurrentRegion(region);
+      updateCompassFromCamera();
     }, 150),  // Reduced from 350ms to 150ms for snappier response after gesture ends
-    []
+    [updateCompassFromCamera]
   );
+
+  const resetMapHeading = React.useCallback(async () => {
+    if (!mapRef.current) return;
+    try {
+      const camera = await mapRef.current.getCamera();
+      mapRef.current.animateCamera(
+        {
+          heading: 0,
+          pitch: camera.pitch,
+          center: camera.center,
+          zoom: camera.zoom,
+        },
+        { duration: 250 }
+      );
+      setMapHeading(0);
+      setIsCompassVisible(false);
+    } catch {
+      // Ignore camera errors
+    }
+  }, []);
 
   const { data: busStopsData } = useBusStops();
 
@@ -2405,9 +2441,10 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         userLocationAnnotationTitle="My Location"
         userLocationCalloutEnabled={false}
         userLocationUpdateInterval={1000}
-        showsMyLocationButton
-        showsCompass
-        showsScale
+        showsMyLocationButton={false}
+        showsCompass={false}
+        showsScale={false}
+        zoomControlEnabled={false}
         mapType={externalMapType ?? internalMapType}
         moveOnMarkerPress={false}
         onRegionChangeComplete={handleRegionChangeDebounced}
@@ -3161,6 +3198,22 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
       </MapView>
 
+      {isCompassVisible && (
+        <Pressable
+          style={styles.compassButton}
+          onPress={resetMapHeading}
+          hitSlop={10}
+        >
+          <View
+            style={{
+              transform: [{ rotate: `${mapHeading}deg` }],
+            }}
+          >
+            <Compass size={18} color="#111827" weight="bold" />
+          </View>
+        </Pressable>
+      )}
+
     </View>
   );
 });
@@ -3172,5 +3225,21 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
+  },
+  compassButton: {
+    position: 'absolute',
+    top: 116,
+    right: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 });
