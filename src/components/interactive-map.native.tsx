@@ -2285,29 +2285,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           }
           tappable={shouldShowResidences}
         />
-        {/* Landmark Markers - Pre-rendered, visibility controlled by opacity */}
-        {NUS_LANDMARKS.map((landmark, index) => {
-          const scale = getLandmarkScale(currentZoom);
-
-          return (
-            <Marker
-              key={`landmark-${index}`}
-              identifier={`landmark:${index}`}
-              coordinate={{
-                latitude: landmark.coordinates.lat,
-                longitude: landmark.coordinates.lng,
-              }}
-              anchor={{ x: 0.5, y: 1 }}
-              tracksViewChanges={false}
-              opacity={shouldShowLandmarks ? 1 : 0}
-              onPress={handleLandmarkPress(landmark)}
-              onSelect={(e) => handleLandmarkPress(landmark)(e as MarkerPressEvent)}
-              zIndex={20}
-            >
-              <PinMarker type={landmark.type} scale={scale} />
-            </Marker>
-          );
-        })}
         {/* Printer Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_PRINTERS.map((printer, index) => {
           const scale = getCircularMarkerScale(currentZoom);
@@ -2500,6 +2477,29 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             shouldLabelBelow={props.shouldLabelBelow}
           />
         ))}
+        {/* Landmark Markers - Rendered LAST to ensure highest priority for tap capture (z-index 70) */}
+        {NUS_LANDMARKS.map((landmark, index) => {
+          const scale = getLandmarkScale(currentZoom);
+
+          return (
+            <Marker
+              key={`landmark-${index}`}
+              identifier={`landmark:${index}`}
+              coordinate={{
+                latitude: landmark.coordinates.lat,
+                longitude: landmark.coordinates.lng,
+              }}
+              anchor={{ x: 0.5, y: 1 }}
+              tracksViewChanges={false}
+              opacity={shouldShowLandmarks ? 1 : 0}
+              onPress={handleLandmarkPress(landmark)}
+              onSelect={(e) => handleLandmarkPress(landmark)(e as MarkerPressEvent)}
+              zIndex={70}
+            >
+              <PinMarker type={landmark.type} scale={scale} />
+            </Marker>
+          );
+        })}
         {/* Custom User Location Marker - Shows with heading if available */}
         {userLocation &&
           typeof userLocation.latitude === 'number' &&
