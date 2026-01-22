@@ -279,13 +279,60 @@ const clusteredInputMarkers = React.useMemo(() => {
 
 ---
 
-## Architecture Decisions
+## ⚠️ CRITICAL: AIRGoogleMap Native Crash Issue
 
-### Why Not Conditionally Mount Polygons?
-- react-native-maps can crash when frequently mounting/unmounting polygon components
-- Opacity-based hiding is more stable and doesn't cause native bridge instability
-- Trade-off: slightly higher memory usage but much more reliable
-- Tested and reverted after observing crashes during filter toggles
+### Problem: Child Reordering Causes Native Crash
+**Crash Type**: `EXC_CRASH (SIGABRT)` - `AIRGoogleMap insertReactSubview:atIndex:`
+
+**Crash Signature**:
+```
+Exception Type:    EXC_CRASH (SIGABRT)
+Termination Reason:  Namespace SIGNAL, Code 6, Abort trap: 6
+
+Stack Trace:
+0  CoreFoundation                  -[__NSArrayM insertObject:atIndex:] + 1232
+1  Expo Go                          -[AIRGoogleMap insertReactSubview:atIndex:] + 556
+2  Expo Go                          -[RCTLegacyViewManagerInteropComponentView finalizeUpdates:] + 688
+```
+
+**Trigger**: Selecting a bus route or toggling filters causes MapView children to be reordered, which crashes the native AIRGoogleMap layer when it tries to insert/reorder React subviews.
+
+**Why This Happens**:
+- Dynamic/conditional rendering of polygon components causes child reordering
+- React Native's bridge attempts to update the native view hierarchy
+- AIRGoogleMap (Google Maps native layer) cannot safely handle frequent child insertion/removal
+- The native layer crashes with `insertObject:atIndex:` error
+
+**Attempted Fix That Caused Crash**:
+Using IIFEs (Immediately Invoked Function Expressions) for polygon rendering:
+```typescript
+// ❌ CAUSES CRASH - Dynamic mounting/unmounting
+{(() => {
+  const props = getResidencePolygonProps(...);
+  return <Polygon ... />;
+})()}
+```
+This pattern makes React treat polygons as conditionally rendered, triggering child reordering.
+
+### Architecture Decisions
+
+### Why NOT Conditionally Mount Polygons?
+- **CRITICAL**: react-native-maps can crash when frequently mounting/unmounting polygon components
+- **Crash Proof**: Opacity-based hiding is stable and doesn't trigger native bridge instability
+- **Trade-off**: Slightly higher memory usage but eliminates crash risk
+- **Tested & Confirmed**: Reverting dynamic rendering after observing crash during route selection
+- **Solution**: Use inline ternaries only (no wrapper functions/IIFEs) for polygon colors/widths
+
+**Correct Pattern** (Inline ternary):
+```typescript
+// ✅ SAFE - No remounting, just property changes
+<Polygon
+  coordinates={AREA_BOUNDARY}
+  strokeColor={shouldShowAcademic ? '#FF0000' : 'transparent'}
+  strokeWidth={shouldShowAcademic ? 2 : 0}
+  fillColor={shouldShowAcademic ? 'rgba(255, 0, 0, 0.2)' : 'transparent'}
+/>
+```
 
 ### Why Cache Bearings Instead of Memoize?
 - Bearing calculations are deterministic (same inputs → same output)

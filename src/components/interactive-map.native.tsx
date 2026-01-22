@@ -515,6 +515,28 @@ const getCircularMarkerScale = (zoom: number): number => {
  * Memoized Bus Stop Label Marker Component
  * Prevents unnecessary re-renders during map pans/zooms by isolating label rendering logic
  */
+/**
+ * Bucket zoom levels for label sizing to reduce SVG regenerations
+ * Instead of smooth font size changes, use discrete buckets that only change at thresholds
+ * This prevents expensive SVG regeneration on every 0.1 zoom increment
+ * Returns: { fontSize, strokeWidth, zoomBucket } where zoomBucket is discrete
+ */
+const getLabelSizeByZoomBucket = (zoomLevel: number): { fontSize: number; strokeWidth: number; zoomBucket: number } => {
+  if (zoomLevel <= 16) {
+    // Bucket 1: zoom <= 16
+    return { fontSize: 12, strokeWidth: 3, zoomBucket: 1 };
+  } else if (zoomLevel === 17) {
+    // Bucket 2: zoom 17
+    return { fontSize: 14, strokeWidth: 3.3, zoomBucket: 2 };
+  } else if (zoomLevel === 18) {
+    // Bucket 3: zoom 18
+    return { fontSize: 16, strokeWidth: 3.6, zoomBucket: 3 };
+  } else {
+    // Bucket 4: zoom > 18
+    return { fontSize: 18, strokeWidth: 4, zoomBucket: 4 };
+  }
+};
+
 interface BusStopLabelProps {
   stop: any;
   isLabelVisible: boolean;
@@ -543,19 +565,19 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   const stopName = stop.ShortName || stop.caption || stop.name;
   const labelOffsetLat = shouldLabelBelow ? -0.0001 : 0.0001;
 
-  // Calculate font size based on zoom level (matching web version)
-  let fontSize = 12;
-  let strokeWidth = 3;
-  if (currentZoom >= 17) {
-    fontSize = Math.min(18, 12 + (currentZoom - 16) * 2);
-    strokeWidth = Math.min(4, 3 + (currentZoom - 16) * 0.3);
-  }
-  const labelWidth = Math.min(
-    200,
-    Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
-  );
-  const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
-  const textY = Math.round(labelHeight * 0.7);
+  // Calculate font size using bucketed zoom levels to reduce SVG regenerations
+  const { fontSize, strokeWidth, zoomBucket } = getLabelSizeByZoomBucket(currentZoom);
+  
+  // Memoize SVG dimensions and rendering properties to avoid recalculating on every render
+  const svgProps = React.useMemo(() => {
+    const labelWidth = Math.min(
+      200,
+      Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
+    );
+    const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
+    const textY = Math.round(labelHeight * 0.7);
+    return { labelWidth, labelHeight, textY };
+  }, [stopName, fontSize]);
 
   // Ensure label color changes are rendered even with tracksViewChanges optimization
   const [trackChanges, setTrackChanges] = React.useState(false);
@@ -591,14 +613,14 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
         }}
       >
         <Svg
-          width={labelWidth}
-          height={labelHeight}
-          viewBox={`0 0 ${labelWidth} ${labelHeight}`}
+          width={svgProps.labelWidth}
+          height={svgProps.labelHeight}
+          viewBox={`0 0 ${svgProps.labelWidth} ${svgProps.labelHeight}`}
         >
           {/* White stroke outline - rendered first (behind) */}
           <SvgText
-            x={labelWidth / 2}
-            y={textY}
+            x={svgProps.labelWidth / 2}
+            y={svgProps.textY}
             fontSize={fontSize}
             fontWeight="600"
             fill="none"
@@ -610,8 +632,8 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
           </SvgText>
           {/* Route-colored text on top */}
           <SvgText
-            x={labelWidth / 2}
-            y={textY}
+            x={svgProps.labelWidth / 2}
+            y={svgProps.textY}
             fontSize={fontSize}
             fontWeight="600"
             fill={labelColor}
@@ -625,10 +647,14 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: only re-render if key props change
+  // Use zoomBucket instead of raw currentZoom to avoid re-rendering between buckets
+  const prevZoomBucket = getLabelSizeByZoomBucket(prevProps.currentZoom).zoomBucket;
+  const nextZoomBucket = getLabelSizeByZoomBucket(nextProps.currentZoom).zoomBucket;
+  
   return (
     prevProps.isLabelVisible === nextProps.isLabelVisible &&
     prevProps.labelColor === nextProps.labelColor &&
-    prevProps.currentZoom === nextProps.currentZoom &&
+    prevZoomBucket === nextZoomBucket &&
     prevProps.shouldLabelBelow === nextProps.shouldLabelBelow &&
     prevProps.stop.latitude === nextProps.stop.latitude &&
     prevProps.stop.longitude === nextProps.stop.longitude &&
@@ -679,6 +705,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
   // Bearing calculation cache to avoid recalculating every 20 seconds
   const bearingCacheRef = useRef<Map<string, number>>(new Map());
+
+  // Zoom gesture tracking - pause expensive recalculations during active gestures
+  const isGestureActiveRef = useRef(false);
+  const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [effectiveZoomLevel, setEffectiveZoomLevel] = useState(0);
 
   // State tracking refs for route selection sync (prevents infinite loops)
   const previousActiveRouteRef = useRef<RouteCode | null>(null);
@@ -789,6 +820,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   };
 
   const currentZoom = getZoomLevel(currentRegion.latitudeDelta);
+  
+  // Initialize effectiveZoomLevel on first mount or currentZoom change
+  React.useEffect(() => {
+    if (effectiveZoomLevel === 0) {
+      setEffectiveZoomLevel(currentZoom);
+    }
+  }, []);
 
   const mapBounds = React.useMemo(() => {
     const lat = currentRegion.latitude;
@@ -879,19 +917,38 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   // This effect is kept for reference but is no longer needed since navigation.tsx sets forceResetCenter on focus
   // Removed duplicate animateToRegion to prevent conflicting animations
 
-  // Handle region changes
+  // Handle region changes with aggressive gesture detection and debouncing
   const handleRegionChange = (region: Region) => {
+    // Mark gesture as active when region changes rapidly
+    if (!isGestureActiveRef.current) {
+      isGestureActiveRef.current = true;
+    }
+    
+    // Clear previous timeout and set new one
+    if (gestureTimeoutRef.current) {
+      clearTimeout(gestureTimeoutRef.current);
+    }
+    
+    // Immediately update currentRegion for clustering/bounds calculations
     setCurrentRegion(region);
+    
+    // Defer effectiveZoomLevel update for 350ms after gesture stops
+    // This prevents expensive SVG regenerations during active zoom gestures
+    gestureTimeoutRef.current = setTimeout(() => {
+      const newZoom = getZoomLevel(region.latitudeDelta);
+      setEffectiveZoomLevel(newZoom);
+      isGestureActiveRef.current = false;
+    }, 350);
   };
 
   const handleRegionChangeDebounced = React.useMemo(
-    () => debounce((region: Region) => setCurrentRegion(region), 150),
+    () => debounce((region: Region) => setCurrentRegion(region), 350),
     []
   );
 
   const { data: busStopsData } = useBusStops();
 
-  // Log zoom level changes for debugging
+  // Log zoom level changes for debugging (use currentZoom for clustering, not effectiveZoomLevel)
   useEffect(() => {
     let stopVisibilityMode = '';
     if (currentZoom <= 13) {
@@ -906,7 +963,21 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       stopVisibilityMode = 'HIDE ALL STOPS';
     }
     console.log(`[MapZoomLevel] Zoom ${currentZoom}: ${stopVisibilityMode}`);
-  }, [currentZoom]);
+    
+    // Log when using deferred zoom for visual rendering
+    if (effectiveZoomLevel !== currentZoom && isGestureActiveRef.current) {
+      console.log(`[ZoomGesture] Active: currentZoom=${currentZoom}, effectiveZoomLevel=${effectiveZoomLevel} (deferred)`);
+    }
+  }, [currentZoom, effectiveZoomLevel]);
+  
+  // Cleanup gesture timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (gestureTimeoutRef.current) {
+        clearTimeout(gestureTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Priority stops shown at zoom level 14 (minimal set of key locations)
   const zoom14PriorityStops = [
@@ -1186,9 +1257,10 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   );
 
   // Fetch live bus locations for the active route
+  // PERFORMANCE: Pause polling during active zoom gestures to prevent marker flicker
   const { data: activeBusesData } = useActiveBuses(
     effectiveActiveRoute as RouteCode,
-    !!effectiveActiveRoute
+    !!effectiveActiveRoute && !isGestureActiveRef.current
   );
   const activeBuses = activeBusesData?.ActiveBusResult?.activebus || [];
   const routeColor = effectiveActiveRoute ? routeColors[effectiveActiveRoute] : '#274F9C';
@@ -2287,7 +2359,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         />
         {/* Printer Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_PRINTERS.map((printer, index) => {
-          const scale = getCircularMarkerScale(currentZoom);
+          const scale = getCircularMarkerScale(effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom);
           const isDimmed =
             selectedPrinterId !== null && selectedPrinterId !== printer.id;
           const isPrinterClickable = shouldShowPrinters;
@@ -2317,7 +2389,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
         {/* Sports Facility Markers - Pre-rendered, visibility controlled by opacity */}
         {NUS_SPORTS_FACILITIES.map((facility, index) => {
-          const scale = getCircularMarkerScale(currentZoom);
+          const scale = getCircularMarkerScale(effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom);
           const isDimmed =
             selectedSportsFacilityId !== null &&
             selectedSportsFacilityId !== facility.id;
@@ -2348,7 +2420,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
         {/* Canteen Markers - Pre-rendered, visibility controlled by opacity */}
         {CANTEENS.map((canteen, index) => {
-          const scale = getCircularMarkerScale(currentZoom);
+          const scale = getCircularMarkerScale(effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom);
           const isDimmed =
             selectedCanteenId !== null && selectedCanteenId !== canteen.id;
           const isCanteenClickable = shouldShowCanteens;
@@ -2472,14 +2544,14 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             isLabelVisible={props.isLabelVisible}
             isLabelClickable={props.isLabelClickable}
             labelColor={props.labelColor}
-            currentZoom={currentZoom}
+            currentZoom={effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom}
             onPress={handleBusStopPress(props.stop)}
             shouldLabelBelow={props.shouldLabelBelow}
           />
         ))}
         {/* Landmark Markers - Rendered LAST to ensure highest priority for tap capture (z-index 70) */}
         {NUS_LANDMARKS.map((landmark, index) => {
-          const scale = getLandmarkScale(currentZoom);
+          const scale = getLandmarkScale(effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom);
 
           return (
             <Marker
