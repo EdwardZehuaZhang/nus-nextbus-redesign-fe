@@ -48,6 +48,7 @@ import {
 } from '@/lib/notifications/leave-reminder';
 import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
 import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
+import { useKeyboardAwareInteraction } from '@/lib/hooks/use-keyboard-aware-interaction';
 import { InternalRoutesSection } from '@/components/internal-route-card';
 import type { InternalBusRoute } from '@/lib/route-finding';
 import { createInternalRoutePolylines } from '@/lib/route-polylines';
@@ -763,30 +764,20 @@ export default function NavigationPage() {
     constants: { MAX_HEIGHT, DEFAULT_HEIGHT },
   } = useDragHandlers({ minHeight: effectiveMinHeight, defaultHeight: 39, maxHeight: 75 });
 
-  // Keep sheet above keyboard and prevent collapsing while editing
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const onShow = (e: any) => {
+  // Keep sheet above keyboard and dismiss on first tap
+  useKeyboardAwareInteraction({
+    autoExpand: true,
+    maxHeight: MAX_HEIGHT,
+    snapToHeight,
+    onKeyboardShow: (height) => {
       setIsKeyboardVisible(true);
-      setKeyboardHeight(e?.endCoordinates?.height ?? 0);
-      snapToHeight(MAX_HEIGHT);
-    };
-
-    const onHide = () => {
+      setKeyboardHeight(height);
+    },
+    onKeyboardHide: () => {
       setIsKeyboardVisible(false);
       setKeyboardHeight(0);
-    };
-
-    const showListener = Keyboard.addListener(showEvent, onShow);
-    const hideListener = Keyboard.addListener(hideEvent, onHide);
-
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
-  }, [MAX_HEIGHT, snapToHeight]);
+    },
+  });
 
   // If min height increases (search/keyboard), snap up to avoid being stuck below default
   useEffect(() => {

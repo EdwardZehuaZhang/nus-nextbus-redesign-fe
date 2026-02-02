@@ -28,6 +28,7 @@ import { Frame } from '@/components/frame';
 import { InteractiveMap, type MapSelection } from '@/components/interactive-map';
 import { MapTypeSelector } from '@/components/map-type-selector';
 import { SportsAndPrintersBubbles } from '@/components/sports-printers-bubbles';
+import { AnimatedDots } from '@/components/animated-dots';
 import {
   FocusAwareStatusBar,
   Image,
@@ -59,6 +60,7 @@ import {
   getBusStationById,
 } from '@/lib/bus-stations';
 import { type LocationCoords, useLocation } from '@/lib/hooks/use-location';
+import { useKeyboardAwareInteraction } from '@/lib/hooks/use-keyboard-aware-interaction';
 import { useFavoritesContext } from '@/lib/contexts/favorites-context';
 import { type FavoriteRoute } from '@/lib/storage/favorites';
 import {
@@ -691,11 +693,11 @@ const FavoriteButton = ({
   };
 
   const handlePress = () => {
+    Keyboard.dismiss();
     // Don't navigate if we're editing
     if (isEditing) {
       inputRef.current?.blur();
       handleSaveEdit();
-      Keyboard.dismiss();
       return;
     }
     // Navigate to navigation page with the route and user location
@@ -859,6 +861,7 @@ const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="always"
           contentContainerStyle={{ gap: 8 }}
         >
           {favorites.map((item) => (
@@ -1027,16 +1030,34 @@ const NearestStopsSection = ({
       {nearestStops.length === 0 ? (
         <View className="rounded-md border border-neutral-200 bg-white p-6 shadow-sm">
           <View className="items-center">
-            <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
-              Location Unavailable
-            </Text>
-            <Text className="text-center text-sm text-neutral-500">
-              {locationLoading
-                ? 'Getting your location...'
-                : locationError
-                  ? `Error: ${locationError}`
-                  : 'Unable to determine your location. Please enable location services in your browser.'}
-            </Text>
+            {locationLoading ? (
+              <>
+                <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+                  Getting your location<AnimatedDots interval={400} />
+                </Text>
+                <Text className="text-center text-sm text-neutral-500">
+                  This will take a second
+                </Text>
+              </>
+            ) : locationError ? (
+              <>
+                <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+                  Location unavailable
+                </Text>
+                <Text className="text-center text-sm text-neutral-500">
+                  Enable location permission in settings
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+                  Location Unavailable
+                </Text>
+                <Text className="text-center text-sm text-neutral-500">
+                  Please enable location services to find nearby stops
+                </Text>
+              </>
+            )}
           </View>
         </View>
       ) : (
@@ -1309,7 +1330,11 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
         </Pressable>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {searchText.trim().length > 0 ? (
           <SearchResults
             searchText={searchText}
@@ -1374,7 +1399,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
   );
 };
 
-const BottomSheetContent = ({
+const BottomSheetContent = React.memo(({
   isCollapsed,
   isSearchMode,
   mapSelection,
@@ -1443,27 +1468,51 @@ const BottomSheetContent = ({
       )}
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison: re-render only if these specific props change
+  return (
+    prevProps.isCollapsed === nextProps.isCollapsed &&
+    prevProps.isSearchMode === nextProps.isSearchMode &&
+    prevProps.mapSelection === nextProps.mapSelection &&
+    prevProps.onCloseSelection === nextProps.onCloseSelection &&
+    prevProps.activeTab === nextProps.activeTab &&
+    prevProps.onTabChange === nextProps.onTabChange &&
+    prevProps.onExpandSheet === nextProps.onExpandSheet &&
+    prevProps.onSearchPress === nextProps.onSearchPress &&
+    prevProps.onCancelSearch === nextProps.onCancelSearch &&
+    prevProps.selectedRoute === nextProps.selectedRoute &&
+    prevProps.onRouteClick === nextProps.onRouteClick &&
+    prevProps.isSearchModeExiting === nextProps.isSearchModeExiting
+  );
+});
 
 /* eslint-disable max-lines-per-function */
 const useDragHandlers = () => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isSearchMode, setIsSearchMode] = React.useState(false);
-  const [containerHeight, setContainerHeight] = React.useState(45); // Start at 45%
+  const screenHeight = Dimensions.get('window').height;
+  // Convert percentage heights to pixels for native driver support
+  const MIN_HEIGHT_PX = Math.round(screenHeight * 0.1); // 10%
+  const MAX_HEIGHT_PX = Math.round(screenHeight * 0.92); // 92%
+  const DEFAULT_HEIGHT_PX = Math.round(screenHeight * 0.45); // 45%
+  
+  const [containerHeight, setContainerHeight] = React.useState(DEFAULT_HEIGHT_PX);
   const [tempHeight, setTempHeight] = React.useState<number | null>(null);
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
   const translateY = React.useRef(new Animated.Value(0)).current;
-  const heightAnimation = React.useRef(new Animated.Value(45)).current; // Add animated value for height
-  const backdropOpacity = React.useRef(new Animated.Value(0)).current; // Add animated value for backdrop opacity
-  const startHeight = React.useRef(45);
+  const heightAnimation = React.useRef(new Animated.Value(DEFAULT_HEIGHT_PX)).current;
+  const backdropOpacity = React.useRef(new Animated.Value(0)).current;
+  const startHeight = React.useRef(DEFAULT_HEIGHT_PX);
   const dragStartY = React.useRef(0);
   const dragStartTime = React.useRef(0);
   const isDragging = React.useRef(false);
+  const lastDragUpdateTime = React.useRef(0); // For debouncing touch move events
   const [isSearchModeExiting, setIsSearchModeExiting] = React.useState(false);
   const exitSearchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSearchModeRef = React.useRef(false);
   const isDragLockedRef = React.useRef(false);
   const dragStartStateRef = React.useRef<'MIN' | 'DEFAULT' | 'MAX'>('DEFAULT');
+  const keyboardTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   React.useEffect(() => {
     isSearchModeRef.current = isSearchMode;
@@ -1471,43 +1520,45 @@ const useDragHandlers = () => {
   const ignoreSearchPressRef = React.useRef(false);
   const ignoreSearchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const MIN_HEIGHT = 10; // Minimum height - just search bar visible
-  const MAX_HEIGHT = 92; // Maximum height - allow nearly full screen expansion for small devices
-  const DEFAULT_HEIGHT = 45; // Default state
+  useKeyboardAwareInteraction({
+    autoExpand: true,
+    maxHeight: MAX_HEIGHT_PX,
+    snapToHeight: (targetHeight) => {
+      setIsCollapsed(false);
+      setTempHeight(null);
+      Animated.spring(heightAnimation, {
+        toValue: targetHeight,
+        useNativeDriver: false,
+        tension: 50,
+        friction: 8,
+      }).start(() => {
+        setContainerHeight(targetHeight);
+      });
+    },
+    onKeyboardShow: (height) => {
+      setKeyboardHeight(height);
+    },
+    onKeyboardHide: () => {
+      setKeyboardHeight(0);
+    },
+  });
 
   const resetToDefault = React.useCallback(() => {
     setIsSearchMode(false);
     setIsCollapsed(false);
     setTempHeight(null);
     setKeyboardHeight(0);
-    setContainerHeight(DEFAULT_HEIGHT);
-    heightAnimation.setValue(DEFAULT_HEIGHT);
+    setContainerHeight(DEFAULT_HEIGHT_PX);
+    heightAnimation.setValue(DEFAULT_HEIGHT_PX);
     backdropOpacity.setValue(0);
     translateY.setValue(0);
-  }, [backdropOpacity, heightAnimation, translateY]);
+  }, [backdropOpacity, heightAnimation, translateY, DEFAULT_HEIGHT_PX]);
 
-  // Listen for keyboard events
   React.useEffect(() => {
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        const kbHeight = e.endCoordinates.height;
-        setKeyboardHeight(kbHeight);
-        console.log('[KEYBOARD] ⌨️ Keyboard showing, height:', kbHeight);
-      }
-    );
-
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        console.log('[KEYBOARD] ⌨️ Keyboard hiding');
-        setKeyboardHeight(0);
-      }
-    );
-
     return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
+      if (keyboardTimeoutRef.current) {
+        clearTimeout(keyboardTimeoutRef.current);
+      }
       if (exitSearchTimeoutRef.current) {
         clearTimeout(exitSearchTimeoutRef.current);
         exitSearchTimeoutRef.current = null;
@@ -1524,19 +1575,27 @@ const useDragHandlers = () => {
     };
   }, []);
 
-  const handleDragMove = (dy: number) => {
+  const handleDragMove = React.useCallback((dy: number) => {
     // Don't allow dragging while search mode is exiting
     if (isDragLockedRef.current) {
       console.log('[DRAG] 🔒 Drag locked during search exit');
       return;
     }
+    
+    // Debounce: skip frame if less than 16ms has passed (roughly 60fps frame rate)
+    const now = Date.now();
+    if (now - lastDragUpdateTime.current < 8) {
+      return; // Skip this update
+    }
+    lastDragUpdateTime.current = now;
+    
     // Store the starting height and state when drag begins
     if (tempHeight === null) {
       startHeight.current = containerHeight;
       // Determine which state we're starting from
-      if (Math.abs(containerHeight - MIN_HEIGHT) < 5) {
+      if (Math.abs(containerHeight - MIN_HEIGHT_PX) < 10) {
         dragStartStateRef.current = 'MIN';
-      } else if (Math.abs(containerHeight - MAX_HEIGHT) < 5) {
+      } else if (Math.abs(containerHeight - MAX_HEIGHT_PX) < 10) {
         dragStartStateRef.current = 'MAX';
       } else {
         dragStartStateRef.current = 'DEFAULT';
@@ -1544,26 +1603,20 @@ const useDragHandlers = () => {
       console.log('[DRAG] 📍 Starting from:', dragStartStateRef.current);
     }
 
-    // Convert dy (pixels) to percentage of screen height
-    const screenHeight = Platform.OS === 'web' 
-      ? (typeof window !== 'undefined' ? window.innerHeight : 800)
-      : Dimensions.get('window').height;
-    const heightChange = (dy / screenHeight) * 100;
-
-    // Calculate new height (dragging down increases dy, so we subtract)
-    let newHeight = startHeight.current - heightChange;
+    // Calculate new height in pixels directly (no percentage conversion needed)
+    let newHeight = startHeight.current - dy;
 
     // Clamp between MIN and MAX
-    newHeight = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight));
+    newHeight = Math.max(MIN_HEIGHT_PX, Math.min(MAX_HEIGHT_PX, newHeight));
 
     setTempHeight(newHeight);
     setContainerHeight(newHeight);
     
-    // Update heightAnimation to keep it in sync
+    // Update heightAnimation to keep it in sync - no expensive string conversion
     heightAnimation.setValue(newHeight);
-  };
+  }, [containerHeight, tempHeight, MIN_HEIGHT_PX, MAX_HEIGHT_PX, heightAnimation]);
 
-  const handleDrag = (gestureState: { dy: number; vy: number }) => {
+  const handleDrag = React.useCallback((gestureState: { dy: number; vy: number }) => {
     // Don't snap while locked
     if (isDragLockedRef.current) {
       console.log('[DRAG] 🔒 Snap locked during search exit');
@@ -1577,56 +1630,56 @@ const useDragHandlers = () => {
     let targetHeight: number;
     let collapsed = false;
 
-    console.log('[DRAG] 🎯 Direction:', dragDirection, 'From state:', dragStartStateRef.current, 'Current height:', currentHeight.toFixed(1));
+    console.log('[DRAG] 🎯 Direction:', dragDirection, 'From state:', dragStartStateRef.current, 'Current height:', currentHeight);
 
     // Hard-coded state transition logic based on starting state and direction
     if (dragStartStateRef.current === 'DEFAULT') {
       if (dragDirection === 'UP') {
-        targetHeight = MAX_HEIGHT;
+        targetHeight = MAX_HEIGHT_PX;
         collapsed = false;
         console.log('[DRAG] DEFAULT + UP → MAX');
       } else {
-        targetHeight = MIN_HEIGHT;
+        targetHeight = MIN_HEIGHT_PX;
         collapsed = true;
         console.log('[DRAG] DEFAULT + DOWN → MIN');
       }
     } else if (dragStartStateRef.current === 'MAX') {
       if (dragDirection === 'DOWN') {
-        targetHeight = DEFAULT_HEIGHT;
+        targetHeight = DEFAULT_HEIGHT_PX;
         collapsed = false;
         console.log('[DRAG] MAX + DOWN → DEFAULT');
       } else {
         // Dragging up from MAX, stay at MAX or go higher
-        targetHeight = MAX_HEIGHT;
+        targetHeight = MAX_HEIGHT_PX;
         collapsed = false;
         console.log('[DRAG] MAX + UP → MAX (stay)');
       }
     } else if (dragStartStateRef.current === 'MIN') {
       if (dragDirection === 'UP') {
-        targetHeight = DEFAULT_HEIGHT;
+        targetHeight = DEFAULT_HEIGHT_PX;
         collapsed = false;
         console.log('[DRAG] MIN + UP → DEFAULT');
       } else {
         // Dragging down from MIN, stay at MIN
-        targetHeight = MIN_HEIGHT;
+        targetHeight = MIN_HEIGHT_PX;
         collapsed = true;
         console.log('[DRAG] MIN + DOWN → MIN (stay)');
       }
     } else {
       // Fallback: snap to nearest state for pass-through cases
-      const distToMin = Math.abs(currentHeight - MIN_HEIGHT);
-      const distToDefault = Math.abs(currentHeight - DEFAULT_HEIGHT);
-      const distToMax = Math.abs(currentHeight - MAX_HEIGHT);
+      const distToMin = Math.abs(currentHeight - MIN_HEIGHT_PX);
+      const distToDefault = Math.abs(currentHeight - DEFAULT_HEIGHT_PX);
+      const distToMax = Math.abs(currentHeight - MAX_HEIGHT_PX);
       const minDist = Math.min(distToMin, distToDefault, distToMax);
 
       if (minDist === distToMin) {
-        targetHeight = MIN_HEIGHT;
+        targetHeight = MIN_HEIGHT_PX;
         collapsed = true;
       } else if (minDist === distToDefault) {
-        targetHeight = DEFAULT_HEIGHT;
+        targetHeight = DEFAULT_HEIGHT_PX;
         collapsed = false;
       } else {
-        targetHeight = MAX_HEIGHT;
+        targetHeight = MAX_HEIGHT_PX;
         collapsed = false;
       }
       console.log('[DRAG] Fallback: snapping to nearest, target:', targetHeight);
@@ -1637,13 +1690,15 @@ const useDragHandlers = () => {
     setTempHeight(null);
 
     // Smoothly animate to target height
+    // Note: useNativeDriver: false because height is not supported by native driver
+    // But other optimizations (debouncing, memoization) make this fast enough
     Animated.spring(heightAnimation, {
       toValue: targetHeight,
       useNativeDriver: false,
       tension: 50,
       friction: 8,
     }).start();
-  };
+  }, [tempHeight, containerHeight, MIN_HEIGHT_PX, MAX_HEIGHT_PX, DEFAULT_HEIGHT_PX, heightAnimation]);
 
   const handleDragEnd = () => {
     // Do nothing - all snapping logic is handled in handleDrag
@@ -1654,29 +1709,29 @@ const useDragHandlers = () => {
   const handleTap = () => {
     // Get the current animation value
     const currentHeight = (heightAnimation as any)._value;
-    console.log('[TAP] 👆 Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT, 'MAX:', MAX_HEIGHT);
+    console.log('[TAP] 👆 Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT_PX, 'MAX:', MAX_HEIGHT_PX);
 
     // Only snap to DEFAULT if at MIN or MAX
-    if (Math.abs(currentHeight - MIN_HEIGHT) < 1) {
+    if (Math.abs(currentHeight - MIN_HEIGHT_PX) < 10) {
       // At MIN_HEIGHT - snap to DEFAULT
       console.log('[TAP] 📍 At MIN - Snapping to DEFAULT');
-      setContainerHeight(DEFAULT_HEIGHT);
+      setContainerHeight(DEFAULT_HEIGHT_PX);
       setIsCollapsed(false);
       setTempHeight(null);
       Animated.spring(heightAnimation, {
-        toValue: DEFAULT_HEIGHT,
+        toValue: DEFAULT_HEIGHT_PX,
         useNativeDriver: false,
         tension: 50,
         friction: 8,
       }).start();
-    } else if (Math.abs(currentHeight - MAX_HEIGHT) < 1) {
+    } else if (Math.abs(currentHeight - MAX_HEIGHT_PX) < 10) {
       // At MAX_HEIGHT - snap to DEFAULT
       console.log('[TAP] 📍 At MAX - Snapping to DEFAULT');
-      setContainerHeight(DEFAULT_HEIGHT);
+      setContainerHeight(DEFAULT_HEIGHT_PX);
       setIsCollapsed(false);
       setTempHeight(null);
       Animated.spring(heightAnimation, {
-        toValue: DEFAULT_HEIGHT,
+        toValue: DEFAULT_HEIGHT_PX,
         useNativeDriver: false,
         tension: 50,
         friction: 8,
@@ -1687,16 +1742,20 @@ const useDragHandlers = () => {
     }
   };
 
-  const handleExpandSheet = () => {
+  const handleExpandSheet = React.useCallback(() => {
+    console.log('[EXPAND] 📈 Expanding to DEFAULT');
+    setContainerHeight(DEFAULT_HEIGHT_PX);
     setIsCollapsed(false);
-    setContainerHeight(45); // Default expanded state
-    Animated.spring(translateY, {
-      toValue: 0,
+    setTempHeight(null);
+    Animated.spring(heightAnimation, {
+      toValue: DEFAULT_HEIGHT_PX,
       useNativeDriver: false,
+      tension: 50,
+      friction: 8,
     }).start();
-  };
+  }, [DEFAULT_HEIGHT_PX, heightAnimation]);
 
-  const handleEnterSearchMode = () => {
+  const handleEnterSearchMode = React.useCallback(() => {
     if (isSearchModeExiting) {
       console.log('[TRANSIT SEARCH] ⛔️ Enter blocked (exiting)');
       return;
@@ -1709,95 +1768,84 @@ const useDragHandlers = () => {
     // Check current panel height
     const currentHeight = (heightAnimation as any)._value;
     
-    // If panel is already at MAX_HEIGHT (fully expanded), don't re-animate
-    if (currentHeight >= MAX_HEIGHT - 1) { // Allow 1 unit tolerance
-      // Just ensure search mode is on
-      if (!isSearchMode) {
-        setIsSearchMode(true);
-        setIsCollapsed(false);
-        // Fade in backdrop without height animation
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: false,
-        }).start();
-      }
+    setIsSearchMode(true);
+    setIsCollapsed(false);
+    
+    // If panel is already at MAX_HEIGHT (fully expanded), skip height animation
+    if (currentHeight >= MAX_HEIGHT_PX - 10) { // Allow 10 pixel tolerance
+      // Just fade in backdrop without height animation - use native driver
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true, // opacity supported by native driver
+      }).start();
       return;
     }
     
-    setIsSearchMode(true);
-    setIsCollapsed(false);
-    // Animate height expansion
-    Animated.spring(heightAnimation, {
-      toValue: MAX_HEIGHT,
-      useNativeDriver: false,
-      tension: 50,
-      friction: 8,
-    }).start(() => {
-      setContainerHeight(MAX_HEIGHT);
+    // Animate height expansion and backdrop in parallel for smoother feel
+    Animated.parallel([
+      Animated.spring(heightAnimation, {
+        toValue: MAX_HEIGHT_PX,
+        useNativeDriver: false, // height not supported by native driver
+        tension: 50,
+        friction: 8,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true, // opacity supported by native driver
+      }),
+    ]).start(() => {
+      setContainerHeight(MAX_HEIGHT_PX);
     });
-    // Animate backdrop fade in
-    Animated.timing(backdropOpacity, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  };
+  }, [isSearchModeExiting, MAX_HEIGHT_PX, heightAnimation, backdropOpacity]);
 
-  const handleExitSearchMode = () => {
+  const handleExitSearchMode = React.useCallback(() => {
     Keyboard.dismiss();
     console.log('[TRANSIT SEARCH] 🚪 Exit search mode');
     console.log('[TRANSIT SEARCH] 📍 Height before exit:', (heightAnimation as any)._value);
     // Lock dragging during exit transition
     isDragLockedRef.current = true;
     setIsSearchModeExiting(true);
-    if (exitSearchTimeoutRef.current) {
-      clearTimeout(exitSearchTimeoutRef.current);
-    }
-    exitSearchTimeoutRef.current = setTimeout(() => {
-      setIsSearchModeExiting(false);
-      isDragLockedRef.current = false;
-      console.log('[TRANSIT SEARCH] 🔓 Drag unlocked');
-    }, 500);
-    ignoreSearchPressRef.current = true;
-    if (ignoreSearchTimeoutRef.current) {
-      clearTimeout(ignoreSearchTimeoutRef.current);
-    }
-    ignoreSearchTimeoutRef.current = setTimeout(() => {
-      ignoreSearchPressRef.current = false;
-    }, 400);
     setIsSearchMode(false);
     setIsCollapsed(false);
     setTempHeight(null);
+    setContainerHeight(DEFAULT_HEIGHT_PX);
     setKeyboardHeight(0);
-    setContainerHeight(DEFAULT_HEIGHT);
+    
+    // Stop any ongoing animations and reset values immediately
     heightAnimation.stopAnimation();
     backdropOpacity.stopAnimation();
     translateY.stopAnimation();
-    heightAnimation.setValue(DEFAULT_HEIGHT);
+    heightAnimation.setValue(DEFAULT_HEIGHT_PX);
     backdropOpacity.setValue(0);
     translateY.setValue(0);
     console.log('[TRANSIT SEARCH] 📍 Height reset to default');
-    // Animate backdrop fade out
-    Animated.timing(backdropOpacity, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-    // Animate height back to default
-    Animated.spring(heightAnimation, {
-      toValue: DEFAULT_HEIGHT,
-      useNativeDriver: false,
-      tension: 50,
-      friction: 8,
-    }).start(() => {
-      setContainerHeight(DEFAULT_HEIGHT);
+    
+    // Parallel animations for smoother exit transition (duration reduced for snappier feel)
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true, // opacity supported by native driver
+      }),
+      Animated.spring(heightAnimation, {
+        toValue: DEFAULT_HEIGHT_PX,
+        useNativeDriver: false, // height not supported by native driver
+        tension: 50,
+        friction: 8,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true, // translateY supported by native driver
+      }),
+    ]).start(() => {
+      setContainerHeight(DEFAULT_HEIGHT_PX);
+      isDragLockedRef.current = false;
+      setIsSearchModeExiting(false);
+      console.log('[TRANSIT SEARCH] 🔓 Drag unlocked');
     });
-    Animated.spring(translateY, {
-      toValue: 0,
-      useNativeDriver: false,
-    }).start();
-  };
+  }, [DEFAULT_HEIGHT_PX, heightAnimation, backdropOpacity, translateY]);
 
   const handleDragStart = (e: any) => {
     const touch = e.nativeEvent?.touches?.[0];
@@ -1838,21 +1886,31 @@ const useDragHandlers = () => {
     }
   };
 
-  const animatedStyle = {
-    height: heightAnimation.interpolate({
-      inputRange: [MIN_HEIGHT, DEFAULT_HEIGHT, MAX_HEIGHT],
-      outputRange: [`${MIN_HEIGHT}%`, `${DEFAULT_HEIGHT}%`, `${MAX_HEIGHT}%`],
+  // Use cached animated style to avoid re-computing on every render
+  // Separate animated styles to avoid driver conflicts
+  // translateY uses native driver, height does not
+  const translateYInterpolated = React.useMemo(
+    () =>
+      translateY.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 700],
+      }),
+    [translateY]
+  );
+
+  const animatedStyle = React.useMemo(
+    () => ({
+      height: heightAnimation,
     }),
-    paddingBottom: keyboardHeight,
-    transform: isSearchMode ? [] : [
-      {
-        translateY: translateY.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 700],
-        }),
-      },
-    ],
-  };
+    [heightAnimation]
+  );
+
+  const transformStyle = React.useMemo(
+    () => ({
+      transform: isSearchMode ? [] : [{ translateY: translateYInterpolated }],
+    }),
+    [isSearchMode, translateYInterpolated]
+  );
 
   return {
     isCollapsed,
@@ -1870,13 +1928,15 @@ const useDragHandlers = () => {
     handleDragMoveWrapper,
     handleDragEndWrapper,
     animatedStyle,
+    transformStyle,
     dragStartY,
     dragStartTime,
     isDragging,
     backdropOpacity,
     heightAnimation,
-    MIN_HEIGHT,
-    MAX_HEIGHT,
+    keyboardHeight,
+    MIN_HEIGHT: MIN_HEIGHT_PX,
+    MAX_HEIGHT: MAX_HEIGHT_PX,
     resetToDefault,
   };
 };
@@ -2418,11 +2478,13 @@ export default function TransitPage() {
     handleDragMoveWrapper,
     handleDragEndWrapper,
     animatedStyle,
+    transformStyle,
     dragStartY,
     dragStartTime,
     isDragging,
     backdropOpacity,
     heightAnimation,
+    keyboardHeight,
     MIN_HEIGHT,
     MAX_HEIGHT,
     resetToDefault,
@@ -2628,7 +2690,7 @@ export default function TransitPage() {
             borderTopRightRadius: 12,
             backgroundColor: '#F9FAFB',
             paddingHorizontal: 20,
-            paddingBottom: 20,
+            paddingBottom: 20 + keyboardHeight,
             paddingTop: 4,
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
             marginTop: 'auto',
@@ -2636,6 +2698,7 @@ export default function TransitPage() {
             zIndex: 10001,
           },
           animatedStyle,
+          transformStyle,
         ]}
         onTouchStart={handleDragStart}
         onTouchMove={handleDragMoveWrapper}

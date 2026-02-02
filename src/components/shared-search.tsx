@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { getPlaceAutocomplete } from '@/api/google-maps/places';
@@ -142,7 +142,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       return (
         <Pressable
           key={item.id}
-          onPress={() => onBusStationPress(item)}
+          onPress={() => {
+            Keyboard.dismiss();
+            onBusStationPress(item);
+          }}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -172,7 +175,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     return (
       <Pressable
         key={item.id}
-        onPress={() => onBusStationPress(item)}
+        onPress={() => {
+          Keyboard.dismiss();
+          onBusStationPress(item);
+        }}
         className={`flex-row items-center gap-3 py-3 ${
           index < busResults.length - 1 ? 'border-b border-neutral-200' : ''
         }`}
@@ -195,7 +201,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       return (
         <Pressable
           key={place.place_id}
-          onPress={() => onGooglePlacePress(place)}
+          onPress={() => {
+            Keyboard.dismiss();
+            onGooglePlacePress(place);
+          }}
           style={{
             flexDirection: 'row',
             alignItems: 'center',
@@ -233,7 +242,10 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     return (
       <Pressable
         key={place.place_id}
-        onPress={() => onGooglePlacePress(place)}
+        onPress={() => {
+          Keyboard.dismiss();
+          onGooglePlacePress(place);
+        }}
         className={`flex-row items-center gap-3 py-3 ${
           index < googlePlaceResults.length - 1
             ? 'border-b border-neutral-200'

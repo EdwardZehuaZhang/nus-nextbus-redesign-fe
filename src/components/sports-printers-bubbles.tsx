@@ -56,8 +56,8 @@ export const SportsAndPrintersBubbles: React.FC<
   filters,
   onFilterChange,
   heightAnimation,
-  MIN_HEIGHT = 10,
-  MAX_HEIGHT = 92,
+  MIN_HEIGHT = 87,
+  MAX_HEIGHT = 804,
 }) => {
   const handleToggle = (filterId: string) => {
     onFilterChange({
@@ -67,21 +67,24 @@ export const SportsAndPrintersBubbles: React.FC<
   };
 
   // Create animated opacity that hides bubbles at MAX_HEIGHT
-  const animatedOpacity = heightAnimation
+  // Calculate midpoint between MIN and MAX for fade transition
+  const midHeight = Math.round((MIN_HEIGHT + MAX_HEIGHT) / 2);
+  
+  const animatedOpacity = heightAnimation && heightAnimation.interpolate
     ? heightAnimation.interpolate({
-        inputRange: [MIN_HEIGHT, 70, MAX_HEIGHT],
+        inputRange: [MIN_HEIGHT, midHeight, MAX_HEIGHT],
         outputRange: [1, 1, 0], // Visible at MIN and normal heights, hidden at MAX
       })
-    : 1;
+    : new Animated.Value(1);
 
   // Calculate dynamic bottom position - position bubbles above the panel
-  // Panel height is a percentage, so we position bubbles just above it
-  const animatedBottom = heightAnimation
+  // Use pixel-based values directly for positioning
+  const animatedBottom = heightAnimation && heightAnimation.interpolate
     ? heightAnimation.interpolate({
         inputRange: [MIN_HEIGHT, MAX_HEIGHT],
-        outputRange: [`${MIN_HEIGHT + 1}%`, `${MAX_HEIGHT + 2}%`], // 2% above panel at all times
+        outputRange: [MIN_HEIGHT + 8, MAX_HEIGHT + 8], // 8 pixels above panel at all times
       })
-    : '12%';
+    : MIN_HEIGHT + 8; // Default fallback in pixels
 
   return (
     <Animated.View
