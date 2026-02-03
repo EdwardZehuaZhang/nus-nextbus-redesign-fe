@@ -86,17 +86,22 @@ export const SportsAndPrintersBubbles: React.FC<
       })
     : MIN_HEIGHT + 8; // Default fallback in pixels
 
+  const animatedTranslateY = typeof animatedBottom === 'number'
+    ? -animatedBottom
+    : Animated.multiply(animatedBottom, -1);
+
   return (
     <Animated.View
       style={{
         position: 'absolute',
-        bottom: animatedBottom,
+        bottom: 0,
         left: 8,
         flexDirection: 'row',
         gap: 8,
         zIndex: 10,
         pointerEvents: 'box-none',
         opacity: animatedOpacity,
+        transform: [{ translateY: animatedTranslateY }],
       }}
     >
       <BubbleButton

@@ -1837,7 +1837,7 @@ const useDragHandlers = () => {
       }),
       Animated.spring(translateY, {
         toValue: 0,
-        useNativeDriver: true, // translateY supported by native driver
+        useNativeDriver: false, // keep consistent with height animation
       }),
     ]).start(() => {
       setContainerHeight(DEFAULT_HEIGHT_PX);
@@ -1887,29 +1887,12 @@ const useDragHandlers = () => {
   };
 
   // Use cached animated style to avoid re-computing on every render
-  // Separate animated styles to avoid driver conflicts
-  // translateY uses native driver, height does not
-  const translateYInterpolated = React.useMemo(
-    () =>
-      translateY.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 700],
-      }),
-    [translateY]
-  );
-
+  // Keep sheet animations on JS driver since height is not supported natively
   const animatedStyle = React.useMemo(
     () => ({
       height: heightAnimation,
     }),
     [heightAnimation]
-  );
-
-  const transformStyle = React.useMemo(
-    () => ({
-      transform: isSearchMode ? [] : [{ translateY: translateYInterpolated }],
-    }),
-    [isSearchMode, translateYInterpolated]
   );
 
   return {
@@ -1928,10 +1911,6 @@ const useDragHandlers = () => {
     handleDragMoveWrapper,
     handleDragEndWrapper,
     animatedStyle,
-    transformStyle,
-    dragStartY,
-    dragStartTime,
-    isDragging,
     backdropOpacity,
     heightAnimation,
     keyboardHeight,
@@ -2478,10 +2457,6 @@ export default function TransitPage() {
     handleDragMoveWrapper,
     handleDragEndWrapper,
     animatedStyle,
-    transformStyle,
-    dragStartY,
-    dragStartTime,
-    isDragging,
     backdropOpacity,
     heightAnimation,
     keyboardHeight,
@@ -2620,7 +2595,7 @@ export default function TransitPage() {
   };
 
   return (
-    <Pressable style={{ flex: 1, backgroundColor: '#F9F9F9' }} onPress={() => Keyboard.dismiss()}>
+    <View style={{ flex: 1, backgroundColor: '#F9F9F9' }}>
       <FocusAwareStatusBar />
 
       <View
@@ -2698,7 +2673,6 @@ export default function TransitPage() {
             zIndex: 10001,
           },
           animatedStyle,
-          transformStyle,
         ]}
         onTouchStart={handleDragStart}
         onTouchMove={handleDragMoveWrapper}
@@ -2876,6 +2850,6 @@ export default function TransitPage() {
           <Info size={22} color="rgba(0, 0, 0, 0.4)" />
         </Pressable>
       </View>
-    </Pressable>
+    </View>
   );
 }

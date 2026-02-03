@@ -1,5 +1,7 @@
 pnpm exec cross-env EXPO_NO_DOTENV=1 expo start --tunnel
 
+pnpm eas build -p ios --profile adhoc
+
 
 <h1 align="center">
   🚌 NUS NextBus Redesign

@@ -1068,12 +1068,14 @@ export default function NavigationPage() {
           setActiveStopId(null);
         }
         
-        // Dismiss keyboard immediately for instant feedback
-        Keyboard.dismiss();
         // Close the search panel
         resetEditingState();
         setPanelState('closed');
         setSearchText('');
+        // Defer keyboard dismissal to allow UI updates to complete first
+        setTimeout(() => {
+          Keyboard.dismiss();
+        }, 0);
       } else {
         console.error('[NAV GOOGLE PLACE] ❌ Backend API error:', placeDetailsData.status);
       }
@@ -1872,12 +1874,14 @@ export default function NavigationPage() {
       setActiveStopId(null);
     }
     
-    // Dismiss keyboard immediately for instant feedback
-    Keyboard.dismiss();
     // Close search panel and clear selection state
     resetEditingState();
     setPanelState('closed');
     setSearchText('');
+    // Defer keyboard dismissal to allow UI updates to complete first
+    setTimeout(() => {
+      Keyboard.dismiss();
+    }, 0);
   };
 
   // Show X and drag icons when there are 3+ locations (origin + at least 1 stop + destination)

@@ -143,8 +143,11 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
         <Pressable
           key={item.id}
           onPress={() => {
-            Keyboard.dismiss();
             onBusStationPress(item);
+            // Defer keyboard dismissal to allow tap event to complete first
+            setTimeout(() => {
+              Keyboard.dismiss();
+            }, 0);
           }}
           style={{
             flexDirection: 'row',
@@ -176,8 +179,11 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       <Pressable
         key={item.id}
         onPress={() => {
-          Keyboard.dismiss();
           onBusStationPress(item);
+          // Defer keyboard dismissal to allow tap event to complete first
+          setTimeout(() => {
+            Keyboard.dismiss();
+          }, 0);
         }}
         className={`flex-row items-center gap-3 py-3 ${
           index < busResults.length - 1 ? 'border-b border-neutral-200' : ''
@@ -202,8 +208,11 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
         <Pressable
           key={place.place_id}
           onPress={() => {
-            Keyboard.dismiss();
             onGooglePlacePress(place);
+            // Defer keyboard dismissal to allow tap event to complete first
+            setTimeout(() => {
+              Keyboard.dismiss();
+            }, 0);
           }}
           style={{
             flexDirection: 'row',
@@ -243,8 +252,11 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       <Pressable
         key={place.place_id}
         onPress={() => {
-          Keyboard.dismiss();
           onGooglePlacePress(place);
+          // Defer keyboard dismissal to allow tap event to complete first
+          setTimeout(() => {
+            Keyboard.dismiss();
+          }, 0);
         }}
         className={`flex-row items-center gap-3 py-3 ${
           index < googlePlaceResults.length - 1
