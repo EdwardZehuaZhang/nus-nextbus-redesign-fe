@@ -180,7 +180,9 @@ type RecentSearchItem = {
 type PopularSearchItem = {
   id: string;
   title: string;
-  image: string;
+  image: string | number;
+  destinationLat?: string;
+  destinationLng?: string;
 };
 
 const popularSearches: PopularSearchItem[] = [
@@ -205,32 +207,31 @@ const popularSearches: PopularSearchItem[] = [
   {
     id: '4',
     title: 'Science Library',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    image: require('../../../assets/images/medicine-science-library.jpg'),
+    destinationLat: '1.2959',
+    destinationLng: '103.7810',
   },
   {
     id: '5',
     title: 'Kent Ridge MRT',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    image: require('../../../assets/images/kent-ridge-mrt.jpg'),
   },
   {
     id: '6',
     title: 'Central Library',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    image: require('../../../assets/images/central-library.png'),
   },
   {
     id: '7',
-    title: 'Engineering Library',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    title: 'Law Library',
+    image: require('../../../assets/images/law-library.jpg'),
+    destinationLat: '1.3188',
+    destinationLng: '103.8182',
   },
   {
     id: '8',
     title: 'COM3 Building',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    image: require('../../../assets/images/COM3-building.avif'),
   },
 ];
 
@@ -569,7 +570,7 @@ const PopularSearchCard = ({
     >
       <View className="relative h-[116px] overflow-hidden rounded-md">
         <Image
-          source={{ uri: item.image }}
+          source={item.image}
           contentFit="cover"
           className="absolute inset-0 size-full"
           style={{ borderRadius: '6px' }}
@@ -1234,12 +1235,17 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
 
   const renderPopularItem = (item: PopularSearchItem) => {
     const handleNavPress = () => {
+      Keyboard.dismiss();
       router.push({
         pathname: '/navigation' as any,
-        params: { 
+        params: {
           destination: item.title.replace('\n', ' '),
           userLat: userLocation?.latitude?.toString(),
           userLng: userLocation?.longitude?.toString(),
+          ...(item.destinationLat && item.destinationLng ? {
+            destinationLat: item.destinationLat,
+            destinationLng: item.destinationLng,
+          } : {}),
         },
       });
     };
@@ -1281,6 +1287,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
         contentContainerStyle={{ gap: 8, paddingRight: 20 }}
         style={{ marginLeft: -20, marginRight: -20, paddingLeft: 20 }}
       >
@@ -1333,7 +1340,7 @@ const SearchContent = ({ onCancel }: { onCancel: () => void }) => {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
       >
         {searchText.trim().length > 0 ? (
           <SearchResults

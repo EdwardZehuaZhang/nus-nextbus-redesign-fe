@@ -2,7 +2,7 @@ import polyline from '@mapbox/polyline';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Animated, TextInput, Platform, ActivityIndicator, Dimensions, Keyboard } from 'react-native';
+import { Animated, TextInput, Platform, ActivityIndicator, Dimensions, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -728,16 +728,16 @@ export default function NavigationPage() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
-  // Log panel state changes
-  useEffect(() => {
-  }, [panelState]);
+
+  const SEARCH_PANEL_HEIGHT = 70;
+  const isSearchModeActive = panelState !== 'closed' || isKeyboardVisible;
 
   // Always expand sheet when entering search/animating state
   useEffect(() => {
-    if (panelState === 'animating') {
-      snapToHeight(MAX_HEIGHT);
+    if (panelState === 'animating' || panelState === 'expanded') {
+      snapToHeight(SEARCH_PANEL_HEIGHT);
     }
-  }, [panelState, MAX_HEIGHT, snapToHeight]);
+  }, [panelState, SEARCH_PANEL_HEIGHT, snapToHeight]);
 
   // Clear selection state when panel fully closes
   useEffect(() => {
@@ -750,7 +750,8 @@ export default function NavigationPage() {
   const searchPanelAnimation = React.useRef(new Animated.Value(0)).current;
 
   // Use drag handlers for the bottom sheet
-  const effectiveMinHeight = panelState !== 'closed' || isKeyboardVisible ? 39 : 5;
+  const effectiveMinHeight = isSearchModeActive ? SEARCH_PANEL_HEIGHT : 5;
+  const effectiveMaxHeight = isSearchModeActive ? SEARCH_PANEL_HEIGHT : 75;
   const {
     containerHeight,
     handleDrag,
@@ -762,11 +763,12 @@ export default function NavigationPage() {
     isDragging,
     snapToHeight,
     constants: { MAX_HEIGHT, DEFAULT_HEIGHT },
-  } = useDragHandlers({ minHeight: effectiveMinHeight, defaultHeight: 39, maxHeight: 75 });
+  } = useDragHandlers({ minHeight: effectiveMinHeight, defaultHeight: 39, maxHeight: effectiveMaxHeight });
 
   // Keep sheet above keyboard and dismiss on first tap
+  // Disable autoExpand when search mode is active since height is CSS-fixed
   useKeyboardAwareInteraction({
-    autoExpand: true,
+    autoExpand: !isSearchModeActive,
     maxHeight: MAX_HEIGHT,
     snapToHeight,
     onKeyboardShow: (height) => {
@@ -779,18 +781,14 @@ export default function NavigationPage() {
     },
   });
 
-  // If min height increases (search/keyboard), snap up to avoid being stuck below default
+  // If min height increases (non-search mode), snap up to avoid being stuck below default
+  // Skip in search mode since height is CSS-fixed and doesn't depend on containerHeight
   useEffect(() => {
-    if (containerHeight < effectiveMinHeight) {
+    if (!isSearchModeActive && containerHeight < effectiveMinHeight) {
       snapToHeight(Math.max(effectiveMinHeight, DEFAULT_HEIGHT));
     }
-  }, [containerHeight, effectiveMinHeight, DEFAULT_HEIGHT, snapToHeight]);
+  }, [isSearchModeActive, containerHeight, effectiveMinHeight, DEFAULT_HEIGHT, snapToHeight]);
   
-  // Log containerHeight changes to see if it's affecting the animation
-  useEffect(() => {
-    if (panelState === 'expanded') {
-    }
-  }, [containerHeight, panelState]);
 
   // Use global location hook
   const { coords: globalUserLocation } = useLocation();
@@ -1072,10 +1070,10 @@ export default function NavigationPage() {
         resetEditingState();
         setPanelState('closed');
         setSearchText('');
-        // Defer keyboard dismissal to allow UI updates to complete first
-        setTimeout(() => {
+        // Dismiss keyboard after React completes its state updates
+        requestAnimationFrame(() => {
           Keyboard.dismiss();
-        }, 0);
+        });
       } else {
         console.error('[NAV GOOGLE PLACE] ❌ Backend API error:', placeDetailsData.status);
       }
@@ -1539,6 +1537,9 @@ export default function NavigationPage() {
   };
 
   const handleRemoveLocation = (id: string) => {
+    if (editingLocationId === id) {
+      closeSearchPanel();
+    }
     setLocations(locations.filter((loc) => loc.id !== id));
   };
 
@@ -1580,7 +1581,20 @@ export default function NavigationPage() {
     setActiveStopId(null);
   }, []);
 
+  const closeSearchPanel = React.useCallback(() => {
+    resetEditingState();
+    setPanelState('closed');
+    setSearchText('');
+    requestAnimationFrame(() => {
+      Keyboard.dismiss();
+    });
+  }, [resetEditingState]);
+
   const startEditingLocation = React.useCallback((location: LocationItem) => {
+    if (editingLocationId === location.id) {
+      closeSearchPanel();
+      return;
+    }
     const mode = location.type === 'stop' ? 'stop' : location.type === 'destination' ? 'destination' : 'origin';
     setSearchMode(mode);
     if (location.type === 'stop') {
@@ -1595,7 +1609,7 @@ export default function NavigationPage() {
       setPanelState('animating');
     }
     snapToHeight(MAX_HEIGHT);
-  }, [MAX_HEIGHT, panelState, snapToHeight]);
+  }, [MAX_HEIGHT, closeSearchPanel, editingLocationId, panelState, snapToHeight]);
 
   const setSearchTextAndSync = React.useCallback((text: string) => {
     setSearchText(text);
@@ -1878,10 +1892,10 @@ export default function NavigationPage() {
     resetEditingState();
     setPanelState('closed');
     setSearchText('');
-    // Defer keyboard dismissal to allow UI updates to complete first
-    setTimeout(() => {
+    // Dismiss keyboard after React completes its state updates
+    requestAnimationFrame(() => {
       Keyboard.dismiss();
-    }, 0);
+    });
   };
 
   // Show X and drag icons when there are 3+ locations (origin + at least 1 stop + destination)
@@ -2074,7 +2088,7 @@ export default function NavigationPage() {
       <View className="flex-1" style={{ overflow: 'visible' }}>
         {!DISABLE_MAP_ENTIRELY ? (
           <InteractiveMap
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}
             routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
             routeSteps={stableRouteSteps}
             internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
@@ -2122,6 +2136,8 @@ export default function NavigationPage() {
             paddingHorizontal: 20,
             boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
             elevation: 2,
+            position: 'relative',
+            zIndex: 2,
           }}
         >
           {/* Render All Locations */}
@@ -2271,20 +2287,21 @@ export default function NavigationPage() {
           </Pressable>
         </View>
 
-        {/* Backdrop/Shading - only appears when in search mode */}
+        {/* Backdrop/Shading - only appears when in search mode, tapping dismisses */}
         {(panelState === 'animating' || panelState === 'expanded') && (
-          <Animated.View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.4)',
-              pointerEvents: 'none', // Allow touches to pass through
-              transition: 'background-color 0.3s ease',
-            } as any}
-          />
+          <TouchableWithoutFeedback onPress={closeSearchPanel}>
+            <View
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                zIndex: 1,
+              }}
+            />
+          </TouchableWithoutFeedback>
         )}
 
         {/* Journey Details Card */}
@@ -2313,9 +2330,13 @@ export default function NavigationPage() {
               inputRange: [0, 1],
               outputRange: [5, 10],
             }) as any,
-            maxHeight: `${containerHeight}%`, // Use state directly, not animated interpolation
+            ...(isSearchModeActive
+              ? { height: `${SEARCH_PANEL_HEIGHT}%` }
+              : { maxHeight: `${containerHeight}%` }),
+            zIndex: 2,
           }}
           onTouchStart={(e: any) => {
+            if (isSearchModeActive) return;
             const touch = e.nativeEvent.touches?.[0];
             if (touch && dragStartY && isDragging && dragStartTime) {
               dragStartY.current = touch.pageY;
@@ -2324,6 +2345,7 @@ export default function NavigationPage() {
             }
           }}
           onTouchMove={(e: any) => {
+            if (isSearchModeActive) return;
             if (!isDragging || !isDragging.current) return;
             const touch = e.nativeEvent.touches?.[0];
             if (touch && dragStartY) {
@@ -2332,6 +2354,7 @@ export default function NavigationPage() {
             }
           }}
           onTouchEnd={(e: any) => {
+            if (isSearchModeActive) return;
             if (!isDragging || !isDragging.current) return;
             const touch = e.nativeEvent.changedTouches?.[0];
             if (touch && dragStartY && dragStartTime) {
