@@ -6,7 +6,7 @@ export type DayType = 'Mon-Fri' | 'Sat' | 'Sun/PH';
 
 export type ScheduleType = 'Term' | 'Vacation';
 
-export type RouteCode = 'A1' | 'A2' | 'D1' | 'D2' | 'BTC' | 'L' | 'E' | 'K' | 'R1' | 'R2' | 'P';
+export type RouteCode = 'A1' | 'A2' | 'D1' | 'D2' | 'K' | 'R1' | 'R2' | 'P';
 
 export type BusStopCode =
   | 'PGP'

@@ -49,7 +49,6 @@ import {
 import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
 import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
 import { useKeyboardAwareInteraction } from '@/lib/hooks/use-keyboard-aware-interaction';
-import { InternalRoutesSection } from '@/components/internal-route-card';
 import type { InternalBusRoute } from '@/lib/route-finding';
 import { createInternalRoutePolylines } from '@/lib/route-polylines';
 import {
@@ -667,7 +666,6 @@ export default function NavigationPage() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
-  const [selectedInternalRoute, setSelectedInternalRoute] = useState<InternalBusRoute | null>(null);
   const [showIntermediateStops, setShowIntermediateStops] = useState(false); // State for expanding bus stops
   
   // Wait for navigation to be ready before using router.setParams
@@ -764,6 +762,8 @@ export default function NavigationPage() {
     snapToHeight,
     constants: { MAX_HEIGHT, DEFAULT_HEIGHT },
   } = useDragHandlers({ minHeight: effectiveMinHeight, defaultHeight: 39, maxHeight: effectiveMaxHeight });
+
+  const isPanelExpanded = isSearchModeActive || containerHeight >= MAX_HEIGHT - 1;
 
   // Keep sheet above keyboard and dismiss on first tap
   // Disable autoExpand when search mode is active since height is CSS-fixed
@@ -2373,8 +2373,8 @@ export default function NavigationPage() {
             onTap={handleTap}
           />
           <ScrollView
-            scrollEnabled={containerHeight > 50}
-            showsVerticalScrollIndicator={containerHeight > 50}
+            scrollEnabled={isPanelExpanded}
+            showsVerticalScrollIndicator={isPanelExpanded}
             style={{ marginTop: 12, paddingHorizontal: 12, marginHorizontal: -12 }}
             contentContainerStyle={{ paddingBottom: 20 }}
             keyboardShouldPersistTaps="always"
@@ -3784,20 +3784,7 @@ export default function NavigationPage() {
               ) : null}
             </View>
 
-            {/* Internal Shuttle Routes Section - Shows AS alternative if Google Maps is shown */}
-            {!isLoadingRoutes && !isLoadingInternalRoutes && !routeError && routes.length > 0 && internalRoutes.length > 0 && !showInternal && !hasIntermediateStops && (
-              <InternalRoutesSection
-                routes={internalRoutes}
-                bestRoute={bestInternalRoute}
-                recommendInternal={showInternal}
-                googleMapsTimeSeconds={googleMapsTime}
-                isLoading={isLoadingInternalRoutes}
-                onSelectRoute={(route) => {
-                  setSelectedInternalRoute(route);
-                  // Optionally show the selected route on the map or expand details
-                }}
-              />
-            )}
+
 
             {/* Divider */}
             <View

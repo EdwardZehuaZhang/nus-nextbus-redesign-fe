@@ -189,20 +189,17 @@ const popularSearches: PopularSearchItem[] = [
   {
     id: '1',
     title: 'UTown\n#NUS Sign',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/b856d37c98b5af1af81ac3776772df08e3da947a?width=308',
+    image: require('../../../assets/images/utown-nus-sign.png'),
   },
   {
     id: '2',
     title: 'Lee Kong Chian Natural History Museum',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/3a44d7def88d02e89437d93d830cf08200a94a57?width=308',
+    image: require('../../../assets/images/lee-kong-chian-natural-history-museum.png'),
   },
   {
     id: '3',
     title: 'UTown Infinite Pool',
-    image:
-      'https://api.builder.io/api/v1/image/assets/TEMP/de1ff172d6adc72d6aa8416033cfbdae50b02a86?width=308',
+    image: require('../../../assets/images/utown-infinity-pool.png'),
   },
   {
     id: '4',
@@ -576,6 +573,7 @@ const PopularSearchCard = ({
           style={{ borderRadius: '6px' }}
           placeholder={undefined}
         />
+        <View className="absolute inset-0" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }} />
         <View className="absolute inset-x-0 bottom-0 p-3">
           <Text className="text-lg font-bold leading-tight text-white">
             {item.title}
@@ -1005,8 +1003,13 @@ const NearestStopsSection = ({
       return;
     }
 
+    // List of obsolete routes to skip prefetching
+    const OBSOLETE_ROUTES = ['BTC', 'E', 'L'];
+
     // Extract route codes from currentBusRoutes
-    const routeCodes = currentBusRoutes.map(route => route.route as any);
+    const routeCodes = currentBusRoutes
+      .map(route => route.route as any)
+      .filter(routeCode => !OBSOLETE_ROUTES.includes(routeCode));
 
     // Prefetch bus data for each route
     routeCodes.forEach((routeCode) => {
@@ -1017,7 +1020,12 @@ const NearestStopsSection = ({
       }).then(() => {
         console.log(`[🚌 BUS PREFETCH] ✅ Prefetched bus data for route: ${routeCode}`);
       }).catch((error) => {
-        console.error(`[🚌 BUS PREFETCH] ❌ Failed to prefetch bus data for route ${routeCode}:`, error);
+        // Silently ignore errors for obsolete or unavailable routes
+        if (error?.response?.status === 500) {
+          console.log(`[🚌 BUS PREFETCH] ⚠️ Route ${routeCode} unavailable (possibly obsolete)`);
+        } else {
+          console.error(`[🚌 BUS PREFETCH] ❌ Failed to prefetch bus data for route ${routeCode}:`, error);
+        }
       });
     });
   }, [currentBusRoutes, queryClient]);
