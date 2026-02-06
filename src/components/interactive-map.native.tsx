@@ -1609,13 +1609,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     const pre = codes.map((routeCode) => {
       const checkpoints = (routeCheckpointsData as Record<string, any>)[routeCode] || [];
       
-      // OPTIMIZATION 1: Douglas-Peucker simplification with epsilon ~5m
-      // Reduces P route from 1500+ points to 300-400 (70-80% reduction)
+      // OPTIMIZATION 1: Douglas-Peucker simplification with epsilon ~10m
+      // Reduces P route from 1500+ points to ~200-350 (80-85% reduction)
       const points = checkpoints.map((pt: any) => ({
         x: pt.longitude,
         y: pt.latitude,
       }));
-      const SIMPLIFICATION_EPSILON = 0.00005; // ~5 meters on ground
+      const SIMPLIFICATION_EPSILON = 0.0001; // ~10 meters on ground
       const simplified = simplify(points, SIMPLIFICATION_EPSILON, true);
       
       const coordinates = simplified.map((pt: any) => ({
