@@ -24,6 +24,7 @@ import type { CanteenVenue } from '@/data/canteens';
 import { NUS_SPORTS_FACILITIES, type SportsFacility, getSportsFacilityColor } from '@/data/sports-facilities';
 import { createCircularMarkerSVG, svgToDataURL as circularSvgToDataURL } from '@/components/circular-marker-icon';
 import routeCheckpointsData from '@/data/route-checkpoints.json';
+import { getBusArrowRotation } from '@/lib/bus-direction';
 import { Env } from '@/lib/env';
 import { useLocation } from '@/lib/hooks/use-location';
 import { getTransitLineColor, PUBLIC_BUS_COLOR } from '@/lib/transit-colors';
@@ -335,82 +336,6 @@ const loadGoogleMapsScript = (): Promise<void> => {
   });
 };
 
-/**
- * Calculate bearing (angle) from one point to another
- * @param from - Starting coordinate {lat, lng}
- * @param to - Ending coordinate {lat, lng}
- * @returns Bearing in degrees (0-360, where 0 is North, 90 is East, 180 is South, 270 is West)
- */
-const calculateBearing = (
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number }
-): number => {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
-
-  const lat1 = toRadians(from.lat);
-  const lat2 = toRadians(to.lat);
-  const dLng = toRadians(to.lng - from.lng);
-
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-
-  const bearing = toDegrees(Math.atan2(y, x));
-  
-  // Convert to 0-360 range
-  return (bearing + 360) % 360;
-};
-
-/**
- * Find the nearest upcoming checkpoint for a bus along its route
- * @param busPos - Current bus position {lat, lng}
- * @param checkpoints - Array of route checkpoints
- * @param direction - Bus direction (1 = forward, 2 = reverse)
- * @returns Next checkpoint or null if not found
- */
-const findNextCheckpoint = (
-  busPos: { lat: number; lng: number },
-  checkpoints: { latitude: number; longitude: number }[],
-  direction: 1 | 2
-): { lat: number; lng: number } | null => {
-  if (!checkpoints || checkpoints.length === 0) return null;
-
-  // For reverse direction, reverse the checkpoint array
-  const orderedCheckpoints =
-    direction === 2 ? [...checkpoints].reverse() : checkpoints;
-
-  // Find the closest checkpoint ahead of the bus
-  let minDistance = Infinity;
-  let closestIndex = -1;
-
-  orderedCheckpoints.forEach((checkpoint, index) => {
-    const distance = Math.sqrt(
-      Math.pow(checkpoint.latitude - busPos.lat, 2) +
-        Math.pow(checkpoint.longitude - busPos.lng, 2)
-    );
-
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestIndex = index;
-    }
-  });
-
-  // Return the next checkpoint after the closest one
-  if (closestIndex !== -1 && closestIndex < orderedCheckpoints.length - 1) {
-    const nextCheckpoint = orderedCheckpoints[closestIndex + 1];
-    return { lat: nextCheckpoint.latitude, lng: nextCheckpoint.longitude };
-  }
-
-  // If we're at the last checkpoint, return the last one
-  if (closestIndex === orderedCheckpoints.length - 1) {
-    const checkpoint = orderedCheckpoints[closestIndex];
-    return { lat: checkpoint.latitude, lng: checkpoint.longitude };
-  }
-
-  return null;
-};
 
 // Create marker with custom color
 const createMarker = ({
@@ -4182,19 +4107,11 @@ const useBusMarkers = (
       const flipHorizontal = direction === 2;
 
       // Calculate arrow rotation based on next checkpoint
-      let arrowRotation = 0; // Default to pointing right (East)
-      const nextCheckpoint = findNextCheckpoint(
+      const arrowRotation = getBusArrowRotation(
         { lat, lng },
         checkpoints,
         direction
       );
-      
-      if (nextCheckpoint) {
-        // Calculate bearing from bus to next checkpoint
-        const bearing = calculateBearing({ lat, lng }, nextCheckpoint);
-        // Convert bearing to SVG rotation (bearing: 0°=North, 90°=East; SVG: 0°=East, 90°=South)
-        arrowRotation = bearing - 90;
-      }
 
       const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
       const iconUrl = svgToDataURL(iconSvg);
@@ -4432,17 +4349,11 @@ const useFilteredBusRoutes = (
         const flipHorizontal = direction === 2;
         
         // Calculate arrow rotation based on next checkpoint
-        let arrowRotation = 0;
-        const nextCheckpoint = findNextCheckpoint(
+        const arrowRotation = getBusArrowRotation(
           { lat, lng },
           checkpoints,
           direction
         );
-        
-        if (nextCheckpoint) {
-          const bearing = calculateBearing({ lat, lng }, nextCheckpoint);
-          arrowRotation = bearing - 90;
-        }
 
         const iconSvg = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
         const iconUrl = svgToDataURL(iconSvg);

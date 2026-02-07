@@ -70,16 +70,17 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { Circle, G, Path, Text as SvgText, SvgXml } from 'react-native-svg';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
 import debounce from 'lodash.debounce';
+import { calculateBearing, findNextCheckpoint } from '@/lib/bus-direction';
 import { useMapClustering } from '@/lib/hooks/use-map-clustering';
 import { ClusterCircle } from '@/components/map/cluster-circle';
+import { BusMarkerIcon } from '@/components/bus-marker-icon.native';
 
 import type { RouteCode } from '@/api/bus';
 import { useBusStops, useActiveBuses, useCheckpoints } from '@/api/bus';
 // Removed getRouteColor import; using explicit mapping to match web
 import type { LatLng } from '@/api/google-maps';
-import { createBusMarkerSVG } from '@/components/bus-marker-icon';
 import { useLocation } from '@/lib/hooks/use-location';
 import { getTransitLineColor } from '@/lib/transit-colors';
 import { getPlaceDetails } from '@/api/google-maps/places';
@@ -148,32 +149,6 @@ const createClickDebouncer = (delayMs: number = 300) => {
 };
 
 /**
- * Calculate bearing between two coordinates
- * @param from - Starting coordinate {lat, lng}
- * @param to - Ending coordinate {lat, lng}
- * @returns Bearing in degrees (0-360, where 0 is North, 90 is East, 180 is South, 270 is West)
- */
-const calculateBearing = (
-  from: { lat: number; lng: number },
-  to: { lat: number; lng: number }
-): number => {
-  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-  const toDegrees = (radians: number) => (radians * 180) / Math.PI;
-
-  const lat1 = toRadians(from.lat);
-  const lat2 = toRadians(to.lat);
-  const dLng = toRadians(to.lng - from.lng);
-
-  const y = Math.sin(dLng) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-
-  const bearing = toDegrees(Math.atan2(y, x));
-  return (bearing + 360) % 360;
-};
-
-/**
  * Create a cache key for bearing calculations to memoize results
  * Rounds coordinates to 4 decimal places (~11 meters precision)
  */
@@ -183,51 +158,6 @@ const createBearingCacheKey = (
 ): string => {
   const round = (n: number) => Math.round(n * 10000) / 10000;
   return `${round(from.lat)},${round(from.lng)}-${round(to.lat)},${round(to.lng)}`;
-};
-
-/**
- * Find the nearest upcoming checkpoint for a bus
- * @param busPos - Current bus position {lat, lng}
- * @param checkpoints - Array of route checkpoints
- * @param direction - Bus direction (1 = forward, 2 = reverse)
- * @returns Next checkpoint or null
- */
-const findNextCheckpoint = (
-  busPos: { lat: number; lng: number },
-  checkpoints: { latitude: number; longitude: number }[],
-  direction: 1 | 2
-): { lat: number; lng: number } | null => {
-  if (!checkpoints || checkpoints.length === 0) return null;
-
-  const orderedCheckpoints =
-    direction === 2 ? [...checkpoints].reverse() : checkpoints;
-
-  let minDistance = Infinity;
-  let closestIndex = -1;
-
-  orderedCheckpoints.forEach((checkpoint, index) => {
-    const distance = Math.sqrt(
-      Math.pow(checkpoint.latitude - busPos.lat, 2) +
-        Math.pow(checkpoint.longitude - busPos.lng, 2)
-    );
-
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestIndex = index;
-    }
-  });
-
-  if (closestIndex !== -1 && closestIndex < orderedCheckpoints.length - 1) {
-    const nextCheckpoint = orderedCheckpoints[closestIndex + 1];
-    return { lat: nextCheckpoint.latitude, lng: nextCheckpoint.longitude };
-  }
-
-  if (closestIndex === orderedCheckpoints.length - 1) {
-    const checkpoint = orderedCheckpoints[closestIndex];
-    return { lat: checkpoint.latitude, lng: checkpoint.longitude };
-  }
-
-  return null;
 };
 
 import {
@@ -859,6 +789,69 @@ const AreaLabelMarker = React.memo<AreaLabelMarkerProps>(({
 });
 
 AreaLabelMarker.displayName = 'AreaLabelMarker';
+
+interface LiveBusMarkerProps {
+  markerKey: string;
+  coordinate: { latitude: number; longitude: number };
+  color: string;
+  flipHorizontal: boolean;
+  arrowRotation: number;
+}
+
+// Live bus marker with tracksViewChanges pulse to ensure SVG rotation updates render
+const LiveBusMarker = React.memo<LiveBusMarkerProps>(({ markerKey, coordinate, color, flipHorizontal, arrowRotation }) => {
+  const [trackChanges, setTrackChanges] = React.useState(true);
+  const prevRotationRef = React.useRef(arrowRotation);
+  const prevFlipRef = React.useRef(flipHorizontal);
+  const prevColorRef = React.useRef(color);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => setTrackChanges(false), 250);
+    return () => clearTimeout(t);
+  }, []);
+
+  React.useEffect(() => {
+    if (
+      prevRotationRef.current !== arrowRotation ||
+      prevFlipRef.current !== flipHorizontal ||
+      prevColorRef.current !== color
+    ) {
+      setTrackChanges(true);
+      const t = setTimeout(() => setTrackChanges(false), 250);
+      prevRotationRef.current = arrowRotation;
+      prevFlipRef.current = flipHorizontal;
+      prevColorRef.current = color;
+      return () => clearTimeout(t);
+    }
+  }, [arrowRotation, flipHorizontal, color]);
+
+  return (
+    <Marker
+      key={markerKey}
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={trackChanges}
+      zIndex={100}
+    >
+      <View
+        style={{
+          width: 28,
+          height: 28,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <BusMarkerIcon
+          color={color}
+          flipHorizontal={flipHorizontal}
+          arrowRotation={arrowRotation}
+        />
+      </View>
+    </Marker>
+  );
+});
+
+LiveBusMarker.displayName = 'LiveBusMarker';
 
 // OPTIMIZATION 4: Memoized polyline component to prevent re-renders on parent state changes
 // Only re-renders when route visibility, coordinates, or color actually change
@@ -3148,67 +3141,64 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         {effectiveActiveRoute && activeBuses.map((bus: any, idx: number) => {
           if (!bus.lat || !bus.lng) return null;
 
-          // Calculate bearing using proper checkpoint data with memoization
+          // Determine arrow rotation
+          const rawDirection = bus.direction as number;
+          const hasHeading = typeof rawDirection === 'number' && rawDirection > 2;
           let bearing = 0; // Default to pointing right (East)
-          const nextCheckpoint = findNextCheckpoint(
-            { lat: bus.lat, lng: bus.lng },
-            checkpoints,
-            bus.direction
-          );
+          let arrowRotation = 0;
+          let flipHorizontal = false;
 
-          if (nextCheckpoint) {
-            const cacheKey = createBearingCacheKey(
+          if (hasHeading) {
+            // If API provides heading in degrees, use it directly
+            arrowRotation = rawDirection - 90;
+          } else {
+            // Otherwise, calculate bearing using checkpoints and direction (1/2)
+            const nextCheckpoint = findNextCheckpoint(
               { lat: bus.lat, lng: bus.lng },
-              nextCheckpoint
+              checkpoints,
+              bus.direction
             );
 
-            // Check cache first to avoid recalculating
-            if (bearingCacheRef.current.has(cacheKey)) {
-              bearing = bearingCacheRef.current.get(cacheKey)!;
-            } else {
-              // Calculate and cache the bearing
-              bearing = calculateBearing(
+            if (nextCheckpoint) {
+              const cacheKey = createBearingCacheKey(
                 { lat: bus.lat, lng: bus.lng },
                 nextCheckpoint
               );
-              bearingCacheRef.current.set(cacheKey, bearing);
+
+              // Check cache first to avoid recalculating
+              if (bearingCacheRef.current.has(cacheKey)) {
+                bearing = bearingCacheRef.current.get(cacheKey)!;
+              } else {
+                // Calculate and cache the bearing
+                bearing = calculateBearing(
+                  { lat: bus.lat, lng: bus.lng },
+                  nextCheckpoint
+                );
+                bearingCacheRef.current.set(cacheKey, bearing);
+              }
             }
+
+            flipHorizontal = bus.direction === 2;
+            arrowRotation = bearing - 90; // Convert bearing to SVG rotation
           }
-
-          // Create SVG marker matching web version (28x28)
-          const flipHorizontal = bus.direction === 2;
-          const arrowRotation = bearing - 90; // Convert bearing to SVG rotation
-          const svgXml = createBusMarkerSVG(routeColor, flipHorizontal, arrowRotation);
-
           // Debug first bus bearing
           if (idx === 0 && effectiveActiveRoute) {
             console.log(
-              `🚌 [BUS] Route ${effectiveActiveRoute}: bearing=${bearing.toFixed(1)}°, arrow=${arrowRotation.toFixed(1)}°, dir=${bus.direction}`
+              `🚌 [BUS] Route ${effectiveActiveRoute}: bearing=${bearing.toFixed(1)}°, arrow=${arrowRotation.toFixed(1)}°, dir=${rawDirection}, mode=${hasHeading ? 'heading' : 'checkpoints'}`
             );
           }
 
           return (
-            <Marker
-              key={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
+            <LiveBusMarker
+              markerKey={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
               coordinate={{
                 latitude: bus.lat,
                 longitude: bus.lng,
               }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              zIndex={100}
-            >
-              <View
-                style={{
-                  width: 28,
-                  height: 28,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <SvgXml xml={svgXml} width={28} height={28} />
-              </View>
-            </Marker>
+              color={routeColor}
+              flipHorizontal={flipHorizontal}
+              arrowRotation={arrowRotation}
+            />
           );
         })}
       </MapView>

@@ -28,3 +28,4 @@ expo-env.d.ts
 # Environment files — keep real secrets out of git
 .env.*
 !.env.example
+.vercel

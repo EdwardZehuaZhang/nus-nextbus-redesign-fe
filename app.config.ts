@@ -32,7 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: 'nus-nextbus',
   version: Env.VERSION.toString(),
   orientation: 'portrait',
-  icon: './assets/icon.png',
+  icon: './assets/app-icons/icon.png',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   updates: {
@@ -45,6 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: Env.BUNDLE_ID,
     buildNumber: '3',
+    icon: './assets/app-icons/icon.png',
     privacyManifests: applePrivacyManifest,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -52,6 +53,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         'This app needs your location to show nearby bus stops and help you navigate to them.',
       NSUserNotificationUsageDescription:
         'This app uses notifications to remind you when it is time to leave.',
+      // Preserve custom app icon variants (dark/tinted)
+      CFBundleIcons: {
+        CFBundlePrimaryIcon: {
+          CFBundleIconFiles: ['AppIcon'],
+          UIPrerenderedIcon: false,
+        },
+      },
     },
     config: {
       googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -112,7 +120,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-localization',
     'expo-router',
-    ['app-icon-badge', appIconBadgeConfig],
+    // Only use app-icon-badge in non-production to avoid overwriting custom icon variants
+    ...(Env.APP_ENV !== 'production' ? [['app-icon-badge', appIconBadgeConfig]] : []),
     ['react-native-edge-to-edge'],
   ],
   extra: {
