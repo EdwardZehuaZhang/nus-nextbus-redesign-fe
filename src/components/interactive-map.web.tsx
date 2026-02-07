@@ -139,6 +139,7 @@ interface InteractiveMapProps {
   showMapControls?: boolean; // Control map type/layer controls visibility (default true)
   showBusStops?: boolean; // Control bus stop markers visibility (default false)
   visibleBusStops?: string[]; // Array of bus stop short names to display (if provided, only these stops will be shown)
+  visibleBusStopsColor?: string; // Optional color override for visible bus stops (internal routes)
   mapFilters?: Record<string, boolean>; // External map filters state
   onMapFiltersChange?: (filters: Record<string, boolean>) => void; // Callback when filters change
   onMapTypeChangeReady?: (
@@ -3650,6 +3651,7 @@ const useBusStopMarkers = (
   showBusStops: boolean,
   activeRoute?: RouteCode | null,
   routeColor?: string,
+  visibleBusStopsColor?: string,
   visibleBusStops?: string[], // Optional array of stop names to show
   onBusStopSelected?: (stop: BusStop) => void,
   selectedStopId?: string | null
@@ -3681,6 +3683,7 @@ const useBusStopMarkers = (
 
     const map = mapRef.current;
     const busStops = busStopsData.BusStopsResult.busstops;
+    const visibleBusStopsSet = new Set(visibleBusStops ?? []);
 
     // Get the pickup points for the active route (stops that belong to this route)
     const routeStopNames = new Set<string>();
@@ -3775,6 +3778,9 @@ const useBusStopMarkers = (
       if (visibleBusStops && visibleBusStops.length > 0) {
         const visibleStopsSet = new Set(visibleBusStops);
         
+        console.log('🚌 [MAP DEBUG] visibleBusStops:', visibleBusStops);
+        console.log('🚌 [MAP DEBUG] labelMarkers count:', labelMarkersRef.current.length);
+        
         // Handle circle markers - show only specified stops when zoomed in
         circleMarkersRef.current.forEach((marker) => {
           const title = marker.getTitle();
@@ -3786,6 +3792,7 @@ const useBusStopMarkers = (
         labelMarkersRef.current.forEach((marker) => {
           const title = marker.getTitle();
           const isVisible = title ? visibleStopsSet.has(title) : false;
+          console.log('🚌 [MAP DEBUG] Label marker title:', title, 'should show:', isVisible);
           marker.setVisible(isVisible);
         });
         return; // Skip all other logic
@@ -3872,9 +3879,11 @@ const useBusStopMarkers = (
           selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
         const stopColor = isDimmed
           ? '#D1D5DB'
-          : activeRoute && isRouteStop && routeColor
-            ? routeColor
-            : '#274F9C';
+          : visibleBusStopsColor && visibleBusStopsSet.has(stop.ShortName)
+            ? visibleBusStopsColor
+            : activeRoute && isRouteStop && routeColor
+              ? routeColor
+              : '#274F9C';
         const labelBelow = shouldLabelBelow(stop);
         const svgAnchorY = labelBelow ? 5 : 25;
 
@@ -3911,9 +3920,11 @@ const useBusStopMarkers = (
           selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
         const stopColor = isDimmed
           ? '#D1D5DB'
-          : activeRoute && isRouteStop && routeColor
-            ? routeColor
-            : '#274F9C';
+          : visibleBusStopsColor && visibleBusStopsSet.has(stop.ShortName)
+            ? visibleBusStopsColor
+            : activeRoute && isRouteStop && routeColor
+              ? routeColor
+              : '#274F9C';
 
         marker.setIcon({
           path: google.maps.SymbolPath.CIRCLE,
@@ -3970,9 +3981,11 @@ const useBusStopMarkers = (
         selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
       const stopColor = isDimmed
         ? '#D1D5DB'
-        : activeRoute && isRouteStop && routeColor
-          ? routeColor
-          : '#274F9C';
+        : visibleBusStopsColor && visibleBusStopsSet.has(stop.ShortName)
+          ? visibleBusStopsColor
+          : activeRoute && isRouteStop && routeColor
+            ? routeColor
+            : '#274F9C';
 
       // Determine label position based on nearby stops
       const labelBelow = shouldLabelBelow(stop);
@@ -4195,6 +4208,7 @@ const useBusMarkers = (
           scaledSize: new google.maps.Size(28, 28),
           anchor: new google.maps.Point(14, 14), // Center the icon
         },
+        visibleBusStopsColor,
         title: `Bus ${veh_plate}`,
         zIndex: 1000, // Ensure buses appear above routes
       });
@@ -4315,7 +4329,6 @@ const useFilteredBusRoutes = (
     A2: '#E3CE0B', // Yellow (was incorrectly #E87722 orange)
     D1: '#C77DE2',
     D2: '#6F1B6F',
-    BTC: '#EF8136',
     L: '#BFBFBF',
     E: '#00B050',
     K: '#345A9B',
@@ -5680,6 +5693,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   showMapControls = true, // Default to true for backward compatibility
   showBusStops = false, // Default to false for backward compatibility
   visibleBusStops, // Optional array of bus stop names to show
+  visibleBusStopsColor,
   mapFilters: externalMapFilters,
   onMapFiltersChange,
   onMapTypeChangeReady,
@@ -5736,7 +5750,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       'bus-route-a2': false,
       'bus-route-d1': false,
       'bus-route-d2': false,
-      'bus-route-btc': false,
       'bus-route-e': false,
       'bus-route-k': false,
       'bus-route-l': false,
@@ -5913,9 +5926,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Show bus stops if:
   // 1. effectiveActiveRoute is set (from either filter or nearest stops)
   // 2. "bus-stops" radio is selected
+  // 3. visibleBusStops is provided (for internal route display)
   const shouldShowBusStops = effectiveActiveRoute
     ? true
-    : mapFilters['bus-stops'] && showBusStops;
+    : (mapFilters['bus-stops'] && showBusStops) || (visibleBusStops && visibleBusStops.length > 0);
 
   const { mapRef, isMapCreated } = useGoogleMapsInit(
     mapContainerRef,
@@ -5990,7 +6004,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       A2: '#E3CE0B', // Yellow
       D1: '#C77DE2', // Light Purple
       D2: '#6F1B6F', // Dark Purple
-      BTC: '#EF8136', // Orange
       L: '#BFBFBF', // Gray
       E: '#00B050', // Green
       K: '#345A9B', // Blue
@@ -6171,6 +6184,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     shouldShowBusStops,
     effectiveActiveRoute,
     routeColor,
+    visibleBusStopsColor,
     visibleBusStops,
     handleBusStopSelected,
     selectedBusStopId

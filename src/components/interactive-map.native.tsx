@@ -327,6 +327,7 @@ interface InteractiveMapProps {
   showLandmarks?: boolean;
   showMapControls?: boolean;
   visibleBusStops?: string[];
+  visibleBusStopsColor?: string;
   mapFilters?: Record<string, boolean>;
   onMapFiltersChange?: (filters: Record<string, boolean>) => void;
   onMapItemSelect?: (selection: MapSelection | null) => void;
@@ -924,6 +925,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   showLandmarks = true,
   showMapControls: _showMapControls = true,
   visibleBusStops,
+  visibleBusStopsColor,
   mapFilters = {},
   onMapFiltersChange: _onMapFiltersChange,
   routeSteps,
@@ -1397,6 +1399,10 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     }
   };
 
+  const visibleBusStopsSet = React.useMemo(() => {
+    return new Set(visibleBusStops ?? []);
+  }, [visibleBusStops]);
+
   useEffect(() => {
     if (onMapTypeChangeReady) {
       onMapTypeChangeReady((newMapType) => {
@@ -1563,7 +1569,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       A2: '#E3CE0B',
       D1: '#C77DE2',
       D2: '#6F1B6F',
-      BTC: '#EF8136',
       L: '#BFBFBF',
       E: '#00B050',
       K: '#345A9B',
@@ -1830,8 +1835,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   const shouldShowPrinters = (mapFilters?.printers ?? false) && currentZoom !== 14;
   const shouldShowSports = (mapFilters?.sports ?? false) && currentZoom !== 14;
   const shouldShowCanteens = (mapFilters?.canteens ?? false) && currentZoom !== 14;
-  // Fix: Only show bus stops if BOTH showBusStops prop AND filterBusStops are true
-  const shouldShowBusStops = showBusStops && filterBusStops;
+  // Fix: Only show bus stops if BOTH showBusStops prop AND filterBusStops are true, OR if visibleBusStops is provided
+  const shouldShowBusStops = (showBusStops && filterBusStops) || (visibleBusStops && visibleBusStops.length > 0);
   const shouldShowAcademic = filterAcademic;
   const shouldShowResidences = filterResidences;
 
@@ -1877,13 +1882,17 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       // Note: Labels update color via useMemo + a short tracksViewChanges pulse in BusStopLabelMarker.
       // Do NOT change other '#274F9C' occurrences for this purpose.
       let labelColor = '#274F9C';
+      const isVisibleStop = visibleBusStopsSet.has(stopName);
+      if (visibleBusStopsColor && isVisibleStop) {
+        labelColor = visibleBusStopsColor;
+      }
       const isRouteStop = deferredActiveRoute
         ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
         : false;
-      if (deferredActiveRoute && isRouteStop) {
+      if (!visibleBusStopsColor && deferredActiveRoute && isRouteStop) {
         // When a route is active, use its color for member stops
         labelColor = routeColors[deferredActiveRoute] || labelColor;
-      } else if (visibleByRoute) {
+      } else if (!visibleBusStopsColor && visibleByRoute) {
         // Multiple filters active - color by first matching route
         const matchCode = activeBusRouteCodes.find((code) =>
           routeStopMembershipRef.current.get(code)?.has(stopKey)
@@ -1914,6 +1923,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     isStopVisibleForActiveRoutes,
     currentZoom,
     visibleBusStops,
+    visibleBusStopsColor,
+    visibleBusStopsSet,
     routeColors,
     shouldShowStop,
   ]);
@@ -2886,14 +2897,18 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           // Change here if you want a different fallback (when no route color applies).
           // Circles do not remount on color change; avoid key changes to prevent native crashes.
           let circleColor = '#274F9C';
-          if (deferredActiveRoute && isRouteStop) {
+          const isVisibleStop = visibleBusStopsSet.has(stopKey);
+          if (visibleBusStopsColor && isVisibleStop) {
+            circleColor = visibleBusStopsColor;
+          }
+          if (!visibleBusStopsColor && deferredActiveRoute && isRouteStop) {
             // When a route is active, use its color for member stops
             circleColor = routeColors[deferredActiveRoute] || circleColor;
             // Debug sample stops
             if (stop.name === 'Central Library' || stop.name === 'KE7') {
               console.log(`🗺️ [CIRCLE] ${stop.name}: color=${circleColor} (route=${deferredActiveRoute})`);
             }
-          } else if (visibleByRoute) {
+          } else if (!visibleBusStopsColor && visibleByRoute) {
             // Multiple filters active - color by first matching route
             const matchCode = activeBusRouteCodes.find((code) =>
               routeStopMembershipRef.current.get(code)?.has(stopKey)

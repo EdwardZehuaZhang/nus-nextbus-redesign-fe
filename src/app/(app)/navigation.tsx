@@ -898,6 +898,23 @@ export default function NavigationPage() {
     });
   }, [effectiveOrigin, destinationCoords, routes]);
 
+  const destinationMarkerCoords = React.useMemo(() => {
+    if (destinationCoords) return destinationCoords;
+
+    const routeEnd = routes[0]?.legs?.[0]?.endLocation?.latLng;
+    if (
+      routeEnd &&
+      typeof routeEnd.latitude === 'number' &&
+      typeof routeEnd.longitude === 'number' &&
+      !isNaN(routeEnd.latitude) &&
+      !isNaN(routeEnd.longitude)
+    ) {
+      return { lat: routeEnd.latitude, lng: routeEnd.longitude };
+    }
+
+    return null;
+  }, [destinationCoords, routes]);
+
   // Use internal route finder hook
   const {
     routes: internalRoutes,
@@ -1912,7 +1929,6 @@ export default function NavigationPage() {
       A2: '#E3CE0B', // Yellow
       D1: '#C77DE2', // Light Purple
       D2: '#6F1B6F', // Dark Purple
-      BTC: '#EF8136', // Orange
       E: '#00B050', // Green
       K: '#345A9B', // Blue
       L: '#BFBFBF', // Gray
@@ -1952,11 +1968,18 @@ export default function NavigationPage() {
     }
     // Include departure stop (extract code), all intermediate stops, and arrival stop (extract code)
     // Note: departureStop and arrivalStop are BusStop objects, intermediateStops are strings
-    return [
+    const stops = [
       bestInternalRoute.departureStop.code, // Extract code from BusStop object
       ...bestInternalRoute.intermediateStops, // Already strings
       bestInternalRoute.arrivalStop.code, // Extract code from BusStop object
     ];
+    console.log('🚌 [NAV] visibleBusStops calculated:', {
+      departure: bestInternalRoute.departureStop.code,
+      intermediate: bestInternalRoute.intermediateStops,
+      arrival: bestInternalRoute.arrivalStop.code,
+      final: stops,
+    });
+    return stops;
   }, [showInternal, bestInternalRoute]);
 
   // Memoize route steps to prevent MapView child reordering on every render
@@ -2095,10 +2118,11 @@ export default function NavigationPage() {
             forceResetCenter={forceResetCenter}
             showLandmarks={false}
             showMapControls={false}
-            activeRoute={showInternal && bestInternalRoute ? (bestInternalRoute.routeCode as RouteCode) : null}
+            activeRoute={null} // Don't show full route - only show the specific segment via internalRoutePolylines
             showBusStops={showInternal} // Show bus stops when displaying internal route
             visibleBusStops={visibleBusStops} // Only show stops on the internal route
             enablePlaceDetails={false} // Disable place details on navigation page
+            destination={destinationMarkerCoords ?? undefined} // Show destination pin marker
             mapFilters={{
               important: true,
               'bus-stops': false,
@@ -2108,8 +2132,6 @@ export default function NavigationPage() {
               'bus-route-a2': false,
               'bus-route-d1': false,
               'bus-route-d2': false,
-              'bus-route-btc': false,
-              'bus-route-e': false,
               'bus-route-k': false,
               'bus-route-l': false,
             }}
@@ -2844,13 +2866,10 @@ export default function NavigationPage() {
               ) : routeError && !bestInternalRoute ? (
                 <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
                   <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
-                    �?Error: {routeError}
+                    Error: {routeError}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
                     Destination: {currentDestination}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#666' }}>
-                    Check the browser console for more details
                   </Text>
                 </View>
               ) : null}
@@ -2912,7 +2931,6 @@ export default function NavigationPage() {
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      marginLeft: -16,
                     }}
                   >
                     <View
@@ -2959,8 +2977,6 @@ export default function NavigationPage() {
                                      bestInternalRoute.routeCode === 'A2' ? '#E3CE0B' : // Yellow
                                      bestInternalRoute.routeCode === 'D1' ? '#C77DE2' : // Light Purple
                                      bestInternalRoute.routeCode === 'D2' ? '#6F1B6F' : // Dark Purple
-                                     bestInternalRoute.routeCode === 'BTC' ? '#EF8136' : // Orange
-                                     bestInternalRoute.routeCode === 'E' ? '#00B050' : // Green
                                      bestInternalRoute.routeCode === 'K' ? '#345A9B' : // Blue
                                      '#BFBFBF'; // L (Gray) or fallback
 

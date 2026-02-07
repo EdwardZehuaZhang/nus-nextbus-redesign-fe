@@ -76,7 +76,6 @@ export const getRouteColor = (
     A2: '#E3CE0B', // Yellow
     D1: '#C77DE2', // Light Purple
     D2: '#6F1B6F', // Dark Purple
-    BTC: '#EF8136', // Orange
     L: '#BFBFBF', // Gray
     E: '#00B050', // Green
     K: '#345A9B', // Blue

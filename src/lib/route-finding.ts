@@ -30,7 +30,7 @@ const WALKING_SPEED = 1.4;
 const BUS_CATCH_BUFFER = 120; // 2 minutes
 
 // All NUS shuttle bus routes
-const SHUTTLE_ROUTES: RouteCode[] = ['A1', 'A2', 'D1', 'D2', 'BTC'];
+const SHUTTLE_ROUTES: RouteCode[] = ['A1', 'A2', 'D1', 'D2'];
 
 export interface BusStop {
   name: string; // API code (e.g., 'YIH', 'CLB')

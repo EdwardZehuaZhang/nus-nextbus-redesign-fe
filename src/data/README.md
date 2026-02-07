@@ -5,7 +5,7 @@ This directory contains a local backup of NUS NextBus route checkpoint data.
 ## Files
 
 ### `route-checkpoints.json`
-Contains GPS checkpoint coordinates for all bus routes (A1, A2, D1, D2, BTC, E, K, L).
+Contains GPS checkpoint coordinates for all bus routes (A1, A2, D1, D2, E, K, L).
 
 **Data structure:**
 ```json
@@ -29,7 +29,6 @@ Contains GPS checkpoint coordinates for all bus routes (A1, A2, D1, D2, BTC, E, 
 - A2: 593 checkpoints
 - D1: 491 checkpoints
 - D2: 751 checkpoints
-- BTC: 1000 checkpoints
 - E: 334 checkpoints
 - K: 681 checkpoints
 - L: 261 checkpoints

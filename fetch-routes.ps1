@@ -1,7 +1,7 @@
 # Script to fetch all bus route checkpoints and save as JSON backup
 $cred = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes("NUSnextbus:13dL?zY,3feWR^`"T"))
 $headers = @{Authorization="Basic $cred"}
-$routes = @('A1', 'A2', 'D1', 'D2', 'BTC', 'E', 'K', 'L')
+$routes = @('A1', 'A2', 'D1', 'D2', 'E', 'K', 'L')
 $allRoutes = @{}
 
 foreach ($route in $routes) {

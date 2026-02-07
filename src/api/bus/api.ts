@@ -33,7 +33,7 @@ export const getBusStops = async (): Promise<BusStopsResponse> => {
 
 /**
  * Get all pickup points (stops) for a specified route
- * @param routeCode - Bus route code (A1, A2, D1, D2, BTC)
+ * @param routeCode - Bus route code (A1, A2, D1, D2)
  */
 export const getPickupPoints = async (
   routeCode: RouteCode

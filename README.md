@@ -29,7 +29,7 @@ NUS NextBus Redesign is a complete overhaul of the NUS Internal Shuttle Bus Serv
 
 - 🗺️ **Interactive Map**: Real-time bus tracking with Google Maps integration
 - 🚏 **Bus Stop Information**: Comprehensive details about all bus stops and routes
-- ⏱️ **Real-time Arrivals**: Live bus arrival times for all routes (A1, A2, D1, D2, BTC, L, E, K)
+- ⏱️ **Real-time Arrivals**: Live bus arrival times for all routes (A1, A2, D1, D2, L, E, K)
 - 🎯 **Route Navigation**: Step-by-step journey planning with walking directions
 - ⭐ **Favorites System**: Save frequently used routes for quick access
 - 🎨 **Route Colors**: Dynamic color-coded routes matching official NUS bus colors
@@ -319,7 +319,7 @@ GET /RouteMinMaxTime       - Route operating hours
 ### ✅ Completed
 
 - [x] Real-time bus tracking with interactive map
-- [x] Multi-route support (A1, A2, D1, D2, BTC, L, E, K)
+- [x] Multi-route support (A1, A2, D1, D2, L, E, K)
 - [x] Dynamic route colors from API
 - [x] Favorites system with persistent storage
 - [x] Search and route planning

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Route visualization with polylines
 
 - **Multi-Route Support**
-  - Support for 8 NUS shuttle routes: A1, A2, D1, D2, BTC, L, E, K
+  - Support for 8 NUS shuttle routes: A1, A2, D1, D2, L, E, K
   - Dynamic route colors from backend API
   - Route-specific information and schedules
 

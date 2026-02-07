@@ -1004,7 +1004,7 @@ const NearestStopsSection = ({
     }
 
     // List of obsolete routes to skip prefetching
-    const OBSOLETE_ROUTES = ['BTC', 'E', 'L'];
+    const OBSOLETE_ROUTES = ['E', 'L'];
 
     // Extract route codes from currentBusRoutes
     const routeCodes = currentBusRoutes
