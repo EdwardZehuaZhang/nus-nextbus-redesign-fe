@@ -334,13 +334,15 @@ const useDragHandlers = (config?: {
   const heightAnimation = React.useRef(new Animated.Value(initialDefault)).current;
 
   // Animate to target height smoothly
-  const animateToHeight = (targetHeight: number) => {
+  const animateToHeight = (targetHeight: number, onComplete?: () => void) => {
     Animated.spring(heightAnimation, {
       toValue: targetHeight,
       useNativeDriver: false,
       tension: 80,
       friction: 12,
-    }).start();
+    }).start(() => {
+      if (onComplete) onComplete();
+    });
   };
 
   // Listen to animation value changes and update state
@@ -460,9 +462,9 @@ const useDragHandlers = (config?: {
     }
   };
 
-  const snapToHeight = (targetHeight: number) => {
+  const snapToHeight = (targetHeight: number, onComplete?: () => void) => {
     setTempHeight(null);
-    animateToHeight(targetHeight);
+    animateToHeight(targetHeight, onComplete);
   };
 
   return {
@@ -716,7 +718,7 @@ export default function NavigationPage() {
   } | null>(null);
   
   // Search panel state - using a single state to track panel position
-  const [panelState, setPanelState] = useState<'closed' | 'animating' | 'expanded'>('closed');
+  const [panelState, setPanelState] = useState<'closed' | 'animating' | 'expanded' | 'closing'>('closed');
   const [searchText, setSearchText] = useState('');
   const [recentSearches, setRecentSearches] = useState<any[]>([]);
   const [searchMode, setSearchMode] = useState<'origin' | 'destination' | 'stop'>('origin'); // Track what we're selecting
@@ -734,8 +736,12 @@ export default function NavigationPage() {
   useEffect(() => {
     if (panelState === 'animating' || panelState === 'expanded') {
       snapToHeight(SEARCH_PANEL_HEIGHT);
+    } else if (panelState === 'closing') {
+      snapToHeight(DEFAULT_HEIGHT, () => {
+        setPanelState('closed');
+      });
     }
-  }, [panelState, SEARCH_PANEL_HEIGHT, snapToHeight]);
+  }, [panelState, SEARCH_PANEL_HEIGHT, snapToHeight, DEFAULT_HEIGHT]);
 
   // Clear selection state when panel fully closes
   useEffect(() => {
@@ -1600,12 +1606,14 @@ export default function NavigationPage() {
 
   const closeSearchPanel = React.useCallback(() => {
     resetEditingState();
-    setPanelState('closed');
     setSearchText('');
+    if (panelState !== 'closed') {
+      setPanelState('closing');
+    }
     requestAnimationFrame(() => {
       Keyboard.dismiss();
     });
-  }, [resetEditingState]);
+  }, [resetEditingState, panelState]);
 
   const startEditingLocation = React.useCallback((location: LocationItem) => {
     if (editingLocationId === location.id) {
@@ -2310,7 +2318,7 @@ export default function NavigationPage() {
         </View>
 
         {/* Backdrop/Shading - only appears when in search mode, tapping dismisses */}
-        {(panelState === 'animating' || panelState === 'expanded') && (
+        {(panelState === 'animating' || panelState === 'expanded' || panelState === 'closing') && (
           <TouchableWithoutFeedback onPress={closeSearchPanel}>
             <View
               style={{
@@ -2401,7 +2409,7 @@ export default function NavigationPage() {
             contentContainerStyle={{ paddingBottom: 20 }}
             keyboardShouldPersistTaps="always"
           >
-            {(panelState === 'animating' || panelState === 'expanded') ? (
+            {(panelState === 'animating' || panelState === 'expanded' || panelState === 'closing') ? (
               // SEARCH PANEL
               <Animated.View
                 style={{
@@ -2475,10 +2483,7 @@ export default function NavigationPage() {
                         setLocations((prev) => prev.filter((loc) => loc.id !== activeStopId));
                       }
 
-                      resetEditingState();
-                      Keyboard.dismiss();
-                      setPanelState('closed');
-                      setSearchText('');
+                      closeSearchPanel();
                     }}
                   >
                     <Text
