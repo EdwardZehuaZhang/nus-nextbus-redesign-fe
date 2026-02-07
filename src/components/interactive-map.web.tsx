@@ -3468,7 +3468,14 @@ const useConnectorLines = (
   mapRef: React.MutableRefObject<google.maps.Map | null>,
   origin?: LatLng,
   destination?: LatLng,
-  routePolyline?: string
+  routePolyline?: string,
+  routeSteps?: RouteStep[],
+  internalRoutePolylines?: {
+    walkToStop: google.maps.LatLngLiteral[];
+    busSegment: google.maps.LatLngLiteral[];
+    walkFromStop: google.maps.LatLngLiteral[];
+    busRouteColor?: string;
+  } | null
 ) => {
   const startConnectorRef = useRef<google.maps.Polyline | null>(null);
   const endConnectorRef = useRef<google.maps.Polyline | null>(null);
@@ -3476,6 +3483,91 @@ const useConnectorLines = (
   useEffect(() => {
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
       return;
+
+    const decodePolylinePath = (encoded?: string) => {
+      if (!encoded) return [] as google.maps.LatLngLiteral[];
+      return polyline.decode(encoded).map(([lat, lng]) => ({ lat, lng }));
+    };
+
+    const resolveRouteEndpoints = () => {
+      if (routePolyline) {
+        const decodedPath = decodePolylinePath(routePolyline);
+        if (decodedPath.length > 0) {
+          return {
+            routeStart: decodedPath[0],
+            routeEnd: decodedPath[decodedPath.length - 1],
+          };
+        }
+      }
+
+      if (Array.isArray(routeSteps) && routeSteps.length > 0) {
+        const firstStep = routeSteps[0];
+        const lastStep = routeSteps[routeSteps.length - 1];
+        const stepStart = firstStep?.startLocation?.latLng;
+        const stepEnd = lastStep?.endLocation?.latLng;
+
+        if (stepStart && stepEnd) {
+          return {
+            routeStart: { lat: stepStart.latitude, lng: stepStart.longitude },
+            routeEnd: { lat: stepEnd.latitude, lng: stepEnd.longitude },
+          };
+        }
+
+        const firstPolylineStep = routeSteps.find(
+          (step) => step.polyline?.encodedPolyline
+        );
+        const lastPolylineStep = [...routeSteps]
+          .reverse()
+          .find((step) => step.polyline?.encodedPolyline);
+
+        if (firstPolylineStep?.polyline?.encodedPolyline) {
+          const firstPath = decodePolylinePath(
+            firstPolylineStep.polyline.encodedPolyline
+          );
+          const lastPath = lastPolylineStep?.polyline?.encodedPolyline
+            ? decodePolylinePath(lastPolylineStep.polyline.encodedPolyline)
+            : firstPath;
+
+          if (firstPath.length > 0 && lastPath.length > 0) {
+            return {
+              routeStart: firstPath[0],
+              routeEnd: lastPath[lastPath.length - 1],
+            };
+          }
+        }
+      }
+
+      if (internalRoutePolylines) {
+        const walkToStop = Array.isArray(internalRoutePolylines.walkToStop)
+          ? internalRoutePolylines.walkToStop
+          : [];
+        const walkFromStop = Array.isArray(internalRoutePolylines.walkFromStop)
+          ? internalRoutePolylines.walkFromStop
+          : [];
+        const busSegment = Array.isArray(internalRoutePolylines.busSegment)
+          ? internalRoutePolylines.busSegment
+          : [];
+
+        const routeStart =
+          busSegment.length > 0
+            ? busSegment[0]
+            : walkToStop.length > 0
+              ? walkToStop[0]
+              : undefined;
+        const routeEnd =
+          busSegment.length > 0
+            ? busSegment[busSegment.length - 1]
+            : walkFromStop.length > 0
+              ? walkFromStop[walkFromStop.length - 1]
+              : undefined;
+
+        if (routeStart && routeEnd) {
+          return { routeStart, routeEnd };
+        }
+      }
+
+      return null;
+    };
 
     // Remove existing connector lines
     if (startConnectorRef.current) {
@@ -3487,74 +3579,72 @@ const useConnectorLines = (
       endConnectorRef.current = null;
     }
 
-    // Only draw connectors if we have a route
-    if (routePolyline) {
-      const decodedPath = polyline
-        .decode(routePolyline)
-        .map(([lat, lng]) => ({ lat, lng }));
+    const endpoints = resolveRouteEndpoints();
 
-      if (decodedPath.length > 0) {
-        const routeStart = decodedPath[0];
-        const routeEnd = decodedPath[decodedPath.length - 1];
+    if (endpoints) {
+      const { routeStart, routeEnd } = endpoints;
 
-        // Draw dotted line from user/origin location to route start
-        if (origin) {
-          const userLocation = { lat: origin.lat, lng: origin.lng };
-          startConnectorRef.current = new google.maps.Polyline({
-            path: [userLocation, routeStart],
-            geodesic: true,
-            strokeColor: '#274F9C',
-            strokeOpacity: 0,
-            strokeWeight: 0,
-            icons: [
-              {
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  fillColor: '#274F9C',
-                  fillOpacity: 0.8,
-                  strokeColor: '#274F9C',
-                  strokeOpacity: 1,
-                  strokeWeight: 0,
-                  scale: 2,
-                },
-                offset: '0',
-                repeat: '10px',
+      // Draw dotted line from user/origin location to route start
+      if (origin) {
+        const userLocation = { lat: origin.lat, lng: origin.lng };
+        startConnectorRef.current = new google.maps.Polyline({
+          path: [userLocation, routeStart],
+          geodesic: true,
+          strokeColor: '#274F9C',
+          strokeOpacity: 0.6,
+          strokeWeight: 2,
+          zIndex: 50,
+          clickable: false,
+          icons: [
+            {
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#274F9C',
+                fillOpacity: 0.8,
+                strokeColor: '#274F9C',
+                strokeOpacity: 1,
+                strokeWeight: 0,
+                scale: 3,
               },
-            ],
-            map: mapRef.current,
-          });
-        }
+              offset: '0',
+              repeat: '8px',
+            },
+          ],
+          map: mapRef.current,
+        });
+      }
 
-        // Draw dotted line from route end to destination
-        if (destination) {
-          const destinationLocation = {
-            lat: destination.lat,
-            lng: destination.lng,
-          };
-          endConnectorRef.current = new google.maps.Polyline({
-            path: [routeEnd, destinationLocation],
-            geodesic: true,
-            strokeColor: '#274F9C',
-            strokeOpacity: 0,
-            strokeWeight: 0,
-            icons: [
-              {
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  fillColor: '#274F9C',
-                  fillOpacity: 0.8,
-                  strokeColor: '#274F9C',
-                  strokeOpacity: 1,
-                  strokeWeight: 0,
-                  scale: 2,
-                },
-                offset: '0',
-                repeat: '10px',
+      // Draw dotted line from route end to destination
+      if (destination) {
+        const destinationLocation = {
+          lat: destination.lat,
+          lng: destination.lng,
+        };
+        endConnectorRef.current = new google.maps.Polyline({
+          path: [routeEnd, destinationLocation],
+          geodesic: true,
+          strokeColor: '#274F9C',
+          strokeOpacity: 0.6,
+          strokeWeight: 2,
+          zIndex: 50,
+          clickable: false,
+          icons: [
+            {
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                fillColor: '#274F9C',
+                fillOpacity: 0.8,
+                strokeColor: '#274F9C',
+                strokeOpacity: 1,
+                strokeWeight: 0,
+                scale: 3,
               },
-            ],
-            map: mapRef.current,
-          });
-        }
+              offset: '0',
+              repeat: '8px',
+            },
+          ],
+          map: mapRef.current,
+        });
       }
     }
 
@@ -3566,7 +3656,7 @@ const useConnectorLines = (
         endConnectorRef.current.setMap(null);
       }
     };
-  }, [origin, destination, routePolyline, mapRef]);
+  }, [origin, destination, routePolyline, routeSteps, internalRoutePolylines, mapRef]);
 };
 
 // Hook to render bus stop markers with labels
@@ -3999,8 +4089,66 @@ const useBusStopMarkers = (
     activeRoute,
     pickupPointsData,
     routeColor,
+    visibleBusStopsColor,
     visibleBusStops,
     onBusStopSelected,
+    selectedStopId,
+  ]);
+
+  // Update circle colors when route color or visibility changes
+  useEffect(() => {
+    if (!busStopsData?.BusStopsResult?.busstops) {
+      return;
+    }
+
+    const busStops = busStopsData.BusStopsResult.busstops;
+    const visibleBusStopsSet = new Set(visibleBusStops ?? []);
+
+    // Get the pickup points for the active route (stops that belong to this route)
+    const routeStopNames = new Set<string>();
+    if (activeRoute && pickupPointsData?.PickupPointResult?.pickuppoint) {
+      pickupPointsData.PickupPointResult.pickuppoint.forEach((pp: any) => {
+        routeStopNames.add(pp.ShortName);
+      });
+    }
+
+    // Helper function to check if a stop belongs to the active route
+    const belongsToRoute = (stop: BusStop) => {
+      return routeStopNames.has(stop.ShortName);
+    };
+
+    // Update circle colors
+    circleMarkersRef.current.forEach((marker, index) => {
+      const stop = busStops[index];
+      if (!stop) return;
+
+      const isRouteStop = belongsToRoute(stop);
+      const isDimmed =
+        selectedStopId !== null && selectedStopId !== (stop.name || stop.ShortName);
+      const stopColor = isDimmed
+        ? '#D1D5DB'
+        : visibleBusStopsColor && visibleBusStopsSet.has(stop.ShortName)
+          ? visibleBusStopsColor
+          : activeRoute && isRouteStop && routeColor
+            ? routeColor
+            : '#274F9C';
+
+      marker.setIcon({
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: stopColor,
+        fillOpacity: 0.8,
+        strokeColor: '#FFFFFF',
+        strokeWeight: 2,
+        scale: 4,
+      });
+    });
+  }, [
+    busStopsData,
+    activeRoute,
+    pickupPointsData,
+    routeColor,
+    visibleBusStopsColor,
+    visibleBusStops,
     selectedStopId,
   ]);
 };
@@ -5718,6 +5866,35 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       ? selectedMapItem.place.stopId || selectedMapItem.place.name
       : null;
 
+  const connectorOrigin = React.useMemo<LatLng | undefined>(() => {
+    if (origin) return origin;
+    if (showUserLocation && userLocation) {
+      return { lat: userLocation.latitude, lng: userLocation.longitude };
+    }
+    return undefined;
+  }, [origin, showUserLocation, userLocation]);
+
+  const connectorDestination = React.useMemo<LatLng | undefined>(() => {
+    if (destination) return destination;
+    if (!selectedMapItem) return undefined;
+    if (selectedMapItem.type === 'place') {
+      return {
+        lat: selectedMapItem.place.coordinates.latitude,
+        lng: selectedMapItem.place.coordinates.longitude,
+      };
+    }
+    if (selectedMapItem.type === 'printer') {
+      return selectedMapItem.printer.coordinates;
+    }
+    if (selectedMapItem.type === 'sports') {
+      return selectedMapItem.facility.coordinates;
+    }
+    if (selectedMapItem.type === 'canteen') {
+      return selectedMapItem.canteen.coords;
+    }
+    return undefined;
+  }, [destination, selectedMapItem]);
+
   // Determine which bus route is selected from filters (radio button selection)
   const selectedFilterRoute = React.useMemo(() => {
     const routeKeys = Object.keys(mapFilters).filter(
@@ -6053,8 +6230,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Render internal route polylines if available, otherwise render Google Maps route
   // Always call all hooks to maintain hook order (Rules of Hooks)
   useInternalRoutePolyline(mapRef, internalRoutePolylines);
-  useMapPolyline(mapRef, internalRoutePolylines ? undefined : routePolyline, internalRoutePolylines ? undefined : routeSteps);
-  useConnectorLines(mapRef, internalRoutePolylines ? undefined : origin, internalRoutePolylines ? undefined : destination, internalRoutePolylines ? undefined : routePolyline); // Draw dotted lines from user to route start and route end to destination
+  useMapPolyline(
+    mapRef,
+    internalRoutePolylines ? undefined : routePolyline,
+    internalRoutePolylines ? undefined : routeSteps
+  );
+  useConnectorLines(
+    mapRef,
+    connectorOrigin,
+    connectorDestination,
+    routePolyline,
+    routeSteps,
+    internalRoutePolylines
+  ); // Draw dotted lines from user to route start and route end to destination
   
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
   useBusMarkers(mapRef, isMapCreated, activeBuses, routeColor, effectiveActiveRoute);

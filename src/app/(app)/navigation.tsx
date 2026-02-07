@@ -1,7 +1,7 @@
 import polyline from '@mapbox/polyline';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter, useNavigationContainerRef } from 'expo-router';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { Animated, TextInput, Platform, ActivityIndicator, Dimensions, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -443,22 +443,22 @@ const useDragHandlers = (config?: {
   const handleTap = () => {
     // Get the current animation value
     const currentHeight = (heightAnimation as any)._value;
-    console.log('[NAV TAP] 👆 Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT, 'MAX:', MAX_HEIGHT);
+    console.log('[NAV TAP] Frame tapped - Current height:', currentHeight, 'MIN:', MIN_HEIGHT, 'MAX:', MAX_HEIGHT);
 
     // Only snap to DEFAULT if at MIN or MAX
     if (Math.abs(currentHeight - MIN_HEIGHT) < 1) {
       // At MIN_HEIGHT - snap to DEFAULT
-      console.log('[NAV TAP] 📍 At MIN - Snapping to DEFAULT');
+      console.log('[NAV TAP] At MIN - Snapping to DEFAULT');
       setTempHeight(null);
       animateToHeight(DEFAULT_HEIGHT);
     } else if (Math.abs(currentHeight - MAX_HEIGHT) < 1) {
       // At MAX_HEIGHT - snap to DEFAULT
-      console.log('[NAV TAP] 📍 At MAX - Snapping to DEFAULT');
+      console.log('[NAV TAP] At MAX - Snapping to DEFAULT');
       setTempHeight(null);
       animateToHeight(DEFAULT_HEIGHT);
     } else {
       // In between - do nothing
-      console.log('[NAV TAP] 🔇 At intermediate height - Ignoring tap');
+      console.log('[NAV TAP] At intermediate height - Ignoring tap');
     }
   };
 
@@ -661,22 +661,26 @@ export default function NavigationPage() {
   const [isNavigationReady, setIsNavigationReady] = useState(false);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [routeExpanded, setRouteExpanded] = useState(false);
-  const [forceResetCenter, setForceResetCenter] = useState(true); // Start as true to reset on initial load
+  const [forceResetCenter, setForceResetCenter] = useState(true);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
-  const [showIntermediateStops, setShowIntermediateStops] = useState(false); // State for expanding bus stops
+  const [showIntermediateStops, setShowIntermediateStops] = useState(false);
+  const [shouldFetchData, setShouldFetchData] = useState(false);
+  const [isPending, startTransition] = useTransition();
   
-  // Wait for navigation to be ready before using router.setParams
+  // OPTIMIZATION: Defer data fetching to after page renders
+  // This ensures the page slides in instantly without blocking on API calls
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsNavigationReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    setIsNavigationReady(true);
+    // Start data fetching after next render using startTransition
+    startTransition(() => {
+      setShouldFetchData(true);
+    });
+  }, [startTransition]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -829,7 +833,7 @@ export default function NavigationPage() {
           longitude: busStation.coordinates.longitude
         };
       }
-      console.warn('⚠️ customOrigin not found in bus stations:', customOrigin);
+      console.warn('[WARNING] customOrigin not found in bus stations:', customOrigin);
     }
     return null;
   }, [customOrigin, customOriginCoords]);
@@ -867,18 +871,18 @@ export default function NavigationPage() {
   const effectiveOrigin = React.useMemo(() => {
     // If user explicitly selected a custom origin, use it (highest priority)
     if (customOriginCoords) {
-      console.log('🎯 Using custom origin explicit coords:', customOriginCoords);
+      console.log('[ORIGIN] Using custom origin explicit coords:', customOriginCoords);
       return customOriginCoords;
     }
     if (customOriginFromBusStation) {
-      console.log('🎯 Using custom origin from bus station:', customOriginFromBusStation);
+      console.log('[ORIGIN] Using custom origin from bus station:', customOriginFromBusStation);
       return customOriginFromBusStation;
     }
     
     // For "Your location", only use userLocation state which is controlled
     // This prevents infinite loops from constant GPS updates (globalUserLocation)
     if (userLocation) {
-      console.log('🎯 Using user location (state):', userLocation);
+      console.log('[ORIGIN] Using user location (state):', userLocation);
       return userLocation;
     }
     
@@ -887,13 +891,13 @@ export default function NavigationPage() {
       return urlUserLocation;
     }
     
-    console.warn('⚠️ No valid location available!');
+    console.warn('[WARNING] No valid location available!');
     return null;
   }, [customOriginCoords, customOriginFromBusStation, userLocation, urlUserLocation]);
 
   // Debug logging for internal route finder
   useEffect(() => {
-    console.log('🔧 [DEBUG] Internal Route Finder State:', {
+    console.log('[DEBUG] Internal Route Finder State:', {
       effectiveOrigin,
       destinationCoords,
       enabled: !!effectiveOrigin && !!destinationCoords,
@@ -921,7 +925,8 @@ export default function NavigationPage() {
     return null;
   }, [destinationCoords, routes]);
 
-  // Use internal route finder hook
+  // OPTIMIZATION: Only enable route finding AFTER page renders
+  // This prevents the internal route finder from blocking the page transition
   const {
     routes: internalRoutes,
     bestRoute: bestInternalRoute,
@@ -938,23 +943,18 @@ export default function NavigationPage() {
     googleMapsTimeSeconds: routes.length > 0 && routes[0].legs?.[0]?.duration 
       ? durationToMinutes(routes[0].legs[0].duration) * 60 
       : undefined,
-    enabled: !!effectiveOrigin && !!destinationCoords,
-    // TODO: Add arrivalTime parameter to filter routes based on arrival time
-    // When selectedArrivalTime is set, we need to:
-    // 1. Calculate the latest departure time (arrivalTime - totalTime)
-    // 2. Filter out buses that arrive too late
-    // 3. Show only routes that get you there before the selected time
+    enabled: shouldFetchData && !!effectiveOrigin && !!destinationCoords,
     arrivalTime: selectedArrivalTime,
   });
 
   // Log route comparison results
   useEffect(() => {
     if (bestInternalRoute && googleMapsTime) {
-      console.log('🔍 [ROUTE COMPARISON]', {
+      console.log('[ROUTE COMPARISON]', {
         internalRouteTime: `${Math.ceil(bestInternalRoute.totalTime / 60)} min (${bestInternalRoute.totalTime}s)`,
         googleMapsTime: `${Math.ceil(googleMapsTime / 60)} min (${googleMapsTime}s)`,
         recommendInternal,
-        winner: recommendInternal ? '🚌 Internal Bus Route' : '🗺️ Google Maps Route',
+        winner: recommendInternal ? 'Internal Bus Route' : 'Google Maps Route',
         timeDifference: `${Math.abs(bestInternalRoute.totalTime - googleMapsTime)}s`
       });
     }
@@ -1029,28 +1029,28 @@ export default function NavigationPage() {
 
   // Handle Google Place selection
   const handleGooglePlacePress = async (place: PlaceAutocompleteResult) => {
-    console.log('[NAV GOOGLE PLACE] 🖱️ Clicked:', place.structured_formatting.main_text);
-    console.log('[NAV GOOGLE PLACE] 📍 Place ID:', place.place_id);
+    console.log('[GOOGLE PLACE] Clicked:', place.structured_formatting.main_text);
+    console.log('[GOOGLE PLACE] Place ID:', place.place_id);
     
     try {
-      console.log('[NAV GOOGLE PLACE] 🔍 Fetching place details from backend API...');
+      console.log('[GOOGLE PLACE] Fetching place details from backend API...');
       
       // Use backend API for place details
       const placeDetailsData = await getPlaceDetails(place.place_id);
       
       if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
         const placeDetails = placeDetailsData.result;
-        console.log('[NAV GOOGLE PLACE] ✅ Got details from backend:', placeDetails);
+        console.log('[GOOGLE PLACE] Got details from backend:', placeDetails);
         
         const destinationLat = placeDetails.geometry?.location?.lat;
         const destinationLng = placeDetails.geometry?.location?.lng;
         
-        console.log('[NAV GOOGLE PLACE] 🧭 Coordinates:', { lat: destinationLat, lng: destinationLng });
+        console.log('[GOOGLE PLACE] Coordinates:', { lat: destinationLat, lng: destinationLng });
         
         // Set the selected location based on search mode
         if (searchMode === 'destination') {
           setLocations((prev) => prev.map((loc) => loc.type === 'destination' ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords } : loc));
-          console.log('[NAV GOOGLE PLACE] 🎯 Setting as destination');
+          console.log('[GOOGLE PLACE] Setting as destination');
           // Update destination
           router.push({
             pathname: '/navigation' as any,
@@ -1068,7 +1068,7 @@ export default function NavigationPage() {
           });
         } else if (searchMode === 'origin') {
           setLocations((prev) => prev.map((loc) => loc.type === 'origin' ? { ...loc, text: place.structured_formatting.main_text, coords: destinationLat && destinationLng ? { lat: destinationLat, lng: destinationLng } : loc.coords } : loc));
-          console.log('[NAV GOOGLE PLACE] 🏠 Setting as origin');
+          console.log('[GOOGLE PLACE] Setting as origin');
           // Update origin
           router.replace({
             pathname: '/navigation' as any,
@@ -1098,10 +1098,10 @@ export default function NavigationPage() {
           Keyboard.dismiss();
         });
       } else {
-        console.error('[NAV GOOGLE PLACE] ❌ Backend API error:', placeDetailsData.status);
+        console.error('[GOOGLE PLACE] Backend API error:', placeDetailsData.status);
       }
     } catch (error) {
-      console.error('[NAV GOOGLE PLACE] ❌ Error getting place details:', error);
+      console.error('[GOOGLE PLACE] Error getting place details:', error);
     }
   };
 
@@ -1141,7 +1141,7 @@ export default function NavigationPage() {
 
   // Debug: Log context availability
   useEffect(() => {
-    console.log('🎬 [Navigation] Component mounted with favorites context:', {
+    console.log('[Navigation] Component mounted with favorites context:', {
       hasAddFavorite: !!addFavorite,
       hasRemoveFavorite: !!removeFavorite,
       hasIsFavorite: !!isFavorite,
@@ -1285,27 +1285,37 @@ export default function NavigationPage() {
   };
 
   // Fetch routes when destination changes
+  // OPTIMIZATION: Set loading state immediately so page renders with spinner
+  // Don't wait for async API calls - let them happen in background
   useEffect(() => {
+    // Skip fetching until page has fully rendered
+    if (!shouldFetchData) {
+      return;
+    }
+
+    const destCoords = getDestinationCoordinates(currentDestination);
+    if (!destCoords) {
+      setRouteError(`Destination coordinates not found for: "${currentDestination}"`);
+      setIsLoadingRoutes(false);
+      return;
+    }
+
+    setDestinationCoords(destCoords); // Store destination coords for map marker
+
+    // If we don't have an origin yet, wait
+    if (!effectiveOrigin) {
+      setRouteError('Waiting for your location...');
+      setIsLoadingRoutes(false);
+      return;
+    }
+
+    // PRIORITY: Set loading state immediately so page shows spinner right away
+    // This must be synchronous to ensure the UI updates before async calls
+    setIsLoadingRoutes(true);
+    setRouteError(null);
+
+    // Async fetching happens in background without blocking page render
     const fetchRoutes = async () => {
-      const destCoords = getDestinationCoordinates(currentDestination);
-      if (!destCoords) {
-        setRouteError(`Destination coordinates not found for: "${currentDestination}"`);
-        setIsLoadingRoutes(false);
-        return;
-      }
-
-      setDestinationCoords(destCoords); // Store destination coords for map marker
-
-      // If we don't have an origin yet, wait
-      if (!effectiveOrigin) {
-        setRouteError('Waiting for your location...');
-        setIsLoadingRoutes(false);
-        return;
-      }
-
-      setIsLoadingRoutes(true);
-      setRouteError(null);
-
       try {
         const origin: Waypoint = {
           location: {
@@ -1363,8 +1373,9 @@ export default function NavigationPage() {
       }
     };
 
+    // Start async fetch but don't wait for it
     fetchRoutes();
-  }, [currentDestination, effectiveOrigin]);
+  }, [currentDestination, effectiveOrigin, shouldFetchData]);
 
   // (moved) helpers and effect for stops are defined after locations state
 
@@ -1403,7 +1414,22 @@ export default function NavigationPage() {
       }
     };
 
-    generatePolylines();
+    // OPTIMIZATION: Schedule polyline generation to run in idle time
+    // instead of synchronously blocking page render
+    const schedulePolylineGeneration = () => {
+      if (typeof requestIdleCallback !== 'undefined') {
+        const idleCallbackId = requestIdleCallback(() => generatePolylines(), {
+          timeout: 3000, // Force execution after 3 seconds
+        });
+        return () => cancelIdleCallback(idleCallbackId);
+      } else {
+        // Fallback to setTimeout for browsers without requestIdleCallback
+        const timeoutId = setTimeout(() => generatePolylines(), 0);
+        return () => clearTimeout(timeoutId);
+      }
+    };
+
+    return schedulePolylineGeneration();
   }, [bestInternalRoute]);
 
   // Manage all locations as a unified list
@@ -2111,6 +2137,21 @@ export default function NavigationPage() {
   // 🔧 TEMPORARY: Completely disable InteractiveMap on navigation page for crash debugging
   const DISABLE_MAP_ENTIRELY = false;
 
+  // DEBUG: Log origin and destination values before rendering map
+  const mapOriginProp = effectiveOrigin
+    ? { lat: effectiveOrigin.latitude, lng: effectiveOrigin.longitude }
+    : undefined;
+  const mapDestinationProp = destinationMarkerCoords ?? undefined;
+
+  console.log('[NavigationPage] Map Props:', {
+    hasEffectiveOrigin: !!effectiveOrigin,
+    effectiveOrigin,
+    mapOriginProp,
+    hasDestinationMarkerCoords: !!destinationMarkerCoords,
+    destinationMarkerCoords,
+    mapDestinationProp,
+  });
+
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>
       <FocusAwareStatusBar />
@@ -2120,6 +2161,8 @@ export default function NavigationPage() {
         {!DISABLE_MAP_ENTIRELY ? (
           <InteractiveMap
             style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}
+            origin={mapOriginProp}
+            showOriginMarker={false}
             routePolyline={!isLoadingRoutes && !isLoadingInternalRoutes && !showInternal ? routes[0]?.polyline?.encodedPolyline : undefined}
             routeSteps={stableRouteSteps}
             internalRoutePolylines={!isLoadingRoutes && !isLoadingInternalRoutes && showInternal ? memoizedInternalRoutePolylines : undefined}
@@ -2129,8 +2172,9 @@ export default function NavigationPage() {
             activeRoute={null} // Don't show full route - only show the specific segment via internalRoutePolylines
             showBusStops={showInternal} // Show bus stops when displaying internal route
             visibleBusStops={visibleBusStops} // Only show stops on the internal route
+            visibleBusStopsColor={memoizedInternalRoutePolylines?.busRouteColor}
             enablePlaceDetails={false} // Disable place details on navigation page
-            destination={destinationMarkerCoords ?? undefined} // Show destination pin marker
+            destination={mapDestinationProp} // Show destination pin marker
             mapFilters={{
               important: true,
               'bus-stops': false,

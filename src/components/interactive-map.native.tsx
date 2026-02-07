@@ -256,6 +256,7 @@ interface InteractiveMapProps {
   showBusStops?: boolean;
   showLandmarks?: boolean;
   showMapControls?: boolean;
+  showOriginMarker?: boolean;
   visibleBusStops?: string[];
   visibleBusStopsColor?: string;
   mapFilters?: Record<string, boolean>;
@@ -528,6 +529,79 @@ const getLabelSizeByZoomBucket = (zoomLevel: number): { fontSize: number; stroke
     return { fontSize: 18, strokeWidth: 4, zoomBucket: 4 };
   }
 };
+
+interface BusStopCircleProps {
+  stop: any;
+  isVisible: boolean;
+  isClickable: boolean;
+  circleColor: string;
+  onPress: (e: MarkerPressEvent) => void;
+  markerId?: string;
+}
+
+// Crash-safe circle rendering strategy:
+// - Stable keys (no color in key)
+// - Short tracksViewChanges pulse when color/visibility changes
+const BusStopCircleMarker = React.memo<BusStopCircleProps>(({
+  stop,
+  isVisible,
+  isClickable,
+  circleColor,
+  onPress,
+  markerId,
+}) => {
+  const [trackChanges, setTrackChanges] = React.useState(false);
+  const prevColorRef = React.useRef(circleColor);
+  const prevVisibleRef = React.useRef(isVisible);
+
+  React.useEffect(() => {
+    if (prevColorRef.current !== circleColor || prevVisibleRef.current !== isVisible) {
+      setTrackChanges(true);
+      const t = setTimeout(() => setTrackChanges(false), 250);
+      prevColorRef.current = circleColor;
+      prevVisibleRef.current = isVisible;
+      return () => clearTimeout(t);
+    }
+  }, [circleColor, isVisible]);
+
+  return (
+    <Marker
+      key={`bus-stop-circle-${stop.name}`}
+      identifier={markerId}
+      coordinate={{
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+      }}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={trackChanges}
+      opacity={isVisible ? 1 : 0}
+      onPress={isClickable ? onPress : undefined}
+      onSelect={isClickable ? onPress : undefined}
+      zIndex={50}
+    >
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          backgroundColor: circleColor,
+          borderRadius: 4,
+          borderWidth: 2,
+          borderColor: '#FFFFFF',
+        }}
+      />
+    </Marker>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.isVisible === nextProps.isVisible &&
+    prevProps.circleColor === nextProps.circleColor &&
+    prevProps.stop.latitude === nextProps.stop.latitude &&
+    prevProps.stop.longitude === nextProps.stop.longitude &&
+    prevProps.stop.name === nextProps.stop.name
+  );
+});
+
+BusStopCircleMarker.displayName = 'BusStopCircleMarker';
 
 interface BusStopLabelProps {
   stop: any;
@@ -918,6 +992,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   showLandmarks = true,
   showMapControls: _showMapControls = true,
   visibleBusStops,
+  showOriginMarker = true,
   visibleBusStopsColor,
   mapFilters = {},
   onMapFiltersChange: _onMapFiltersChange,
@@ -1538,6 +1613,296 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     return [];
   }, [internalRoutePolylines, routeSteps]);
 
+  // CRITICAL: Calculate connectorOrigin and connectorDestination BEFORE connectorSegments
+  // These must be defined first since connectorSegments depends on them
+  const connectorOrigin = React.useMemo<LatLng | undefined>(() => {
+    console.log('[ConnectorOrigin] Computing:', {
+      hasOriginProp: !!origin,
+      originProp: origin,
+      hasUserLocation: !!userLocation,
+      userLocation,
+    });
+    if (origin) {
+      console.log('[ConnectorOrigin] Using origin prop:', origin);
+      return origin;
+    }
+    if (userLocation) {
+      const result = { lat: userLocation.latitude, lng: userLocation.longitude };
+      console.log('[ConnectorOrigin] Using userLocation:', result);
+      return result;
+    }
+    console.log('[ConnectorOrigin] No valid origin found');
+    return undefined;
+  }, [origin, userLocation]);
+
+  const connectorDestination = React.useMemo<LatLng | undefined>(() => {
+    console.log('[ConnectorDestination] Computing:', {
+      hasDestinationProp: !!destination,
+      destinationProp: destination,
+      hasSelectedMapItem: !!selectedMapItem,
+      selectedMapItem,
+    });
+    if (destination) {
+      console.log('[ConnectorDestination] Using destination prop:', destination);
+      return destination;
+    }
+    if (!selectedMapItem) {
+      console.log('[ConnectorDestination] No selectedMapItem');
+      return undefined;
+    }
+    if (selectedMapItem.type === 'place') {
+      const result = {
+        lat: selectedMapItem.place.coordinates.latitude,
+        lng: selectedMapItem.place.coordinates.longitude,
+      };
+      console.log('[ConnectorDestination] Using place coordinates:', result);
+      return result;
+    }
+    if (selectedMapItem.type === 'printer') {
+      console.log('[ConnectorDestination] Using printer coordinates:', selectedMapItem.printer.coordinates);
+      return selectedMapItem.printer.coordinates;
+    }
+    if (selectedMapItem.type === 'sports') {
+      console.log('[ConnectorDestination] Using sports facility coordinates:', selectedMapItem.facility.coordinates);
+      return selectedMapItem.facility.coordinates;
+    }
+    if (selectedMapItem.type === 'canteen') {
+      console.log('[ConnectorDestination] Using canteen coordinates:', selectedMapItem.canteen.coords);
+      return selectedMapItem.canteen.coords;
+    }
+    console.log('[ConnectorDestination] No valid destination found');
+    return undefined;
+  }, [destination, selectedMapItem]);
+
+  const connectorSegments = React.useMemo(() => {
+    const segments: Array<{
+      key: string;
+      coordinates: { latitude: number; longitude: number }[];
+      strokeColor: string;
+      strokeWidth: number;
+      lineDashPattern: number[];
+      zIndex: number;
+    }> = [];
+
+    console.log('[ConnectorSegments] Computing connector segments:', {
+      hasInternalPolylines: !!internalRoutePolylines,
+      hasRouteSteps: !!routeSteps && routeSteps.length > 0,
+      hasRouteCoordinates: routeCoordinates.length > 0,
+      hasConnectorOrigin: !!connectorOrigin,
+      hasConnectorDestination: !!connectorDestination,
+      connectorOrigin,
+      connectorDestination,
+    });
+
+    // Early exit if we don't have both origin and destination
+    if (!connectorOrigin || !connectorDestination) {
+      console.log('[ConnectorSegments] Missing origin or destination - cannot render connectors');
+      return segments;
+    }
+
+    const routeEndpoints = (() => {
+      if (internalRoutePolylines) {
+        const busSeg = internalRoutePolylines.busSegment || [];
+        const walkToStop = internalRoutePolylines.walkToStop || [];
+        const walkFromStop = internalRoutePolylines.walkFromStop || [];
+
+        console.log('[ConnectorSegments] Internal route segments:', {
+          walkToStopLength: walkToStop.length,
+          busSegLength: busSeg.length,
+          walkFromStopLength: walkFromStop.length,
+          walkToStopFirst: walkToStop[0],
+          busSegFirst: busSeg[0],
+          walkFromStopLast: walkFromStop[walkFromStop.length - 1],
+          busSegLast: busSeg[busSeg.length - 1],
+        });
+
+        // For internal routes: connectors bridge gaps between origin/destination and the rendered segments
+        // Priority: walkToStop > busSegment for start, walkFromStop > busSegment for end
+        // This ensures connectors connect to the actual visible route segments
+        
+        let startPoint = null;
+        let endPoint = null;
+
+        // Determine route start: prefer walkToStop if it exists and will be rendered (length > 1)
+        if (walkToStop.length > 1) {
+          startPoint = walkToStop[0];
+        } else if (busSeg.length > 0) {
+          startPoint = busSeg[0];
+        }
+        
+        // Determine route end: prefer walkFromStop if it exists and will be rendered (length > 1)
+        if (walkFromStop.length > 1) {
+          endPoint = walkFromStop[walkFromStop.length - 1];
+        } else if (busSeg.length > 0) {
+          endPoint = busSeg[busSeg.length - 1];
+        }
+
+        console.log('[ConnectorSegments] Computed route endpoints from internal:', { 
+          startPoint, 
+          endPoint,
+          strategy: walkToStop.length > 1 ? 'walkToStop' : 'busSegment',
+          endStrategy: walkFromStop.length > 1 ? 'walkFromStop' : 'busSegment',
+        });
+
+        if (startPoint && endPoint) {
+          return {
+            routeStart: { latitude: startPoint.lat, longitude: startPoint.lng },
+            routeEnd: { latitude: endPoint.lat, longitude: endPoint.lng },
+          };
+        }
+      }
+
+      if (routeSteps && routeSteps.length > 0) {
+        const firstStep = routeSteps[0];
+        const lastStep = routeSteps[routeSteps.length - 1];
+        const start = firstStep?.startLocation?.latLng;
+        const end = lastStep?.endLocation?.latLng;
+
+        if (start && end) {
+          return {
+            routeStart: { latitude: start.latitude, longitude: start.longitude },
+            routeEnd: { latitude: end.latitude, longitude: end.longitude },
+          };
+        }
+
+        const firstPolylineStep = routeSteps.find((step: any) => step?.polyline?.encodedPolyline);
+        const lastPolylineStep = [...routeSteps]
+          .reverse()
+          .find((step: any) => step?.polyline?.encodedPolyline);
+
+        if (firstPolylineStep?.polyline?.encodedPolyline) {
+          const firstPath = tryDecodePolyline(firstPolylineStep.polyline.encodedPolyline);
+          const lastPath = lastPolylineStep?.polyline?.encodedPolyline
+            ? tryDecodePolyline(lastPolylineStep.polyline.encodedPolyline)
+            : firstPath;
+
+          if (firstPath.length > 0 && lastPath.length > 0) {
+            return {
+              routeStart: firstPath[0],
+              routeEnd: lastPath[lastPath.length - 1],
+            };
+          }
+        }
+      }
+
+      if (routeCoordinates.length > 0) {
+        return {
+          routeStart: routeCoordinates[0],
+          routeEnd: routeCoordinates[routeCoordinates.length - 1],
+        };
+      }
+
+      return null;
+    })();
+
+    console.log('[ConnectorSegments] Route endpoints:', routeEndpoints);
+
+    if (!routeEndpoints) {
+      console.log('[ConnectorSegments] No route endpoints - falling back to direct origin-destination connector');
+      // FALLBACK: If no route segments exist, draw a direct connector from origin to destination
+      const originPoint = { latitude: connectorOrigin.lat, longitude: connectorOrigin.lng };
+      const destPoint = { latitude: connectorDestination.lat, longitude: connectorDestination.lng };
+      const dottedColor = hexToRgba('#274F9C', 1.0);
+      
+      segments.push({
+        key: 'connector-direct',
+        coordinates: [originPoint, destPoint],
+        strokeColor: dottedColor,
+        strokeWidth: 4,
+        lineDashPattern: [8, 8],
+        zIndex: 40,
+      });
+      
+      console.log('[ConnectorSegments] Added direct origin-to-destination connector');
+      return segments;
+    }
+
+    console.log('[ConnectorSegments] Route endpoints found:', {
+      routeStart: routeEndpoints.routeStart,
+      routeEnd: routeEndpoints.routeEnd,
+    });
+
+    // Use a more visible color and wider stroke for connectors
+    const dottedColor = hexToRgba('#274F9C', 1.0);
+
+    // Helper to calculate distance between two points (simple Euclidean distance)
+    const getDistance = (p1: { latitude: number; longitude: number }, p2: { latitude: number; longitude: number }) => {
+      const latDiff = p1.latitude - p2.latitude;
+      const lngDiff = p1.longitude - p2.longitude;
+      return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+    };
+
+    // Reduced minimum distance to render more connectors (from 0.0001 to 0.00001 degrees ≈ 1 meter)
+    const MIN_CONNECTOR_DISTANCE = 0.00001;
+
+    const originPoint = { latitude: connectorOrigin.lat, longitude: connectorOrigin.lng };
+    const distanceToStart = getDistance(originPoint, routeEndpoints.routeStart);
+    
+    console.log('[ConnectorSegments] Origin connector analysis:', {
+      originPoint,
+      routeStart: routeEndpoints.routeStart,
+      distance: distanceToStart,
+      minDistance: MIN_CONNECTOR_DISTANCE,
+      willRender: distanceToStart > MIN_CONNECTOR_DISTANCE,
+    });
+    
+    if (distanceToStart > MIN_CONNECTOR_DISTANCE) {
+      console.log('[ConnectorSegments] Adding origin connector (dotted line)');
+      segments.push({
+        key: 'connector-start',
+        coordinates: [
+          originPoint,
+          routeEndpoints.routeStart,
+        ],
+        strokeColor: dottedColor,
+        strokeWidth: 5,
+        lineDashPattern: [10, 10],
+        zIndex: 45,
+      });
+    } else {
+      console.log('[ConnectorSegments] Skipping origin connector (distance too small)');
+    }
+
+    const destPoint = { latitude: connectorDestination.lat, longitude: connectorDestination.lng };
+    const distanceToEnd = getDistance(routeEndpoints.routeEnd, destPoint);
+    
+    console.log('[ConnectorSegments] Destination connector analysis:', {
+      routeEnd: routeEndpoints.routeEnd,
+      destPoint,
+      distance: distanceToEnd,
+      minDistance: MIN_CONNECTOR_DISTANCE,
+      willRender: distanceToEnd > MIN_CONNECTOR_DISTANCE,
+    });
+    
+    if (distanceToEnd > MIN_CONNECTOR_DISTANCE) {
+      console.log('[ConnectorSegments] Adding destination connector (dotted line)');
+      segments.push({
+        key: 'connector-end',
+        coordinates: [
+          routeEndpoints.routeEnd,
+          destPoint,
+        ],
+        strokeColor: dottedColor,
+        strokeWidth: 5,
+        lineDashPattern: [10, 10],
+        zIndex: 45,
+      });
+    } else {
+      console.log('[ConnectorSegments] Skipping destination connector (distance too small)');
+    }
+
+    console.log('[ConnectorSegments] Final segments summary:', {
+      totalSegments: segments.length,
+      segmentKeys: segments.map(s => s.key),
+      connectorOrigin: originPoint,
+      connectorDestination: destPoint,
+      routeStart: routeEndpoints.routeStart,
+      routeEnd: routeEndpoints.routeEnd,
+    });
+    
+    return segments;
+  }, [connectorOrigin, connectorDestination, internalRoutePolylines, routeSteps, routeCoordinates]);
+
   // Generate stable MapView key to force remount when route structure changes
   // This prevents iOS AIRGoogleMap crash from child count changes during render
   const mapViewKey = React.useMemo(() => {
@@ -1855,6 +2220,56 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       ? selectedMapItem.place.stopId || selectedMapItem.place.name
       : null;
 
+  const getBusStopColor = React.useCallback(
+    ({
+      stopName,
+      stopKey,
+      stopId,
+      visibleByRoute,
+    }: {
+      stopName: string;
+      stopKey: string;
+      stopId: string;
+      visibleByRoute: boolean;
+    }) => {
+      let color = '#274F9C';
+      const isVisibleStop = visibleBusStopsSet.has(stopName);
+
+      if (visibleBusStopsColor && isVisibleStop) {
+        color = visibleBusStopsColor;
+      }
+
+      const isRouteStop = deferredActiveRoute
+        ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
+        : false;
+
+      if (!visibleBusStopsColor && deferredActiveRoute && isRouteStop) {
+        color = routeColors[deferredActiveRoute] || color;
+      } else if (!visibleBusStopsColor && visibleByRoute) {
+        const matchCode = activeBusRouteCodes.find((code) =>
+          routeStopMembershipRef.current.get(code)?.has(stopKey)
+        );
+        if (matchCode) {
+          color = routeColors[matchCode] || color;
+        }
+      }
+
+      if (selectedBusStopId && selectedBusStopId !== stopId) {
+        color = '#D1D5DB';
+      }
+
+      return color;
+    },
+    [
+      visibleBusStopsSet,
+      visibleBusStopsColor,
+      deferredActiveRoute,
+      routeColors,
+      activeBusRouteCodes,
+      selectedBusStopId,
+    ]
+  );
+
   // PERFORMANCE: Memoize label properties to only recalculate on zoom/filter changes, not on every active bus update
   const busStopLabelProps = React.useMemo(() => {
     const allStops = allBusStops;
@@ -1869,34 +2284,12 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       const isLabelVisible =
         shouldShowBusStops && shouldShowStop(stopName) && visibleByRoute;
       const isLabelClickable = isLabelVisible;
-      // Choose label color: per-route membership (same logic as circle)
-      // DEFAULT bus stop label color.
-      // Change here if you want a different fallback (when no route color applies).
-      // Note: Labels update color via useMemo + a short tracksViewChanges pulse in BusStopLabelMarker.
-      // Do NOT change other '#274F9C' occurrences for this purpose.
-      let labelColor = '#274F9C';
-      const isVisibleStop = visibleBusStopsSet.has(stopName);
-      if (visibleBusStopsColor && isVisibleStop) {
-        labelColor = visibleBusStopsColor;
-      }
-      const isRouteStop = deferredActiveRoute
-        ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
-        : false;
-      if (!visibleBusStopsColor && deferredActiveRoute && isRouteStop) {
-        // When a route is active, use its color for member stops
-        labelColor = routeColors[deferredActiveRoute] || labelColor;
-      } else if (!visibleBusStopsColor && visibleByRoute) {
-        // Multiple filters active - color by first matching route
-        const matchCode = activeBusRouteCodes.find((code) =>
-          routeStopMembershipRef.current.get(code)?.has(stopKey)
-        );
-        if (matchCode) {
-          labelColor = routeColors[matchCode] || labelColor;
-        }
-      }
-      if (selectedBusStopId && selectedBusStopId !== stopId) {
-        labelColor = '#D1D5DB';
-      }
+      const labelColor = getBusStopColor({
+        stopName,
+        stopKey,
+        stopId,
+        visibleByRoute,
+      });
 
       return {
         stop,
@@ -1920,6 +2313,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     visibleBusStopsSet,
     routeColors,
     shouldShowStop,
+    getBusStopColor,
   ]);
 
   // Fit map to show all markers ONLY on initial route load (not on every render)
@@ -2877,74 +3271,29 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         {allBusStops.map((stop: any) => {
           const showCircle = shouldShowBusStops && currentZoom >= 17;
           const visibleByRoute = isStopVisibleForActiveRoutes(stop);
-          const opacity = showCircle && visibleByRoute ? 1 : 0;
+          const visibleByFilter = shouldShowStop(stop.name || stop.ShortName); // Check visibleBusStops
+          const isCircleVisible = showCircle && visibleByRoute && visibleByFilter;
           const stopId = stop.name || stop.ShortName || stop.caption;
-          const isCircleClickable = showCircle && visibleByRoute;
+          const isCircleClickable = isCircleVisible;
           const stopKey = stop.name || stop.ShortName || stop.caption;
-          const isRouteStop = deferredActiveRoute
-            ? routeStopMembershipRef.current.get(deferredActiveRoute)?.has(stopKey)
-            : false;
-          
-          // Choose circle color: if multiple routes active, color by first matching route membership
-          // DEFAULT bus stop circle color (small dot).
-          // Change here if you want a different fallback (when no route color applies).
-          // Circles do not remount on color change; avoid key changes to prevent native crashes.
-          let circleColor = '#274F9C';
-          const isVisibleStop = visibleBusStopsSet.has(stopKey);
-          if (visibleBusStopsColor && isVisibleStop) {
-            circleColor = visibleBusStopsColor;
-          }
-          if (!visibleBusStopsColor && deferredActiveRoute && isRouteStop) {
-            // When a route is active, use its color for member stops
-            circleColor = routeColors[deferredActiveRoute] || circleColor;
-            // Debug sample stops
-            if (stop.name === 'Central Library' || stop.name === 'KE7') {
-              console.log(`🗺️ [CIRCLE] ${stop.name}: color=${circleColor} (route=${deferredActiveRoute})`);
-            }
-          } else if (!visibleBusStopsColor && visibleByRoute) {
-            // Multiple filters active - color by first matching route
-            const matchCode = activeBusRouteCodes.find((code) =>
-              routeStopMembershipRef.current.get(code)?.has(stopKey)
-            );
-            if (matchCode) {
-              circleColor = routeColors[matchCode] || circleColor;
-            }
-          }
-
-          if (selectedBusStopId && selectedBusStopId !== stopId) {
-            circleColor = '#D1D5DB';
-          }
+          const stopName = stop.ShortName || stop.caption || stop.name;
+          const circleColor = getBusStopColor({
+            stopName,
+            stopKey,
+            stopId,
+            visibleByRoute,
+          });
 
           return (
-            <Marker
+            <BusStopCircleMarker
               key={`bus-stop-circle-${stop.name}`}
-              identifier={`bus-stop-circle:${stop.name || stop.ShortName || stop.caption}`}
-              coordinate={{
-                latitude: stop.latitude,
-                longitude: stop.longitude,
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
-              opacity={opacity}
-              onPress={isCircleClickable ? handleBusStopPress(stop) : undefined}
-              onSelect={
-                isCircleClickable
-                  ? (e) => handleBusStopPress(stop)(e as MarkerPressEvent)
-                  : undefined
-              }
-              zIndex={50}
-            >
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  backgroundColor: circleColor,
-                  borderRadius: 4,
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                }}
-              />
-            </Marker>
+              markerId={`bus-stop-circle:${stop.name || stop.ShortName || stop.caption}`}
+              stop={stop}
+              isVisible={isCircleVisible}
+              isClickable={isCircleClickable}
+              circleColor={circleColor}
+              onPress={handleBusStopPress(stop)}
+            />
           );
         })}
         {/* Bus Stop Label Markers - Text labels with dynamic positioning (filtered by route if active) */}
@@ -3039,7 +3388,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           )}
         
         {/* Origin Marker */}
-        {origin && (
+        {origin && showOriginMarker && (
           <Marker
             key="origin"
             identifier="origin"
@@ -3074,6 +3423,19 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             onSelect={(e) => handleDestinationPress(e as MarkerPressEvent)}
           />
         )}
+        {/* Connector Dotted Lines - origin to route start, route end to destination */}
+        {connectorSegments.map((seg) => (
+          <Polyline
+            key={seg.key}
+            coordinates={seg.coordinates}
+            strokeColor={seg.strokeColor}
+            strokeWidth={seg.strokeWidth}
+            lineCap="round"
+            lineJoin="round"
+            lineDashPattern={seg.lineDashPattern}
+            zIndex={seg.zIndex}
+          />
+        ))}
         {/* Transit/Internal Route Segments (colored per segment) */}
         {transitSegments.map((seg) => (
           <Polyline
@@ -3190,6 +3552,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
           return (
             <LiveBusMarker
+              key={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
               markerKey={`bus-${effectiveActiveRoute || 'none'}-${bus.veh_plate || idx}`}
               coordinate={{
                 latitude: bus.lat,

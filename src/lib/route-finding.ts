@@ -32,6 +32,42 @@ const BUS_CATCH_BUFFER = 120; // 2 minutes
 // All NUS shuttle bus routes
 const SHUTTLE_ROUTES: RouteCode[] = ['A1', 'A2', 'D1', 'D2'];
 
+// OPTIMIZATION: Cache for walking route API calls to avoid duplicate requests
+// Key format: "lat1,lng1|lat2,lng2"
+const walkingRouteCache = new Map<string, GoogleRoute>();
+
+function getWalkingRouteCacheKey(origin: LatLng, destination: LatLng): string {
+  return `${origin.latitude.toFixed(6)},${origin.longitude.toFixed(6)}|${destination.latitude.toFixed(6)},${destination.longitude.toFixed(6)}`;
+}
+
+async function getCachedWalkingRoute(origin: LatLng, destination: LatLng): Promise<GoogleRoute | null> {
+  const cacheKey = getWalkingRouteCacheKey(origin, destination);
+  
+  // Check cache first
+  if (walkingRouteCache.has(cacheKey)) {
+    console.log('[CACHE HIT] Walking route:', cacheKey);
+    return walkingRouteCache.get(cacheKey) || null;
+  }
+  
+  try {
+    const response = await getWalkingRoute(
+      { location: { latLng: origin } },
+      { location: { latLng: destination } }
+    );
+    
+    if (response.routes && response.routes.length > 0) {
+      const route = response.routes[0];
+      walkingRouteCache.set(cacheKey, route);
+      console.log('[CACHE MISS] Cached walking route:', cacheKey);
+      return route;
+    }
+  } catch (error) {
+    console.error('[ERROR] Error fetching walking route:', error);
+  }
+  
+  return null;
+}
+
 export interface BusStop {
   name: string; // API code (e.g., 'YIH', 'CLB')
   caption: string; // Display name (e.g., 'Yusof Ishak House', 'Prince George\'s Park')
@@ -327,63 +363,36 @@ export async function findInternalBusRoutes(
           );
           const walkFromStopTime = calculateWalkingTime(walkFromStopDistance);
 
-          // Fetch actual walking routes from Google Maps
+          // OPTIMIZATION: Fetch walking routes in parallel with caching
           let walkToStopRoute: GoogleRoute | undefined;
           let walkFromStopRoute: GoogleRoute | undefined;
           let actualWalkToStopTime = walkToStopTime;
           let actualWalkFromStopTime = walkFromStopTime;
 
           try {
-            // Get walking directions to the bus stop
-            // console.log(`🚶 Fetching walking route from origin to ${departureStop.code}...`);
-            const walkToStopResponse = await getWalkingRoute(
-              { location: { latLng: origin } },
-              { location: { latLng: departureStop.location } }
-            );
+            // Fetch both walking routes in parallel with caching
+            const [walkToRoute, walkFromRoute] = await Promise.all([
+              getCachedWalkingRoute(origin, departureStop.location),
+              getCachedWalkingRoute(arrivalStop.location, destination)
+            ]);
             
-            if (walkToStopResponse.routes && walkToStopResponse.routes.length > 0) {
-              walkToStopRoute = walkToStopResponse.routes[0];
-              // console.log('✅ Got walking route to stop:', {
-              //   duration: walkToStopRoute.duration,
-              //   distance: walkToStopRoute.distanceMeters,
-              //   hasPolyline: !!walkToStopRoute.polyline?.encodedPolyline
-              // });
-              // Update walking time with actual Google Maps estimate
-              const durationSeconds = parseInt(walkToStopRoute.duration.replace('s', ''), 10);
+            if (walkToRoute) {
+              walkToStopRoute = walkToRoute;
+              const durationSeconds = parseInt(walkToRoute.duration.replace('s', ''), 10);
               if (!isNaN(durationSeconds)) {
                 actualWalkToStopTime = durationSeconds;
-                // console.log(`⏱️ Updated walk time: ${actualWalkToStopTime}s (${Math.ceil(actualWalkToStopTime / 60)} min)`);
               }
             }
-          } catch (error) {
-            console.error('❌ Error fetching walking route to stop:', error);
-            // Continue with Haversine estimate if Google Maps fails
-          }
-
-          try {
-            // Get walking directions from bus stop to destination
-            // console.log(`🚶 Fetching walking route from ${arrivalStop.code} to destination...`);
-            const walkFromStopResponse = await getWalkingRoute(
-              { location: { latLng: arrivalStop.location } },
-              { location: { latLng: destination } }
-            );
             
-            if (walkFromStopResponse.routes && walkFromStopResponse.routes.length > 0) {
-              walkFromStopRoute = walkFromStopResponse.routes[0];
-              // console.log('✅ Got walking route from stop:', {
-              //   duration: walkFromStopRoute.duration,
-              //   distance: walkFromStopRoute.distanceMeters,
-              //   hasPolyline: !!walkFromStopRoute.polyline?.encodedPolyline
-              // });
-              // Update walking time with actual Google Maps estimate
-              const durationSeconds = parseInt(walkFromStopRoute.duration.replace('s', ''), 10);
+            if (walkFromRoute) {
+              walkFromStopRoute = walkFromRoute;
+              const durationSeconds = parseInt(walkFromRoute.duration.replace('s', ''), 10);
               if (!isNaN(durationSeconds)) {
                 actualWalkFromStopTime = durationSeconds;
-                // console.log(`⏱️ Updated walk time: ${actualWalkFromStopTime}s (${Math.ceil(actualWalkFromStopTime / 60)} min)`);
               }
             }
           } catch (error) {
-            console.error('❌ Error fetching walking route from stop:', error);
+            console.error('[ERROR] Error fetching walking routes:', error);
             // Continue with Haversine estimate if Google Maps fails
           }
 
@@ -462,9 +471,9 @@ export async function findInternalBusRoutes(
     routes.sort((a, b) => a.totalTime - b.totalTime);
     
     if (routes.length > 0) {
-      console.log('🏆 Top 3 routes by time:');
+      console.log('[ROUTES] Top 3 routes by time:');
       routes.slice(0, 3).forEach((route, idx) => {
-        console.log(`  ${idx + 1}. ${route.routeCode} (${route.departureStop.code} → ${route.arrivalStop.code}): ${Math.ceil(route.totalTime / 60)} min total`);
+        console.log(`  ${idx + 1}. ${route.routeCode} (${route.departureStop.code} -> ${route.arrivalStop.code}): ${Math.ceil(route.totalTime / 60)} min total`);
         console.log(`     - Walk to stop: ${Math.ceil(route.walkToStopTime / 60)} min`);
         console.log(`     - Bus wait: ${Math.ceil(route.waitingTime / 60)} min (actual wait after walking: ${Math.ceil(Math.max(0, route.waitingTime - route.walkToStopTime) / 60)} min)`);
         console.log(`     - Bus ride: ${Math.ceil(route.busTravelTime / 60)} min`);
