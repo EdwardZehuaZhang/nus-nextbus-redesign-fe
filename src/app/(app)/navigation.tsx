@@ -895,18 +895,7 @@ export default function NavigationPage() {
     return null;
   }, [customOriginCoords, customOriginFromBusStation, userLocation, urlUserLocation]);
 
-  // Debug logging for internal route finder
-  useEffect(() => {
-    console.log('[DEBUG] Internal Route Finder State:', {
-      effectiveOrigin,
-      destinationCoords,
-      enabled: !!effectiveOrigin && !!destinationCoords,
-      hasRoutes: routes.length > 0,
-      googleMapsTime: routes.length > 0 && routes[0].legs?.[0]?.duration 
-        ? durationToMinutes(routes[0].legs[0].duration) * 60 
-        : undefined
-    });
-  }, [effectiveOrigin, destinationCoords, routes]);
+
 
   const destinationMarkerCoords = React.useMemo(() => {
     if (destinationCoords) return destinationCoords;
@@ -2143,14 +2132,7 @@ export default function NavigationPage() {
     : undefined;
   const mapDestinationProp = destinationMarkerCoords ?? undefined;
 
-  console.log('[NavigationPage] Map Props:', {
-    hasEffectiveOrigin: !!effectiveOrigin,
-    effectiveOrigin,
-    mapOriginProp,
-    hasDestinationMarkerCoords: !!destinationMarkerCoords,
-    destinationMarkerCoords,
-    mapDestinationProp,
-  });
+
 
   return (
     <View className="flex-1" style={{ backgroundColor: '#FAFAFA' }}>

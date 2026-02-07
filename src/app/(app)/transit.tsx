@@ -840,11 +840,6 @@ const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
   // Get user's current location to pass to navigation
   const { coords: userLocation } = useLocation();
 
-  // Log favorites changes for debugging
-  React.useEffect(() => {
-    console.log('🔄 [Transit] Favorites updated:', favorites.length);
-  }, [favorites]);
-
   return (
     <View>
       <Text className="mb-2 text-sm font-medium text-neutral-500" style={{ fontFamily: 'Inter' }}>
@@ -1018,7 +1013,6 @@ const NearestStopsSection = ({
         queryFn: () => getActiveBuses(routeCode),
         staleTime: 1 * 1000, // 1 second
       }).then(() => {
-        console.log(`[🚌 BUS PREFETCH] ✅ Prefetched bus data for route: ${routeCode}`);
       }).catch((error) => {
         // Silently ignore errors for obsolete or unavailable routes
         if (error?.response?.status === 500) {

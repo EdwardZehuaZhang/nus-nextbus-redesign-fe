@@ -30,7 +30,6 @@
  *    - Batch route filter changes: effectiveActiveRoute → deferredActiveRoute with 0ms timeout
  *    - Allows React to batch multiple filter state updates before triggering re-renders
  *    - Prevents cascading re-renders that reorder map children
- *    - Log: "[RouteToogle] Deferred active route update" confirms batching
  * 
  * 4. GESTURE-AWARE POLLING (isGestureActiveRef)
  *    - handleRegionChange detects gesture start; pauses live bus polling during zoom/pan
@@ -1073,7 +1072,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     // Use 0ms timeout to defer to next frame (allows React batching of multiple filter updates)
     routeToggleTimeoutRef.current = setTimeout(() => {
       setDeferredActiveRoute(effectiveActiveRoute);
-      console.log(`[RouteToogle] Deferred active route update: ${effectiveActiveRoute || 'none'}`);
     }, 0);
 
     return () => {
@@ -1307,7 +1305,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     () => debounce((region: Region) => {
       // This is a safety update to sync state if setCurrentRegion wasn't called during gesture
       // Usually the handleRegionChange callback fires during gesture, so this is rarely invoked
-      console.log('[RegionChangeComplete] Gesture finished, syncing region if needed');
       setCurrentRegion(region);
       updateCompassFromCamera();
     }, 150),  // Reduced from 350ms to 150ms for snappier response after gesture ends
@@ -1616,61 +1613,37 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   // CRITICAL: Calculate connectorOrigin and connectorDestination BEFORE connectorSegments
   // These must be defined first since connectorSegments depends on them
   const connectorOrigin = React.useMemo<LatLng | undefined>(() => {
-    console.log('[ConnectorOrigin] Computing:', {
-      hasOriginProp: !!origin,
-      originProp: origin,
-      hasUserLocation: !!userLocation,
-      userLocation,
-    });
     if (origin) {
-      console.log('[ConnectorOrigin] Using origin prop:', origin);
       return origin;
     }
     if (userLocation) {
-      const result = { lat: userLocation.latitude, lng: userLocation.longitude };
-      console.log('[ConnectorOrigin] Using userLocation:', result);
-      return result;
+      return { lat: userLocation.latitude, lng: userLocation.longitude };
     }
-    console.log('[ConnectorOrigin] No valid origin found');
     return undefined;
   }, [origin, userLocation]);
 
   const connectorDestination = React.useMemo<LatLng | undefined>(() => {
-    console.log('[ConnectorDestination] Computing:', {
-      hasDestinationProp: !!destination,
-      destinationProp: destination,
-      hasSelectedMapItem: !!selectedMapItem,
-      selectedMapItem,
-    });
     if (destination) {
-      console.log('[ConnectorDestination] Using destination prop:', destination);
       return destination;
     }
     if (!selectedMapItem) {
-      console.log('[ConnectorDestination] No selectedMapItem');
       return undefined;
     }
     if (selectedMapItem.type === 'place') {
-      const result = {
+      return {
         lat: selectedMapItem.place.coordinates.latitude,
         lng: selectedMapItem.place.coordinates.longitude,
       };
-      console.log('[ConnectorDestination] Using place coordinates:', result);
-      return result;
     }
     if (selectedMapItem.type === 'printer') {
-      console.log('[ConnectorDestination] Using printer coordinates:', selectedMapItem.printer.coordinates);
       return selectedMapItem.printer.coordinates;
     }
     if (selectedMapItem.type === 'sports') {
-      console.log('[ConnectorDestination] Using sports facility coordinates:', selectedMapItem.facility.coordinates);
       return selectedMapItem.facility.coordinates;
     }
     if (selectedMapItem.type === 'canteen') {
-      console.log('[ConnectorDestination] Using canteen coordinates:', selectedMapItem.canteen.coords);
       return selectedMapItem.canteen.coords;
     }
-    console.log('[ConnectorDestination] No valid destination found');
     return undefined;
   }, [destination, selectedMapItem]);
 
@@ -1684,19 +1657,10 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       zIndex: number;
     }> = [];
 
-    console.log('[ConnectorSegments] Computing connector segments:', {
-      hasInternalPolylines: !!internalRoutePolylines,
-      hasRouteSteps: !!routeSteps && routeSteps.length > 0,
-      hasRouteCoordinates: routeCoordinates.length > 0,
-      hasConnectorOrigin: !!connectorOrigin,
-      hasConnectorDestination: !!connectorDestination,
-      connectorOrigin,
-      connectorDestination,
-    });
+
 
     // Early exit if we don't have both origin and destination
     if (!connectorOrigin || !connectorDestination) {
-      console.log('[ConnectorSegments] Missing origin or destination - cannot render connectors');
       return segments;
     }
 
@@ -1706,15 +1670,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         const walkToStop = internalRoutePolylines.walkToStop || [];
         const walkFromStop = internalRoutePolylines.walkFromStop || [];
 
-        console.log('[ConnectorSegments] Internal route segments:', {
-          walkToStopLength: walkToStop.length,
-          busSegLength: busSeg.length,
-          walkFromStopLength: walkFromStop.length,
-          walkToStopFirst: walkToStop[0],
-          busSegFirst: busSeg[0],
-          walkFromStopLast: walkFromStop[walkFromStop.length - 1],
-          busSegLast: busSeg[busSeg.length - 1],
-        });
+
 
         // For internal routes: connectors bridge gaps between origin/destination and the rendered segments
         // Priority: walkToStop > busSegment for start, walkFromStop > busSegment for end
@@ -1737,12 +1693,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           endPoint = busSeg[busSeg.length - 1];
         }
 
-        console.log('[ConnectorSegments] Computed route endpoints from internal:', { 
-          startPoint, 
-          endPoint,
-          strategy: walkToStop.length > 1 ? 'walkToStop' : 'busSegment',
-          endStrategy: walkFromStop.length > 1 ? 'walkFromStop' : 'busSegment',
-        });
+
 
         if (startPoint && endPoint) {
           return {
@@ -1795,10 +1746,9 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       return null;
     })();
 
-    console.log('[ConnectorSegments] Route endpoints:', routeEndpoints);
+
 
     if (!routeEndpoints) {
-      console.log('[ConnectorSegments] No route endpoints - falling back to direct origin-destination connector');
       // FALLBACK: If no route segments exist, draw a direct connector from origin to destination
       const originPoint = { latitude: connectorOrigin.lat, longitude: connectorOrigin.lng };
       const destPoint = { latitude: connectorDestination.lat, longitude: connectorDestination.lng };
@@ -1808,19 +1758,15 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         key: 'connector-direct',
         coordinates: [originPoint, destPoint],
         strokeColor: dottedColor,
-        strokeWidth: 4,
-        lineDashPattern: [8, 8],
+        strokeWidth: 5,
+        lineDashPattern: [1, 4],
         zIndex: 40,
       });
       
-      console.log('[ConnectorSegments] Added direct origin-to-destination connector');
       return segments;
     }
 
-    console.log('[ConnectorSegments] Route endpoints found:', {
-      routeStart: routeEndpoints.routeStart,
-      routeEnd: routeEndpoints.routeEnd,
-    });
+
 
     // Use a more visible color and wider stroke for connectors
     const dottedColor = hexToRgba('#274F9C', 1.0);
@@ -1838,16 +1784,9 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     const originPoint = { latitude: connectorOrigin.lat, longitude: connectorOrigin.lng };
     const distanceToStart = getDistance(originPoint, routeEndpoints.routeStart);
     
-    console.log('[ConnectorSegments] Origin connector analysis:', {
-      originPoint,
-      routeStart: routeEndpoints.routeStart,
-      distance: distanceToStart,
-      minDistance: MIN_CONNECTOR_DISTANCE,
-      willRender: distanceToStart > MIN_CONNECTOR_DISTANCE,
-    });
+
     
     if (distanceToStart > MIN_CONNECTOR_DISTANCE) {
-      console.log('[ConnectorSegments] Adding origin connector (dotted line)');
       segments.push({
         key: 'connector-start',
         coordinates: [
@@ -1856,26 +1795,16 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         ],
         strokeColor: dottedColor,
         strokeWidth: 5,
-        lineDashPattern: [10, 10],
+        lineDashPattern: [1, 4],
         zIndex: 45,
       });
     } else {
-      console.log('[ConnectorSegments] Skipping origin connector (distance too small)');
     }
 
     const destPoint = { latitude: connectorDestination.lat, longitude: connectorDestination.lng };
     const distanceToEnd = getDistance(routeEndpoints.routeEnd, destPoint);
     
-    console.log('[ConnectorSegments] Destination connector analysis:', {
-      routeEnd: routeEndpoints.routeEnd,
-      destPoint,
-      distance: distanceToEnd,
-      minDistance: MIN_CONNECTOR_DISTANCE,
-      willRender: distanceToEnd > MIN_CONNECTOR_DISTANCE,
-    });
-    
     if (distanceToEnd > MIN_CONNECTOR_DISTANCE) {
-      console.log('[ConnectorSegments] Adding destination connector (dotted line)');
       segments.push({
         key: 'connector-end',
         coordinates: [
@@ -1884,21 +1813,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         ],
         strokeColor: dottedColor,
         strokeWidth: 5,
-        lineDashPattern: [10, 10],
+        lineDashPattern: [1, 4],
         zIndex: 45,
       });
     } else {
-      console.log('[ConnectorSegments] Skipping destination connector (distance too small)');
     }
 
-    console.log('[ConnectorSegments] Final segments summary:', {
-      totalSegments: segments.length,
-      segmentKeys: segments.map(s => s.key),
-      connectorOrigin: originPoint,
-      connectorDestination: destPoint,
-      routeStart: routeEndpoints.routeStart,
-      routeEnd: routeEndpoints.routeEnd,
-    });
+
     
     return segments;
   }, [connectorOrigin, connectorDestination, internalRoutePolylines, routeSteps, routeCoordinates]);
@@ -2009,11 +1930,9 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   useEffect(() => {
     const allStops = busStopsData?.BusStopsResult?.busstops;
     if (!allStops) {
-      console.log('🗺️ [MEMBERSHIP] No bus stops data available');
       return;
     }
     
-    console.log(`🗺️ [MEMBERSHIP] Computing for ${Object.keys(routeColors).length} routes with ${allStops.length} stops`);
     
     const LAT_THRESHOLD = 0.0005;
     const LNG_THRESHOLD = 0.0005;
@@ -2032,7 +1951,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         if (match) set.add(stop.name);
       });
       routeStopMembershipRef.current.set(routeCode, set);
-      console.log(`🗺️ [MEMBERSHIP] Route ${routeCode}: ${set.size} stops`);
     });
   }, [busStopsData, routeColors]);
 
@@ -2204,8 +2122,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   // Log bus stop visibility summary
   useEffect(() => {
     if (shouldShowBusStops && clusteredInputMarkers.length > 0) {
-      console.log(`[BusStopsVisibility] Zoom ${currentZoom}: ${clusteredInputMarkers.length} stops visible (out of ${allBusStops.length} total)`);
-      console.log(`[BusStopsVisibility] Visible stops: ${clusteredInputMarkers.map((m) => m.name).join(', ')}`);
     }
   }, [clusteredInputMarkers, currentZoom, shouldShowBusStops, allBusStops.length]);
 
