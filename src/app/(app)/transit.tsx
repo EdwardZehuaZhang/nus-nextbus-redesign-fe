@@ -68,6 +68,7 @@ import {
   getRecentSearches,
 } from '@/lib/storage/recent-searches';
 
+
 // Initialize location permissions early
 const LocationInitializer = () => {
   useLocation();
@@ -2359,7 +2360,7 @@ const MapSelectionDetails = ({
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
-  // Initialize location permissions on mount
+  // Initialize location permissions on mount (backup)
   useLocation();
   
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
@@ -2545,7 +2546,8 @@ export default function TransitPage() {
   };
 
   const handleFilterChange = (filters: Record<string, boolean>) => {
-    console.log('Filter changes:', filters);
+    const mergedFilters = { ...mapFilters, ...filters };
+    console.log('Filter changes:', mergedFilters);
     
     // Check if a bus route was selected/deselected in the filter panel
     const busRouteFilters = [
@@ -2561,7 +2563,7 @@ export default function TransitPage() {
     
     let newSelectedRoute: string | null = null;
     for (const routeFilter of busRouteFilters) {
-      if (filters[routeFilter]) {
+      if (mergedFilters[routeFilter]) {
         // Extract route name from filter id (e.g., 'bus-route-d1' -> 'D1')
         newSelectedRoute = routeFilter.replace('bus-route-', '').toUpperCase();
         break;
@@ -2598,8 +2600,8 @@ export default function TransitPage() {
     
     // Only update mapFilters if we're not restoring from previousState
     if (!isRestoringPreviousState) {
-      setMapFilters(filters);
-      storage.set('map-filters', JSON.stringify(filters));
+      setMapFilters(mergedFilters);
+      storage.set('map-filters', JSON.stringify(mergedFilters));
     }
   };
 

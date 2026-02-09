@@ -2107,10 +2107,11 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
 
   // Determine what to show based on filters
+  const isRouteActive = !!deferredActiveRoute;
   const shouldShowLandmarks = showLandmarks && filterImportant;
-  const shouldShowPrinters = (mapFilters?.printers ?? false) && currentZoom !== 14;
-  const shouldShowSports = (mapFilters?.sports ?? false) && currentZoom !== 14;
-  const shouldShowCanteens = (mapFilters?.canteens ?? false) && currentZoom !== 14;
+  const shouldShowPrinters = (mapFilters?.printers ?? false) && currentZoom !== 14 && !isRouteActive;
+  const shouldShowSports = (mapFilters?.sports ?? false) && currentZoom !== 14 && !isRouteActive;
+  const shouldShowCanteens = (mapFilters?.canteens ?? false) && currentZoom !== 14 && !isRouteActive;
   // Fix: Only show bus stops if BOTH showBusStops prop AND filterBusStops are true, OR if visibleBusStops is provided
   const shouldShowBusStops = (showBusStops && filterBusStops) || (visibleBusStops && visibleBusStops.length > 0);
   const shouldShowAcademic = filterAcademic;

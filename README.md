@@ -35,6 +35,20 @@ NUS NextBus Redesign is a complete overhaul of the NUS Internal Shuttle Bus Serv
 - 🎨 **Route Colors**: Dynamic color-coded routes matching official NUS bus colors
 - 🔍 **Smart Search**: Find destinations and plan routes efficiently
 - 🌐 **Multi-environment Support**: Development and production backend configurations
+- ⚡ **Optimized Startup**: Priority loading system ensures nearest stops appear in ~2-3 seconds
+
+---
+
+## ⚡ Performance Optimization
+
+**NEW:** The app now includes a **Priority Initialization System** that dramatically improves startup speed:
+
+- **Fastest possible UI:** User location and nearest stops load first (~2-3 seconds)
+- **Smart prefetching:** Shuttle data loads silently in the background
+- **Clear feedback:** Users see specific status messages ("Getting location..." instead of generic "Loading...")
+- **Network efficient:** Prioritized sequencing prevents congestion
+
+📖 See [STARTUP_OPTIMIZATION.md](./STARTUP_OPTIMIZATION.md) for details on how this works and how to customize it.
 
 ---
 

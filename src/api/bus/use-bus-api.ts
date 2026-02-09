@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { PRIORITY_QUERY_CONFIG } from '@/api/common/query-config';
 import {
   getActiveBuses,
   getAnnouncements,
@@ -28,13 +29,15 @@ export const usePublicity = () => {
 
 /**
  * Hook to fetch all bus stops
+ * PRIORITY: Critical for nearest stops calculation on app startup
+ * Uses fast retry and longer cache time
  */
 export const useBusStops = () => {
   try {
     return useQuery({
       queryKey: ['busStops'],
       queryFn: getBusStops,
-      staleTime: 10 * 60 * 1000, // 10 minutes - bus stops rarely change
+      ...PRIORITY_QUERY_CONFIG.busStops, // Use priority config: 10min stale, fast retry
     });
   } catch (error) {
     console.error('[useBusStops] Error initializing query:', error);
@@ -57,6 +60,7 @@ export const usePickupPoints = (routeCode: RouteCode) => {
 
 /**
  * Hook to fetch shuttle service at a bus stop
+ * PRIORITY: Critical for displaying nearest stop bus arrivals
  * Refetches frequently for real-time updates
  * Uses dynamic polling: faster when buses are arriving soon, slower otherwise
  */
@@ -65,7 +69,7 @@ export const useShuttleService = (busStopName: string, enabled = true) => {
     queryKey: ['shuttleService', busStopName],
     queryFn: () => getShuttleService(busStopName),
     enabled: enabled && !!busStopName,
-    staleTime: 5 * 1000, // 5 seconds
+    ...PRIORITY_QUERY_CONFIG.shuttleService, // Use priority config: 5s stale, no refetch on focus
     refetchInterval: (query) => {
       const data = query.state.data;
       
@@ -156,11 +160,15 @@ export const useRouteMinMaxTime = (routeCode: RouteCode) => {
 /**
  * Hook to fetch service descriptions
  */
+/**
+ * Hook to fetch service descriptions (route colors and metadata)
+ * PRIORITY: Critical for displaying route colors on nearest stops
+ */
 export const useServiceDescriptions = () => {
   return useQuery({
     queryKey: ['serviceDescriptions'],
     queryFn: getServiceDescriptions,
-    staleTime: 30 * 60 * 1000, // 30 minutes
+    ...PRIORITY_QUERY_CONFIG.serviceDescriptions, // Use priority config
   });
 };
 
