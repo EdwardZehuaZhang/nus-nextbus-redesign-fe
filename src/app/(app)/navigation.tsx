@@ -2157,6 +2157,7 @@ export default function NavigationPage() {
             visibleBusStopsColor={memoizedInternalRoutePolylines?.busRouteColor}
             enablePlaceDetails={false} // Disable place details on navigation page
             destination={mapDestinationProp} // Show destination pin marker
+            showRouteConnectors={true}
             mapFilters={{
               important: true,
               'bus-stops': false,

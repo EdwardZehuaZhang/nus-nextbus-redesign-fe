@@ -264,6 +264,7 @@ interface InteractiveMapProps {
   enablePlaceDetails?: boolean;
   selectedMapItem?: MapSelection | null;
   forceResetCenter?: boolean;
+  showRouteConnectors?: boolean;
 }
 
 const DEFAULT_REGION: Region = {
@@ -1001,6 +1002,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   enablePlaceDetails = true,
   selectedMapItem,
   forceResetCenter = false,
+  showRouteConnectors = false,
 }) => {
   const mapRef = useRef<MapView>(null);
   const [internalMapType, setInternalMapType] = useState<
@@ -1657,7 +1659,9 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       zIndex: number;
     }> = [];
 
-
+    if (!showRouteConnectors) {
+      return segments;
+    }
 
     // Early exit if we don't have both origin and destination
     if (!connectorOrigin || !connectorDestination) {
@@ -1822,7 +1826,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
     
     return segments;
-  }, [connectorOrigin, connectorDestination, internalRoutePolylines, routeSteps, routeCoordinates]);
+  }, [connectorOrigin, connectorDestination, internalRoutePolylines, routeSteps, routeCoordinates, showRouteConnectors]);
 
   // Generate stable MapView key to force remount when route structure changes
   // This prevents iOS AIRGoogleMap crash from child count changes during render

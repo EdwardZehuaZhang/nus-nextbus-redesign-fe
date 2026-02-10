@@ -150,6 +150,7 @@ interface InteractiveMapProps {
   onMapItemSelect?: (selection: MapSelection | null) => void;
   selectedMapItem?: MapSelection | null;
   forceResetCenter?: boolean; // Force reset map center to initial region
+  showRouteConnectors?: boolean; // Control route connector dotted lines (default false)
 }
 
 // Use a campus-centered starting point. The user provided a screen-centered
@@ -3475,12 +3476,24 @@ const useConnectorLines = (
     busSegment: google.maps.LatLngLiteral[];
     walkFromStop: google.maps.LatLngLiteral[];
     busRouteColor?: string;
-  } | null
+  } | null,
+  showRouteConnectors: boolean = false
 ) => {
   const startConnectorRef = useRef<google.maps.Polyline | null>(null);
   const endConnectorRef = useRef<google.maps.Polyline | null>(null);
 
   useEffect(() => {
+    if (!showRouteConnectors) {
+      if (startConnectorRef.current) {
+        startConnectorRef.current.setMap(null);
+        startConnectorRef.current = null;
+      }
+      if (endConnectorRef.current) {
+        endConnectorRef.current.setMap(null);
+        endConnectorRef.current = null;
+      }
+      return;
+    }
     if (!mapRef.current || typeof window === 'undefined' || !window.google)
       return;
 
@@ -3656,7 +3669,7 @@ const useConnectorLines = (
         endConnectorRef.current.setMap(null);
       }
     };
-  }, [origin, destination, routePolyline, routeSteps, internalRoutePolylines, mapRef]);
+  }, [origin, destination, routePolyline, routeSteps, internalRoutePolylines, mapRef, showRouteConnectors]);
 };
 
 // Hook to render bus stop markers with labels
@@ -5760,6 +5773,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapItemSelect,
   selectedMapItem,
   forceResetCenter = false,
+  showRouteConnectors = false,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
@@ -6241,7 +6255,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     connectorDestination,
     routePolyline,
     routeSteps,
-    internalRoutePolylines
+    internalRoutePolylines,
+    showRouteConnectors
   ); // Draw dotted lines from user to route start and route end to destination
   
   useNUSCampusHighlight(mapRef, isMapCreated, showD1Route, mapFilters.academic || false, mapFilters.residences || false);
