@@ -3034,6 +3034,10 @@ const useNUSCampusHighlight = (
         if (label) {
           if (shouldShow) {
             label.setMap(map);
+            // Update font size to trigger redraw with correct positioning
+            if (typeof (label as any).updateFontSize === 'function') {
+              (label as any).updateFontSize(14);
+            }
           } else {
             label.setMap(null);
           }

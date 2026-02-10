@@ -3096,7 +3096,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
                 longitude: printer.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowPrinters ? 1 : 0}
               onPress={isPrinterClickable ? handlePrinterPress(printer) : undefined}
               onSelect={
@@ -3127,7 +3127,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
                 longitude: facility.coordinates.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowSports ? 1 : 0}
               onPress={isSportsClickable ? handleSportsFacilityPress(facility) : undefined}
               onSelect={
@@ -3157,7 +3157,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
                 longitude: canteen.coords.lng,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
               opacity={shouldShowCanteens ? 1 : 0}
               onPress={isCanteenClickable ? handleCanteenPress(canteen) : undefined}
               onSelect={
@@ -3250,8 +3250,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
         {/* Residence Hall Labels - Visible at zoom 17+ only when bus stops are shown */}
         {RESIDENCE_LABELS.map((area) => {
-          const zoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
-          const isVisible = shouldShowResidences && zoom >= 17 && zoom >= 14;
+          const labelZoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
+          const isVisible = shouldShowResidences && currentZoom >= 17;
           
           return (
             <AreaLabelMarker
@@ -3261,7 +3261,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               position={area.position}
               color={area.color}
               isVisible={isVisible}
-              currentZoom={zoom}
+              currentZoom={labelZoom}
             />
           );
         })}
