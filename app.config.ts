@@ -53,13 +53,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         'This app needs your location to show nearby bus stops and help you navigate to them.',
       NSUserNotificationUsageDescription:
         'This app uses notifications to remind you when it is time to leave.',
-      // Preserve custom app icon variants (dark/tinted)
-      CFBundleIcons: {
-        CFBundlePrimaryIcon: {
-          CFBundleIconFiles: ['AppIcon'],
-          UIPrerenderedIcon: false,
-        },
-      },
     },
     config: {
       googleMapsApiKey: Env.GOOGLE_MAPS_API_KEY,
@@ -120,6 +113,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     'expo-localization',
     'expo-router',
+    './plugins/with-ios-icon-variants',
     // Only use app-icon-badge in non-production to avoid overwriting custom icon variants
     ...(Env.APP_ENV !== 'production' ? [['app-icon-badge', appIconBadgeConfig]] : []),
     ['react-native-edge-to-edge'],

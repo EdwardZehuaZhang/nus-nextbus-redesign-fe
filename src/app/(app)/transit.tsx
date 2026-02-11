@@ -1082,6 +1082,8 @@ const NearestStopsSection = ({
             ) : currentBusRoutes.length === 0 ? (
               <View className="items-center py-8">
                 <Text className="text-sm text-neutral-500">No buses available</Text>
+                <Text className="text-xs text-neutral-400 mt-2">Mon - Sat: 07:00 - 23:00</Text>
+                <Text className="text-xs text-neutral-400">Sun/Public Holiday: 9:00 - 22:00</Text>
               </View>
             ) : (
               <View className="gap-2">
@@ -2135,6 +2137,8 @@ const MapSelectionDetails = ({
                     <Text style={{ fontSize: 13, color: '#6B7280' }}>
                       No buses available
                     </Text>
+                    <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 8 }}>Mon - Sat: 07:00 - 23:00</Text>
+                    <Text style={{ fontSize: 12, color: '#9CA3AF' }}>Sun/Public Holiday: 9:00 - 22:00</Text>
                   </View>
                 ) : (
                   <View style={{ gap: 8 }}>
