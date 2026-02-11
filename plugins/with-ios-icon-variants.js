@@ -30,6 +30,8 @@ module.exports = function withIosIconVariants(config) {
         'icon-dark.png': 'App-Icon-dark-1024x1024@1x.png',
         'icon-tinted.png': 'App-Icon-tinted-1024x1024@1x.png',
         'icon-tinted-dark.png': 'App-Icon-tinted-dark-1024x1024@1x.png',
+        'Nus-maps-iOS-ClearDark-1024x1024@1x.png': 'App-Icon-clear-dark-1024x1024@1x.png',
+        'Nus-maps-iOS-ClearLight-1024x1024@1x.png': 'App-Icon-light-1024x1024@1x.png',
       };
 
       Object.entries(iconFiles).forEach(([sourceFile, targetFile]) => {
@@ -55,10 +57,7 @@ module.exports = function withIosIconVariants(config) {
           },
           {
             appearances: [
-              {
-                appearance: 'luminosity',
-                value: 'dark',
-              },
+              { appearance: 'luminosity', value: 'dark' },
             ],
             filename: 'App-Icon-dark-1024x1024@1x.png',
             idiom: 'universal',
@@ -67,10 +66,7 @@ module.exports = function withIosIconVariants(config) {
           },
           {
             appearances: [
-              {
-                appearance: 'luminosity',
-                value: 'tinted',
-              },
+              { appearance: 'luminosity', value: 'tinted' },
             ],
             filename: 'App-Icon-tinted-1024x1024@1x.png',
             idiom: 'universal',
@@ -79,16 +75,31 @@ module.exports = function withIosIconVariants(config) {
           },
           {
             appearances: [
-              {
-                appearance: 'luminosity',
-                value: 'dark',
-              },
-              {
-                appearance: 'luminosity',
-                value: 'tinted',
-              },
+              { appearance: 'luminosity', value: 'dark' },
+              { appearance: 'luminosity', value: 'tinted' },
             ],
             filename: 'App-Icon-tinted-dark-1024x1024@1x.png',
+            idiom: 'universal',
+            platform: 'ios',
+            size: '1024x1024',
+          },
+          // Clear dark
+          {
+            appearances: [
+              { appearance: 'luminosity', value: 'dark' },
+              { appearance: 'theme', value: 'clear' },
+            ],
+            filename: 'App-Icon-clear-dark-1024x1024@1x.png',
+            idiom: 'universal',
+            platform: 'ios',
+            size: '1024x1024',
+          },
+          // Clear light
+          {
+            appearances: [
+              { appearance: 'theme', value: 'clear' },
+            ],
+            filename: 'App-Icon-light-1024x1024@1x.png',
             idiom: 'universal',
             platform: 'ios',
             size: '1024x1024',

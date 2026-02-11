@@ -1,6 +1,7 @@
 pnpm exec cross-env EXPO_NO_DOTENV=1 expo start --tunnel
 
 pnpm eas build -p ios --profile adhoc
+yes | pnpm eas build -p ios --profile adhoc
 pnpm eas build -p android --profile adhoc
 
 pnpm eas build -p android --profile production
