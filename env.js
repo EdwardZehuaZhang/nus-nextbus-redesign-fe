@@ -35,12 +35,12 @@ require('dotenv').config({
 
 // TODO: Replace these values with your own
 
-const BUNDLE_ID = 'com.edwardzhang.nusnextbus'; // ios bundle id
-const PACKAGE = 'com.edwardzhang.nusnextbus'; // android package name
+const BUNDLE_ID = 'com.edwardzehuazhang.nusmaps'; // ios bundle id
+const PACKAGE = 'com.edwardzehuazhang.nusmaps'; // android package name
 const NAME = 'NUS-Maps'; // app name
 const EXPO_ACCOUNT_OWNER = 'edwardzehuazhang'; // expo account owner
 const EAS_PROJECT_ID = '52efcc10-65b2-4756-92c9-b44bcacf373e'; // eas project id
-const SCHEME = 'nusnextbus'; // app scheme
+const SCHEME = 'nusmaps'; // app scheme
 
 /**
  * We declare a function withEnvSuffix that will add a suffix to the variable name based on the APP_ENV
@@ -164,3 +164,4 @@ module.exports = {
   ClientEnv,
   withEnvSuffix,
 };
+

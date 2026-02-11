@@ -2388,30 +2388,15 @@ export default function TransitPage() {
   };
 
   const openPrivacy = () => {
-    router.push('/privacy');
+    openExternal('https://www.nusmaps.com/app/privacy-policy');
   };
 
   const openTerms = () => {
-    router.push('/terms');
+    openExternal('https://www.nusmaps.com/app/terms-of-service');
   };
 
   const openSupport = () => {
-    Linking.canOpenURL(supportMailto)
-      .then((canOpen) => {
-        if (canOpen) return Linking.openURL(supportMailto);
-        showMessage({
-          message: 'No mail app available',
-          description: 'Please install or configure an email app.',
-          type: 'warning',
-        });
-      })
-      .catch(() => {
-        showMessage({
-          message: 'Unable to open email',
-          description: 'Please try again or check your mail app.',
-          type: 'danger',
-        });
-      });
+    openExternal('https://www.nusmaps.com/support');
   };
   const pathname = usePathname();
   const isFocused = useIsFocused();
