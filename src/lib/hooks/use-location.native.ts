@@ -49,6 +49,7 @@ const SF_MOCK_LOCATION = {
 // Global singleton watcher
 let globalWatchSubscription: Location.LocationSubscription | null = null;
 let activeSubscribers = 0;
+let initializationStarted = false;
 
 /**
  * Check if location is the default simulator mock location
@@ -64,33 +65,43 @@ const isSimulatorMockLocation = (lat: number, lng: number): boolean => {
  * Initialize the global location watcher (only once)
  */
 const initializeLocationWatcher = async () => {
-  if (globalWatchSubscription !== null) {
+  // If already initialized or already started, don't do it again
+  if (initializationStarted || globalWatchSubscription !== null) {
+    debugLog('[Location] Initialization already started/completed, skipping');
     return;
   }
 
+  initializationStarted = true;
   const store = useLocationStore.getState();
 
-  
-  // Request location permissions
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  
-  if (status !== 'granted') {
-    store.setLoading(false);
-    return;
-  }
-
-  
-  // Only set loading if we don't have a location yet
-  if (!store.coords) {
-    store.setLoading(true);
-  }
-
   try {
-    // First, try to get the current location immediately
+    // Request location permissions
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    
+    debugLog('[Location] Permission status:', status);
+    
+    if (status !== 'granted') {
+      store.setError('Location permission denied. Please enable it in settings.');
+      debugWarn('[Location] Permission not granted:', status);
+      return;
+    }
+    
+    // Clear any previous errors now that we have permission
+    debugLog('[Location] Permission granted, clearing any previous errors');
+    
+    // Only set loading if we don't have a location yet
+    if (!store.coords) {
+      store.setLoading(true);
+    }
+
     try {
+      debugLog('[Location] Requesting current position...');
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
+        timeoutMs: 10000,
       });
+      
+      debugLog('[Location] Got current position:', currentLocation.coords);
       
       let latitude = currentLocation.coords.latitude;
       let longitude = currentLocation.coords.longitude;
@@ -100,9 +111,10 @@ const initializeLocationWatcher = async () => {
       if (isSimulatorMockLocation(latitude, longitude)) {
         latitude = TEST_LOCATION.latitude;
         longitude = TEST_LOCATION.longitude;
+        debugLog('[Location] Replaced simulator mock location with test location');
       }
       
-      // Simulate heading if not available (simulators typically don't have heading)
+      // Simulate heading if not available
       if (!heading || heading < 0) {
         heading = simulatedHeading;
       }
@@ -114,30 +126,37 @@ const initializeLocationWatcher = async () => {
         speed: currentLocation.coords.speed,
         accuracy: currentLocation.coords.accuracy ?? undefined,
       });
+      
+      debugLog('[Location] Location set successfully', {
+        lat: latitude,
+        lng: longitude,
+      });
     } catch (err) {
+      debugWarn('[Location] Error getting current position:', err);
+      // Don't set error here - the watch will try to get location
+      // Only set loading to false to prevent infinite loading state
+      store.setLoading(false);
     }
 
     // Then start watching for continuous updates
+    debugLog('[Location] Starting location watch...');
     globalWatchSubscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-        timeInterval: 5000, // Update every 5 seconds
-        distanceInterval: 10, // Or when user moves 10 meters
+        timeInterval: 5000,
+        distanceInterval: 10,
       },
       (location) => {
         let latitude = location.coords.latitude;
         let longitude = location.coords.longitude;
         let heading = location.coords.heading;
         
-        // Check if it's the simulator mock location and replace with test location
         if (isSimulatorMockLocation(latitude, longitude)) {
           latitude = TEST_LOCATION.latitude;
           longitude = TEST_LOCATION.longitude;
         }
         
-        // Simulate heading if not available (simulators typically don't have heading)
         if (!heading || heading < 0) {
-          // Animate heading for visual effect
           simulatedHeading = (simulatedHeading + HEADING_ANIMATION_SPEED) % 360;
           heading = simulatedHeading;
         }
@@ -149,11 +168,25 @@ const initializeLocationWatcher = async () => {
           speed: location.coords.speed,
           accuracy: location.coords.accuracy ?? undefined,
         });
+        debugLog('[Location] Location watch updated');
+      },
+      (error) => {
+        // Don't set error for watch position errors - these are transient issues
+        // that shouldn't prevent the user from seeing the map.
+        // Only getCurrentPositionAsync errors indicate a real problem.
+        debugWarn('[Location] Watch position error (non-critical):', error);
       }
     );
+    
+    debugLog('[Location] Location watcher started successfully');
 
   } catch (err) {
-    store.setError('Failed to start location tracking');
+    debugWarn('[Location] Location initialization error:', err);
+    // Only set error if permission was actually denied
+    // For other errors, the watch might still work
+    if (err instanceof Error && err.message?.includes('permission')) {
+      store.setError('Location permission denied');
+    }
     store.setLoading(false);
   }
 };
@@ -178,21 +211,27 @@ export const useLocation = () => {
 
   useEffect(() => {
     activeSubscribers++;
+    debugLog('[Location] Subscriber count:', activeSubscribers);
 
     // Initialize watcher on first mount
-    initializeLocationWatcher();
+    initializeLocationWatcher().catch((err) => {
+      debugWarn('[Location] Init error:', err);
+    });
 
     return () => {
       activeSubscribers--;
+      debugLog('[Location] Subscriber unmounted, count:', activeSubscribers);
 
-      // Only clean up watcher when ALL components are unmounted
+      // Clean up watcher when all subscribers are gone
       if (activeSubscribers === 0) {
         setTimeout(() => {
           if (activeSubscribers === 0 && globalWatchSubscription !== null) {
+            debugLog('[Location] Cleaning up watcher');
             globalWatchSubscription.remove();
             globalWatchSubscription = null;
+            initializationStarted = false; // Allow re-initialization if app remounts
           }
-        }, 1000); // 1 second delay to handle navigation transitions
+        }, 300);
       }
     };
   }, []);

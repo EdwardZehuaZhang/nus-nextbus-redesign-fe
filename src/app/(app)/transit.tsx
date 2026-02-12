@@ -917,7 +917,11 @@ const NearestStopsSection = ({
   const effectiveLocation = userLocation || (locationError ? SDE3_FALLBACK_COORDS : null);
 
   // Fetch all bus stops from the API
-  const { data: busStopsData } = useBusStops();
+  const {
+    data: busStopsData,
+    isLoading: busStopsLoading,
+    isError: busStopsError,
+  } = useBusStops();
 
   // Calculate nearest stops based on user location
   const nearestStops = React.useMemo(() => {
@@ -1043,6 +1047,15 @@ const NearestStopsSection = ({
                   This will take a second
                 </Text>
               </>
+            ) : busStopsLoading ? (
+              <>
+                <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+                  Loading bus stops<AnimatedDots interval={400} />
+                </Text>
+                <Text className="text-center text-sm text-neutral-500">
+                  This will take a moment
+                </Text>
+              </>
             ) : locationError ? (
               <>
                 <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
@@ -1052,13 +1065,22 @@ const NearestStopsSection = ({
                   Enable location permission in settings
                 </Text>
               </>
+            ) : busStopsError ? (
+              <>
+                <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
+                  Bus stops unavailable
+                </Text>
+                <Text className="text-center text-sm text-neutral-500">
+                  Please check your connection and try again
+                </Text>
+              </>
             ) : (
               <>
                 <Text className="mb-2 text-center text-base font-semibold text-neutral-700">
-                  Location Unavailable
+                  No nearby stops
                 </Text>
                 <Text className="text-center text-sm text-neutral-500">
-                  Please enable location services to find nearby stops
+                  Try moving closer to campus or refresh
                 </Text>
               </>
             )}
@@ -2364,8 +2386,12 @@ const MapSelectionDetails = ({
 
 /* eslint-disable max-lines-per-function */
 export default function TransitPage() {
-  // Initialize location permissions on mount (backup)
-  useLocation();
+  // Initialize location permissions on mount and get location state
+  const { error: locationError, loading: locationLoading } = useLocation();
+  
+  // Only show error if location is no longer loading AND there's an error
+  // This prevents showing "unavailable" during the short initialization period
+  const shouldShowLocationError = !locationLoading && !!locationError;
   
   const [isInfoOpen, setIsInfoOpen] = React.useState(false);
   const githubUrl = 'https://github.com/EdwardZehuaZhang';
@@ -2609,45 +2635,68 @@ export default function TransitPage() {
           height: '100%',
         }}
       >
-        <InteractiveMap
-          style={{ width: '100%', height: '100%' }}
-          showD1Route={selectedRoute === 'D1'}
-          activeRoute={(selectedRoute?.toUpperCase() ?? null) as any} // Pass selected route to show real-time buses (ensure uppercase)
-          onActiveRouteChange={(route: any) => setSelectedRoute(route)} // Sync filter selection back to transit page
-          showBusStops={true} // Show bus stop markers with labels
-          showLandmarks={true} // Show landmarks (hospital, MRT, library) when zoomed in
-          showMapControls={false} // Disable map controls in InteractiveMap, we'll render them at top level
-          mapFilters={mapFilters} // Pass filters from parent
-          onMapFiltersChange={handleFilterChange} // Handle filter changes
-          onMapItemSelect={(selection: MapSelection | null) => {
-            // If the sheet is collapsed, expand back to default when a location is picked
-            if (selection && isCollapsed) {
-              resetToDefault();
-            }
-            setMapSelection(selection);
-          }}
-          selectedMapItem={mapSelection}
-          onMapTypeChangeReady={(handler: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) => {
-            mapTypeChangeHandlerRef.current = handler;
-          }}
-        />
+        {/* Only render map if there's no location error (including during loading) */}
+        {!shouldShowLocationError && (
+          <InteractiveMap
+            style={{ width: '100%', height: '100%' }}
+            showD1Route={selectedRoute === 'D1'}
+            activeRoute={(selectedRoute?.toUpperCase() ?? null) as any}
+            onActiveRouteChange={(route: any) => setSelectedRoute(route)}
+            showBusStops={true}
+            showLandmarks={true}
+            showMapControls={false}
+            mapFilters={mapFilters}
+            onMapFiltersChange={handleFilterChange}
+            onMapItemSelect={(selection: MapSelection | null) => {
+              if (selection && isCollapsed) {
+                resetToDefault();
+              }
+              setMapSelection(selection);
+            }}
+            selectedMapItem={mapSelection}
+            onMapTypeChangeReady={(handler: (mapType: 'standard' | 'satellite' | 'hybrid' | 'terrain') => void) => {
+              mapTypeChangeHandlerRef.current = handler;
+            }}
+          />
+        )}
+        
+        {/* Show error message only if we've stopped loading AND there's an error */}
+        {shouldShowLocationError && (
+          <View style={{ flex: 1, backgroundColor: '#FAFAFA', justifyContent: 'center', alignItems: 'center' }}>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 40, alignItems: 'center', gap: 12 }}>
+              <LocationIcon width={48} height={48} color="#D1D5DB" />
+              <Text style={{ fontSize: 18, fontWeight: '600', color: '#374151', textAlign: 'center' }}>
+                Location Unavailable
+              </Text>
+              <Text style={{ fontSize: 14, color: '#6B7280', textAlign: 'center' }}>
+                {locationError}
+              </Text>
+              <Text style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginTop: 8 }}>
+                To use the interactive map, please enable location services in your device settings.
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <ActionButtons />
 
       {/* Backdrop/Shading - animated opacity for smooth transition */}
-      <Animated.View
-        style={{
-          position: 'absolute' as any,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          opacity: backdropOpacity,
-          pointerEvents: 'none',
-        }}
-      />
+      {/* Only show backdrop if map is available (no location error) */}
+      {!shouldShowLocationError && (
+        <Animated.View
+          style={{
+            position: 'absolute' as any,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            opacity: backdropOpacity,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
 
       {/* Sports and Printers Toggle Bubbles */}
       <SportsAndPrintersBubbles

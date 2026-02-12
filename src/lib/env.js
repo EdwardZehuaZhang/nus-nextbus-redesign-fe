@@ -10,4 +10,8 @@ import Constants from 'expo-constants';
  *  @type {typeof import('../../env.js').ClientEnv}
  */
 //@ts-ignore // Don't worry about TypeScript here; we know we're passing the correct environment variables to `extra` in `app.config.ts`.
-export const Env = Constants.expoConfig?.extra ?? {};
+const extraFromExpoConfig = Constants.expoConfig?.extra;
+const extraFromManifest = Constants.manifest?.extra;
+const extraFromManifest2 = Constants.manifest2?.extra;
+
+export const Env = extraFromExpoConfig ?? extraFromManifest ?? extraFromManifest2 ?? {};
