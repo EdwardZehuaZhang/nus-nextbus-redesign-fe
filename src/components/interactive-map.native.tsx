@@ -60,7 +60,7 @@ import polyline from '@mapbox/polyline';
 import simplify from 'simplify-js';
 import { Barbell, BookOpen, BowlFood, Bus, Compass, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -614,11 +614,69 @@ interface BusStopLabelProps {
   markerId?: string;
 }
 
+// Off-screen SVG renderer for generating label images.
+// Renders an SVG hidden off-screen, converts to base64 via toDataURL,
+// and provides the URI for use with Marker's image prop.
+// This bypasses the Marker's broken SizeReportingShadowNode on New Architecture (Fabric),
+// which locks the bitmap width to 100px regardless of child view dimensions.
+const OffscreenLabelSvg = React.memo<{
+  id: string;
+  text: string;
+  fontSize: number;
+  strokeWidth: number;
+  color: string;
+  onImageReady: (id: string, uri: string) => void;
+}>(({ id, text, fontSize, strokeWidth, color, onImageReady }) => {
+  const svgRef = React.useRef<Svg>(null);
+
+  const labelWidth = Math.max(80, Math.ceil(text.length * fontSize * 0.65 + strokeWidth * 3 + 16));
+  const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
+  const textY = Math.round(labelHeight * 0.75);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      svgRef.current?.toDataURL((base64: string) => {
+        onImageReady(id, `data:image/png;base64,${base64}`);
+      });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [id, text, fontSize, strokeWidth, color, onImageReady]);
+
+  return (
+    <Svg ref={svgRef} width={labelWidth} height={labelHeight}>
+      <SvgText
+        x={labelWidth / 2}
+        y={textY}
+        fontSize={fontSize}
+        fontWeight="600"
+        fill="none"
+        textAnchor="middle"
+        stroke="#FFFFFF"
+        strokeWidth={strokeWidth}
+      >
+        {text}
+      </SvgText>
+      <SvgText
+        x={labelWidth / 2}
+        y={textY}
+        fontSize={fontSize}
+        fontWeight="600"
+        fill={color}
+        textAnchor="middle"
+      >
+        {text}
+      </SvgText>
+    </Svg>
+  );
+});
+
+OffscreenLabelSvg.displayName = 'OffscreenLabelSvg';
+
 // Crash-safe label rendering strategy:
-// - Stable keys: key uses stop.name only (no color/version in key)
-// - Color updates: a short tracksViewChanges pulse (~250ms) when labelColor/visibility changes
-// - This avoids mass remounts/reordering that can trigger AIRGoogleMap insertReactSubview crashes on iOS
-const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
+// - Uses pre-rendered SVG images via Marker's image prop to bypass bitmap width constraint
+// - On New Architecture (Fabric), SizeReportingShadowNode doesn't work, locking bitmap to 100px
+// - By providing an image prop instead of child views, we get full-width labels
+const BusStopLabelMarker = React.memo<BusStopLabelProps & { imageUri?: string }>(({
   stop,
   isLabelVisible,
   isLabelClickable,
@@ -627,24 +685,9 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   onPress,
   shouldLabelBelow,
   markerId,
+  imageUri,
 }) => {
-  const stopName = stop.ShortName || stop.caption || stop.name;
   const labelOffsetLat = shouldLabelBelow ? -0.0001 : 0.0001;
-
-  // Calculate font size using bucketed zoom levels to reduce SVG regenerations
-  const { fontSize, strokeWidth, zoomBucket } = getLabelSizeByZoomBucket(currentZoom);
-  
-  // Ensure label color changes are rendered even with tracksViewChanges optimization
-  const [trackChanges, setTrackChanges] = React.useState(false);
-  const prevColorRef = React.useRef(labelColor);
-  React.useEffect(() => {
-    if (prevColorRef.current !== labelColor || isLabelVisible) {
-      setTrackChanges(true);
-      const t = setTimeout(() => setTrackChanges(false), 250);
-      prevColorRef.current = labelColor;
-      return () => clearTimeout(t);
-    }
-  }, [labelColor, isLabelVisible]);
 
   return (
     <Marker
@@ -655,37 +698,18 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
         longitude: stop.longitude,
       }}
       anchor={{ x: 0.5, y: shouldLabelBelow ? 0 : 1 }}
-      tracksViewChanges={trackChanges}
+      tracksViewChanges={false}
       opacity={isLabelVisible ? 1 : 0}
       onPress={isLabelClickable ? onPress : undefined}
       onSelect={isLabelClickable ? onPress : undefined}
       zIndex={60}
-    >
-      <Text
-        style={{
-          fontSize,
-          fontWeight: '600',
-          color: labelColor,
-          textShadowColor: '#FFFFFF',
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: strokeWidth,
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        {stopName}
-      </Text>
-    </Marker>
+      image={imageUri ? { uri: imageUri } : undefined}
+    />
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison: only re-render if key props change
-  // Use zoomBucket instead of raw currentZoom to avoid re-rendering between buckets
-  const prevZoomBucket = getLabelSizeByZoomBucket(prevProps.currentZoom).zoomBucket;
-  const nextZoomBucket = getLabelSizeByZoomBucket(nextProps.currentZoom).zoomBucket;
-  
   return (
     prevProps.isLabelVisible === nextProps.isLabelVisible &&
-    prevProps.labelColor === nextProps.labelColor &&
-    prevZoomBucket === nextZoomBucket &&
+    prevProps.imageUri === nextProps.imageUri &&
     prevProps.shouldLabelBelow === nextProps.shouldLabelBelow &&
     prevProps.stop.latitude === nextProps.stop.latitude &&
     prevProps.stop.longitude === nextProps.stop.longitude &&
@@ -2205,6 +2229,12 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     getBusStopColor,
   ]);
 
+  // Store pre-rendered label image URIs (keyed by stop name + color + zoom bucket)
+  const [labelImages, setLabelImages] = React.useState<Record<string, string>>({});
+  const handleLabelImageReady = React.useCallback((id: string, uri: string) => {
+    setLabelImages(prev => ({ ...prev, [id]: uri }));
+  }, []);
+
   // Fit map to show all markers ONLY on initial route load (not on every render)
   useEffect(() => {
     // Only fit to coordinates if we actually have markers to show AND haven't fit yet
@@ -2686,9 +2716,31 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     ]
   );
 
+  // Compute label render data for off-screen SVG generation
+  const labelZoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
+  const { fontSize: labelFontSize, strokeWidth: labelStrokeWidth } = getLabelSizeByZoomBucket(labelZoom);
+
   return (
     <View style={[styles.container, style]}>
-      {/* 
+      {/* Off-screen SVG renderer for bus stop label images */}
+      <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', overflow: 'hidden', width: 0, height: 0 }}>
+        {busStopLabelProps.map((props) => {
+          const stopName = props.stop.ShortName || props.stop.caption || props.stop.name;
+          const labelId = `${stopName}-${props.labelColor}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
+          return (
+            <OffscreenLabelSvg
+              key={`offscreen-${props.stop.name}`}
+              id={labelId}
+              text={stopName}
+              fontSize={labelFontSize}
+              strokeWidth={labelStrokeWidth}
+              color={props.labelColor}
+              onImageReady={handleLabelImageReady}
+            />
+          );
+        })}
+      </View>
+      {/*
         ============================================================================
         CRITICAL: MapView Children Stable Ordering
         ============================================================================
@@ -3179,20 +3231,25 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             />
           );
         })}
-        {/* Bus Stop Label Markers - Text labels with dynamic positioning (filtered by route if active) */}
-        {busStopLabelProps.map((props) => (
-          <BusStopLabelMarker
-            key={`bus-stop-label-${props.stop.name}`}
-            markerId={`bus-stop-label:${props.stop.name || props.stop.ShortName || props.stop.caption}`}
-            stop={props.stop}
-            isLabelVisible={props.isLabelVisible}
-            isLabelClickable={props.isLabelClickable}
-            labelColor={props.labelColor}
-            currentZoom={effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom}
-            onPress={handleBusStopPress(props.stop)}
-            shouldLabelBelow={props.shouldLabelBelow}
-          />
-        ))}
+        {/* Bus Stop Label Markers - Using pre-rendered images to bypass Marker bitmap width constraint */}
+        {busStopLabelProps.map((props) => {
+          const stopName = props.stop.ShortName || props.stop.caption || props.stop.name;
+          const labelId = `${stopName}-${props.labelColor}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
+          return (
+            <BusStopLabelMarker
+              key={`bus-stop-label-${props.stop.name}`}
+              markerId={`bus-stop-label:${props.stop.name || props.stop.ShortName || props.stop.caption}`}
+              stop={props.stop}
+              isLabelVisible={props.isLabelVisible}
+              isLabelClickable={props.isLabelClickable}
+              labelColor={props.labelColor}
+              currentZoom={labelZoom}
+              onPress={handleBusStopPress(props.stop)}
+              shouldLabelBelow={props.shouldLabelBelow}
+              imageUri={labelImages[labelId]}
+            />
+          );
+        })}
         {/* Academic Area Labels - Visible at zoom 15+ (hidden at zoom 14 with key bus stops) */}
         {ACADEMIC_AREA_LABELS.map((area) => {
           const labelZoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
