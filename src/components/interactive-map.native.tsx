@@ -60,7 +60,7 @@ import polyline from '@mapbox/polyline';
 import simplify from 'simplify-js';
 import { Barbell, BookOpen, BowlFood, Bus, Compass, FirstAid, Printer, Racquet, Subway, Waves } from 'phosphor-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, {
   Marker,
   type MarkerPressEvent,
@@ -634,17 +634,6 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
   // Calculate font size using bucketed zoom levels to reduce SVG regenerations
   const { fontSize, strokeWidth, zoomBucket } = getLabelSizeByZoomBucket(currentZoom);
   
-  // Memoize SVG dimensions and rendering properties to avoid recalculating on every render
-  const svgProps = React.useMemo(() => {
-    const labelWidth = Math.min(
-      200,
-      Math.max(60, Math.ceil(stopName.length * fontSize * 0.6))
-    );
-    const labelHeight = Math.max(22, Math.ceil(fontSize + 10));
-    const textY = Math.round(labelHeight * 0.7);
-    return { labelWidth, labelHeight, textY };
-  }, [stopName, fontSize]);
-
   // Ensure label color changes are rendered even with tracksViewChanges optimization
   const [trackChanges, setTrackChanges] = React.useState(false);
   const prevColorRef = React.useRef(labelColor);
@@ -672,43 +661,19 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps>(({
       onSelect={isLabelClickable ? onPress : undefined}
       zIndex={60}
     >
-      <View
+      <Text
         style={{
-          alignItems: 'center',
-          justifyContent: 'center',
+          fontSize,
+          fontWeight: '600',
+          color: labelColor,
+          textShadowColor: '#FFFFFF',
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: strokeWidth,
+          backgroundColor: '#FFFFFF',
         }}
       >
-        <Svg
-          width={svgProps.labelWidth}
-          height={svgProps.labelHeight}
-          viewBox={`0 0 ${svgProps.labelWidth} ${svgProps.labelHeight}`}
-        >
-          {/* White stroke outline - rendered first (behind) */}
-          <SvgText
-            x={svgProps.labelWidth / 2}
-            y={svgProps.textY}
-            fontSize={fontSize}
-            fontWeight="600"
-            fill="none"
-            textAnchor="middle"
-            stroke="#FFFFFF"
-            strokeWidth={strokeWidth}
-          >
-            {stopName}
-          </SvgText>
-          {/* Route-colored text on top */}
-          <SvgText
-            x={svgProps.labelWidth / 2}
-            y={svgProps.textY}
-            fontSize={fontSize}
-            fontWeight="600"
-            fill={labelColor}
-            textAnchor="middle"
-          >
-            {stopName}
-          </SvgText>
-        </Svg>
-      </View>
+        {stopName}
+      </Text>
     </Marker>
   );
 }, (prevProps, nextProps) => {
@@ -805,8 +770,11 @@ const AreaLabelMarker = React.memo<AreaLabelMarkerProps>(({
     >
       <View
         style={{
+          width: svgProps.labelWidth,
+          height: svgProps.labelHeight,
           alignItems: 'center',
           justifyContent: 'center',
+          backgroundColor: '#FFFFFF',
         }}
       >
         <Svg
@@ -2790,19 +2758,23 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           fillColor="transparent"
         />
 
-        {/* Gray overlay outside campus - creates dimming effect */}
+        {/* Dark overlay outside campus - two tessellating polygons (no holes prop) */}
+        {/* The holes prop is broken on Android/Google Maps (known react-native-maps bug). */}
+        {/* Instead, split campus boundary in half and create two simple polygons that */}
+        {/* each trace half the boundary + far-off world points. Campus = gap between them. */}
+        {/* This is the same proven approach used by the web implementation. */}
+
+        {/* Top overlay - north half of campus boundary + far-off points covering north */}
         <Polygon
           coordinates={[
-            // Large outer boundary covering the entire visible map area
-            { latitude: 85.55, longitude: 31.65 },
-            { latitude: 85.55, longitude: 203.9 },
-            { latitude: -85.23, longitude: 203.9 },
-            { latitude: -85.23, longitude: 31.65 },
-            { latitude: 1.35, longitude: 31.65 },
-          ]}
-          holes={[
-            // Campus boundary as a hole - this area stays clear
-            NUS_CAMPUS_BOUNDARY,
+            ...NUS_CAMPUS_BOUNDARY.slice(0, 26),
+            { latitude: 1.314415799754581, longitude: 103.76018809355106 },
+            { latitude: 0.4330389574208255, longitude: 61.93316067193789 },
+            { latitude: 53.278578905253895, longitude: 57.19774758350203 },
+            { latitude: 51.23464389578209, longitude: 168.81884133350204 },
+            { latitude: 1.142880113710714, longitude: 171.45556008350204 },
+            { latitude: 1.2924711660087167, longitude: 103.79623264668385 },
+            NUS_CAMPUS_BOUNDARY[0],
           ]}
           strokeWidth={0}
           strokeColor="transparent"
@@ -2810,27 +2782,17 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
           tappable={false}
         />
 
-        {/* Complementary overlay - covers the opposite side of Earth */}
+        {/* Bottom overlay - south half of campus boundary + far-off points covering south */}
         <Polygon
           coordinates={[
-            { latitude: 85.55, longitude: 31.65 },
-            { latitude: 85.55, longitude: -141.65 },
-            { latitude: -85.23, longitude: -141.65 },
-            { latitude: -85.23, longitude: 31.65 },
-          ]}
-          strokeWidth={0}
-          strokeColor="transparent"
-          fillColor="rgba(0, 0, 0, 0.222)"
-          tappable={false}
-        />
-
-        {/* Additional overlay - fills gap between complementary and original */}
-        <Polygon
-          coordinates={[
-            { latitude: 85.55, longitude: -141.65 },
-            { latitude: 85.55, longitude: -156.1 },
-            { latitude: -85.23, longitude: -156.1 },
-            { latitude: -85.23, longitude: -141.65 },
+            ...NUS_CAMPUS_BOUNDARY.slice(25),
+            { latitude: 1.2924711660087167, longitude: 103.79623264668385 },
+            { latitude: 1.142880113710714, longitude: 171.45556008350204 },
+            { latitude: -61.06998094801668, longitude: 167.55930473224873 },
+            { latitude: -57.10164716693408, longitude: 64.90305473224875 },
+            { latitude: 0.4330389574208255, longitude: 61.93316067193789 },
+            { latitude: 1.314415799754581, longitude: 103.76018809355106 },
+            NUS_CAMPUS_BOUNDARY[25],
           ]}
           strokeWidth={0}
           strokeColor="transparent"
