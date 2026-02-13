@@ -98,7 +98,6 @@ const initializeLocationWatcher = async () => {
       debugLog('[Location] Requesting current position...');
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        timeoutMs: 10000,
       });
       
       debugLog('[Location] Got current position:', currentLocation.coords);
