@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
@@ -6,6 +6,62 @@ import { getPlaceAutocomplete } from '@/api/google-maps/places';
 import type { PlaceAutocompleteResult } from '@/api/google-maps/types';
 import { type BusStation, searchBusStations } from '@/lib/bus-stations';
 import { type LocationCoords } from '@/lib/hooks/use-location';
+
+/**
+ * Retry logic with exponential backoff for rate-limited requests
+ */
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelayMs = 500,
+  backoffMultiplier = 2
+): Promise<T> => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isRateLimited = error?.response?.status === 429;
+      const isLastAttempt = attempt === maxRetries - 1;
+
+      if (isRateLimited && !isLastAttempt) {
+        const delayMs = initialDelayMs * Math.pow(backoffMultiplier, attempt);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[SHARED SEARCH] 🔄 Rate limited, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
+
+/**
+ * Debounce function to prevent excessive API calls during typing
+ */
+const createDebouncedSearch = (
+  callback: (text: string) => Promise<void>,
+  delayMs = 300
+) => {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return {
+    execute: (text: string) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        callback(text).catch((error) => {
+          // eslint-disable-next-line no-console
+          console.error('[SHARED SEARCH] Error in debounced search:', error);
+        });
+      }, delayMs);
+    },
+    cancel: () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    },
+  };
+};
 
 // MapPin component - consistent across all pages
 const MapPin = () => (
@@ -39,75 +95,112 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
   const [googlePlaceResults, setGooglePlaceResults] = useState<
     PlaceAutocompleteResult[]
   >([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Handle search input changes with Google Maps API + local bus stations
+  const debouncedSearchRef = useRef<ReturnType<typeof createDebouncedSearch> | null>(null);
+
+  // Initialize debounced search
   useEffect(() => {
-    if (searchText.trim().length > 0) {
-      // Search local bus stations
-      const busStationResults = searchBusStations(searchText);
-      setBusResults(busStationResults);
+    const searchPlaces = async (query: string) => {
+      if (query.trim().length === 0) {
+        setBusResults([]);
+        setGooglePlaceResults([]);
+        setSearchError(null);
+        return;
+      }
 
-      // Search Google Places API for other locations via backend
-      const searchPlaces = async () => {
-        try {
-          console.log('[SHARED SEARCH] 🔍 Searching with input:', searchText);
+      try {
+        setIsSearching(true);
+        setSearchError(null);
 
-          // Calculate location bias if user location is available
-          let location: { lat: number; lng: number } | undefined;
-          let radius: number | undefined;
+        // Search local bus stations (instant, no API call needed)
+        const busStationResults = searchBusStations(query);
+        setBusResults(busStationResults);
 
-          if (userLocation?.latitude && userLocation?.longitude) {
-            location = {
-              lat: userLocation.latitude,
-              lng: userLocation.longitude,
-            };
-            radius = 10000; // 10km radius in meters
-          }
+        // Calculate location bias if user location is available
+        let location: { lat: number; lng: number } | undefined;
+        let radius: number | undefined;
 
-          // Call backend API for autocomplete
-          const data = await getPlaceAutocomplete(
-            searchText,
-            undefined, // sessiontoken
-            location,
-            radius
-          );
+        if (userLocation?.latitude && userLocation?.longitude) {
+          location = {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude,
+          };
+          radius = 10000; // 10km radius in meters
+        }
 
-          if (data.predictions && data.predictions.length > 0) {
-            // Backend returns the standard autocomplete format
-            const convertedResults: PlaceAutocompleteResult[] =
-              data.predictions.map((prediction: any) => ({
-                description: prediction.description || '',
-                matched_substrings: prediction.matched_substrings || [],
-                place_id: prediction.place_id || '',
-                reference: prediction.reference || prediction.place_id || '',
-                structured_formatting: {
-                  main_text: prediction.structured_formatting?.main_text || '',
-                  main_text_matched_substrings:
-                    prediction.structured_formatting
-                      ?.main_text_matched_substrings || [],
-                  secondary_text:
-                    prediction.structured_formatting?.secondary_text || '',
-                },
-                terms: prediction.terms || [],
-                types: prediction.types || [],
-              }));
+        // Call backend API with retry logic for rate limiting
+        const data = await retryWithBackoff(
+          () =>
+            getPlaceAutocomplete(
+              query,
+              undefined, // sessiontoken
+              location,
+              radius
+            ),
+          3, // max retries
+          500, // initial delay
+          2 // backoff multiplier
+        );
 
-            setGooglePlaceResults(convertedResults.slice(0, 5)); // Limit to 5 results
-          } else {
-            setGooglePlaceResults([]);
-          }
-        } catch (error) {
-          console.error('[SHARED SEARCH] ❌ Places API Error:', error);
+        if (data.predictions && data.predictions.length > 0) {
+          // Backend returns the standard autocomplete format
+          const convertedResults: PlaceAutocompleteResult[] =
+            data.predictions.map((prediction: any) => ({
+              description: prediction.description || '',
+              matched_substrings: prediction.matched_substrings || [],
+              place_id: prediction.place_id || '',
+              reference: prediction.reference || prediction.place_id || '',
+              structured_formatting: {
+                main_text: prediction.structured_formatting?.main_text || '',
+                main_text_matched_substrings:
+                  prediction.structured_formatting
+                    ?.main_text_matched_substrings || [],
+                secondary_text:
+                  prediction.structured_formatting?.secondary_text || '',
+              },
+              terms: prediction.terms || [],
+              types: prediction.types || [],
+            }));
+
+          setGooglePlaceResults(convertedResults.slice(0, 5)); // Limit to 5 results
+        } else {
           setGooglePlaceResults([]);
         }
-      };
+      } catch (error: any) {
+        const statusCode = error?.response?.status;
+        const isRateLimited = statusCode === 429;
 
-      searchPlaces();
-    } else {
-      setBusResults([]);
-      setGooglePlaceResults([]);
-    }
-  }, [searchText, userLocation]);
+        if (isRateLimited) {
+          setSearchError(
+            'Search is temporarily unavailable due to high traffic. Please try again in a moment.'
+          );
+        } else {
+          // eslint-disable-next-line no-console
+          console.error('[SHARED SEARCH] ❌ Places API Error:', error);
+          setSearchError(
+            'Failed to search locations. Please try again.'
+          );
+        }
+
+        setGooglePlaceResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    debouncedSearchRef.current = createDebouncedSearch(searchPlaces, 300);
+
+    return () => {
+      debouncedSearchRef.current?.cancel();
+    };
+  }, [userLocation]);
+
+  // Trigger debounced search when search text changes
+  useEffect(() => {
+    debouncedSearchRef.current?.execute(searchText);
+  }, [searchText]);
 
   const renderIconContainer = (children: React.ReactNode) => {
     if (useStyleProp) {
@@ -320,8 +413,39 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
     );
   };
 
+  const renderError = () => {
+    if (!searchError) return null;
+
+    if (useStyleProp) {
+      return (
+        <View
+          style={{
+            paddingVertical: 12,
+            paddingHorizontal: 12,
+            marginBottom: 12,
+            backgroundColor: '#FEE2E2',
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ fontSize: 14, color: '#DC2626' }}>
+            {searchError}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View className="mb-3 rounded-lg bg-red-100 px-3 py-2">
+        <Text className="text-sm text-red-600">{searchError}</Text>
+      </View>
+    );
+  };
+
   return (
     <View className={containerClassName}>
+      {/* Error message */}
+      {renderError()}
+
       {/* Bus Stops Results */}
       {busResults.length > 0 && (
         <View style={{ marginBottom: googlePlaceResults.length > 0 ? 16 : 0 }}>
@@ -344,7 +468,15 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
       {busResults.length === 0 &&
         googlePlaceResults.length === 0 &&
         searchText.trim().length > 0 &&
+        !isSearching &&
         renderNoResults()}
+
+      {/* Loading state */}
+      {isSearching && (
+        <View className="items-center py-8">
+          <Text className="text-sm text-neutral-500">Searching...</Text>
+        </View>
+      )}
     </View>
   );
 };

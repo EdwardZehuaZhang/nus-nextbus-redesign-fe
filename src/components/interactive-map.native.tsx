@@ -62,6 +62,7 @@ import { Barbell, BookOpen, BowlFood, Bus, Compass, FirstAid, Printer, Racquet, 
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import MapView, {
+  type Camera,
   Marker,
   type MarkerPressEvent,
   Polygon,
@@ -268,10 +269,79 @@ interface InteractiveMapProps {
 }
 
 const DEFAULT_REGION: Region = {
-  latitude: 1.289, // Moved further down (south)
+  latitude: 1.2895, // Moved further down (south)
   longitude: 103.777, // Adjusted slightly right (east)
   latitudeDelta: 0.02, // Zoom level 14 - zoomed out to see full campus
   longitudeDelta: 0.02,
+};
+
+// Convert a Region's latitudeDelta to a Google Maps zoom level
+// Formula: zoom = log2(360 / latitudeDelta)
+const regionToZoom = (latitudeDelta: number): number => {
+  // Use ceil instead of round to zoom in slightly more on Android,
+  // better matching the iOS default view of the NUS campus.
+  return Math.ceil(Math.log2(360 / latitudeDelta));
+};
+
+// Convert a Region to a Camera object for use with initialCamera/animateCamera.
+// On Android, Google Maps SDK uses explicit zoom levels natively. Using initialCamera
+// with an explicit zoom bypasses the unreliable latitudeDelta-to-zoom conversion that
+// causes initialRegion to show the entire world instead of the desired campus view.
+const regionToCamera = (region: Region): Camera => ({
+  center: {
+    latitude: region.latitude,
+    longitude: region.longitude,
+  },
+  zoom: regionToZoom(region.latitudeDelta),
+  heading: 0,
+  pitch: 0,
+  altitude: 1000,
+});
+
+// Calculate bounded region from a list of coordinates and convert to zoom level.
+// This is used for route fitting to ensure all route points are visible.
+// Returns a Camera object for use with animateCamera on Android.
+const calculateCameraFromCoordinates = (
+  coordinates: { latitude: number; longitude: number }[]
+): Camera | null => {
+  if (coordinates.length === 0) return null;
+
+  try {
+    // Find bounds of all coordinates
+    const lats = coordinates.map((c) => c.latitude);
+    const lngs = coordinates.map((c) => c.longitude);
+
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    // Calculate center point
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+
+    // Calculate latitudeDelta from bounds with padding
+    // Add 20% padding on each side to ensure route has breathing room
+    const latitudeDelta = (maxLat - minLat) * 1.2;
+    const longitudeDelta = (maxLng - minLng) * 1.2;
+
+    // Use the larger of the two deltas to ensure both dimensions fit
+    const maxDelta = Math.max(latitudeDelta, longitudeDelta || 0.01);
+    const zoomLevel = regionToZoom(Math.max(maxDelta, 0.001));
+
+    return {
+      center: {
+        latitude: centerLat,
+        longitude: centerLng,
+      },
+      zoom: Math.max(10, zoomLevel), // Ensure at least zoom 10 (safety floor)
+      heading: 0,
+      pitch: 0,
+      altitude: 1000,
+    };
+  } catch {
+    return null;
+  }
 };
 
 const isValidInitialRegion = (region: Region): boolean => {
@@ -719,9 +789,74 @@ const BusStopLabelMarker = React.memo<BusStopLabelProps & { imageUri?: string }>
 
 BusStopLabelMarker.displayName = 'BusStopLabelMarker';
 
+// Off-screen SVG renderer for multi-line area labels (academic/residence).
+// Same approach as OffscreenLabelSvg but handles multi-line text with \n splits.
+const OffscreenAreaLabelSvg = React.memo<{
+  id: string;
+  text: string;
+  fontSize: number;
+  strokeWidth: number;
+  color: string;
+  onImageReady: (id: string, uri: string) => void;
+}>(({ id, text, fontSize, strokeWidth, color, onImageReady }) => {
+  const svgRef = React.useRef<Svg>(null);
+  const lines = text.split('\n');
+
+  const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const labelWidth = Math.max(80, Math.ceil(maxLineLength * fontSize * 0.65 + strokeWidth * 3 + 16));
+  const lineHeight = Math.round(fontSize * 1.15);
+  const totalTextHeight = lineHeight * lines.length;
+  const labelHeight = Math.max(30, Math.ceil(totalTextHeight + fontSize));
+  const textStartY = Math.round((labelHeight - totalTextHeight) / 2 + fontSize * 0.9);
+
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      svgRef.current?.toDataURL((base64: string) => {
+        onImageReady(id, `data:image/png;base64,${base64}`);
+      });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [id, text, fontSize, strokeWidth, color, onImageReady]);
+
+  return (
+    <Svg ref={svgRef} width={labelWidth} height={labelHeight}>
+      {lines.map((line, index) => (
+        <SvgText
+          key={`stroke-${index}`}
+          x={labelWidth / 2}
+          y={textStartY + index * lineHeight}
+          fontSize={fontSize}
+          fontWeight="bold"
+          fill="none"
+          textAnchor="middle"
+          stroke="#FFFFFF"
+          strokeWidth={strokeWidth}
+        >
+          {line}
+        </SvgText>
+      ))}
+      {lines.map((line, index) => (
+        <SvgText
+          key={`fill-${index}`}
+          x={labelWidth / 2}
+          y={textStartY + index * lineHeight}
+          fontSize={fontSize}
+          fontWeight="bold"
+          fill={color}
+          textAnchor="middle"
+        >
+          {line}
+        </SvgText>
+      ))}
+    </Svg>
+  );
+});
+
+OffscreenAreaLabelSvg.displayName = 'OffscreenAreaLabelSvg';
+
 /**
  * Area label marker component for rendering academic and residence area labels
- * Uses SVG text rendering with white stroke outline, similar to BusStopLabelMarker
+ * Uses pre-rendered SVG images via Marker's image prop (same approach as BusStopLabelMarker)
  */
 interface AreaLabelMarkerProps {
   areaName: string;
@@ -730,6 +865,7 @@ interface AreaLabelMarkerProps {
   isVisible: boolean;
   currentZoom: number;
   markerId: string;
+  imageUri?: string;
 }
 
 const AreaLabelMarker = React.memo<AreaLabelMarkerProps>(({
@@ -739,44 +875,8 @@ const AreaLabelMarker = React.memo<AreaLabelMarkerProps>(({
   isVisible,
   currentZoom,
   markerId,
+  imageUri,
 }) => {
-  // Calculate font size using bucketed zoom levels
-  const { fontSize, strokeWidth, zoomBucket } = getLabelSizeByZoomBucket(currentZoom);
-  
-  const lines = React.useMemo(() => areaName.split('\n'), [areaName]);
-
-  // Memoize SVG dimensions
-  const svgProps = React.useMemo(() => {
-    const maxLineLength = lines.reduce((max, line) => Math.max(max, line.length), 0);
-    const labelWidth = Math.min(
-      220,
-      Math.max(60, Math.ceil(maxLineLength * fontSize * 0.7))
-    );
-    const lineHeight = Math.round(fontSize * 1.15);
-    const totalTextHeight = lineHeight * lines.length;
-    const labelHeight = Math.max(30, Math.ceil(totalTextHeight + fontSize));
-    const textStartY = Math.round((labelHeight - totalTextHeight) / 2 + fontSize * 0.9);
-    return { labelWidth, labelHeight, lineHeight, textStartY };
-  }, [lines, fontSize]);
-
-  // Track visibility changes for tracksViewChanges optimization
-  const [trackChanges, setTrackChanges] = React.useState(true);
-  const prevVisibleRef = React.useRef(isVisible);
-
-  React.useEffect(() => {
-    const t = setTimeout(() => setTrackChanges(false), 250);
-    return () => clearTimeout(t);
-  }, []);
-
-  React.useEffect(() => {
-    if (prevVisibleRef.current !== isVisible) {
-      setTrackChanges(true);
-      const t = setTimeout(() => setTrackChanges(false), 250);
-      prevVisibleRef.current = isVisible;
-      return () => clearTimeout(t);
-    }
-  }, [isVisible]);
-
   const safeMarkerId = React.useMemo(
     () => markerId.replace(/\s+/g, '-'),
     [markerId]
@@ -788,66 +888,16 @@ const AreaLabelMarker = React.memo<AreaLabelMarkerProps>(({
       identifier={safeMarkerId}
       coordinate={position}
       anchor={{ x: 0.5, y: 0.5 }}
-      tracksViewChanges={trackChanges}
+      tracksViewChanges={false}
       opacity={isVisible ? 1 : 0}
       zIndex={markerId.startsWith('residence:') || markerId.startsWith('academic:') ? 5 : 55}
-    >
-      <View
-        style={{
-          width: svgProps.labelWidth,
-          height: svgProps.labelHeight,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#FFFFFF',
-        }}
-      >
-        <Svg
-          width={svgProps.labelWidth}
-          height={svgProps.labelHeight}
-          viewBox={`0 0 ${svgProps.labelWidth} ${svgProps.labelHeight}`}
-        >
-          {/* White stroke outline - rendered first (behind) */}
-          {lines.map((line, index) => (
-            <SvgText
-              key={`area-label-stroke-${markerId}-${index}`}
-              x={svgProps.labelWidth / 2}
-              y={svgProps.textStartY + index * svgProps.lineHeight}
-              fontSize={fontSize}
-              fontWeight="bold"
-              fill="none"
-              textAnchor="middle"
-              stroke="#FFFFFF"
-              strokeWidth={strokeWidth}
-            >
-              {line}
-            </SvgText>
-          ))}
-          {/* Area-colored text on top */}
-          {lines.map((line, index) => (
-            <SvgText
-              key={`area-label-fill-${markerId}-${index}`}
-              x={svgProps.labelWidth / 2}
-              y={svgProps.textStartY + index * svgProps.lineHeight}
-              fontSize={fontSize}
-              fontWeight="bold"
-              fill={color}
-              textAnchor="middle"
-            >
-              {line}
-            </SvgText>
-          ))}
-        </Svg>
-      </View>
-    </Marker>
+      image={imageUri ? { uri: imageUri } : undefined}
+    />
   );
 }, (prevProps, nextProps) => {
-  const prevZoomBucket = getLabelSizeByZoomBucket(prevProps.currentZoom).zoomBucket;
-  const nextZoomBucket = getLabelSizeByZoomBucket(nextProps.currentZoom).zoomBucket;
-  
   return (
     prevProps.isVisible === nextProps.isVisible &&
-    prevProps.color === nextProps.color &&
-    prevZoomBucket === nextZoomBucket &&
+    prevProps.imageUri === nextProps.imageUri &&
     prevProps.position.latitude === nextProps.position.latitude &&
     prevProps.position.longitude === nextProps.position.longitude &&
     prevProps.areaName === nextProps.areaName
@@ -1030,6 +1080,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     () => (isValidInitialRegion(initialRegion) ? initialRegion : DEFAULT_REGION),
     [initialRegion]
   );
+  // On Android, Google Maps SDK natively uses zoom levels (not latitudeDelta).
+  // initialRegion's delta-to-zoom conversion is unreliable on Android (shows world view).
+  // initialCamera with an explicit zoom bypasses this issue entirely.
+  const safeInitialCamera = React.useMemo(
+    () => regionToCamera(safeInitialRegion),
+    [safeInitialRegion]
+  );
   const [currentRegion, setCurrentRegion] = useState<Region>(safeInitialRegion);
   const [mapReady, setMapReady] = useState(false);
   const [mapHeading, setMapHeading] = useState(0);
@@ -1098,20 +1155,29 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
   // Force reset map center when requested (e.g., on navigation screen focus)
   useEffect(() => {
     if (!forceResetCenter || !mapReady || !mapRef.current) {
-      if (forceResetCenter) {
-      }
       return;
     }
-    if (routePolyline || internalRoutePolylines) {
+    
+    const hasRouteData = routePolyline || internalRoutePolylines;
+    
+    if (hasRouteData) {
       return;
     }
-    mapRef.current.animateToRegion(safeInitialRegion, 100);
+    
+    // On Android, use animateCamera with explicit zoom for reliable positioning.
+    // animateToRegion's delta-to-zoom conversion is unreliable on Android.
+    if (Platform.OS === 'android') {
+      mapRef.current.animateCamera(safeInitialCamera, { duration: 100 });
+    } else {
+      mapRef.current.animateToRegion(safeInitialRegion, 100);
+    }
   }, [
     forceResetCenter,
     mapReady,
     routePolyline,
     internalRoutePolylines,
     safeInitialRegion,
+    safeInitialCamera,
   ]);
 
   // Fallback: mark map ready shortly after mount to avoid blocking live markers
@@ -1348,6 +1414,43 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       console.log(`[ZoomGesture] Active: currentZoom=${currentZoom}, effectiveZoomLevel=${effectiveZoomLevel} (deferred)`);
     }
   }, [currentZoom, effectiveZoomLevel]);
+
+  // DIRECT ROUTE ANIMATION - High Priority
+  // This effect immediately animates to route when internalRoutePolylines arrives,
+  // bypassing the complexity of coordinate fitting which fails on Android.
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    let coords: { latitude: number; longitude: number }[] = [];
+
+    if (internalRoutePolylines) {
+      const allRouteCoords = [
+        ...(internalRoutePolylines.walkToStop || []),
+        ...(internalRoutePolylines.busSegment || []),
+        ...(internalRoutePolylines.walkFromStop || []),
+      ];
+
+      coords = allRouteCoords.map((c: any) => ({
+        latitude: typeof c.lat === 'number' ? c.lat : c.latitude,
+        longitude: typeof c.lng === 'number' ? c.lng : c.longitude,
+      }));
+    } else if (routeCoordinates.length > 0) {
+      coords = [...routeCoordinates];
+    }
+
+    if (coords.length === 0) return;
+
+    // Add origin and destination if available
+    if (origin) coords.unshift({ latitude: origin.lat, longitude: origin.lng });
+    if (destination) coords.push({ latitude: destination.lat, longitude: destination.lng });
+
+    // Calculate camera
+    const camera = calculateCameraFromCoordinates(coords);
+    if (!camera) return;
+
+    // IMMEDIATELY animate to the calculated camera
+    mapRef.current.animateCamera(camera, { duration: 250 });
+  }, [internalRoutePolylines, routePolyline, origin, destination]);
   
   // Cleanup gesture timeout on unmount
   React.useEffect(() => {
@@ -1513,13 +1616,6 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
       const walkColor = '#274F9C';
       const busColor = internalRoutePolylines.busRouteColor || '#274F9C';
-
-      console.log('🗺️ [ROUTE_COORDS_NATIVE] Internal route polylines:', {
-        walkToStopPoints: toStop.length > 0 ? `${toStop.length} points - First: ${toStop[0]?.latitude},${toStop[0]?.longitude}` : 'empty',
-        busSegmentPoints: busSeg.length > 0 ? `${busSeg.length} points - First: ${busSeg[0]?.latitude},${busSeg[0]?.longitude}` : 'empty',
-        walkFromStopPoints: fromStop.length > 0 ? `${fromStop.length} points - First: ${fromStop[0]?.latitude},${fromStop[0]?.longitude}` : 'empty',
-        busColor: busColor,
-      });
 
       return [
         toStop.length > 1
@@ -2235,30 +2331,84 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     setLabelImages(prev => ({ ...prev, [id]: uri }));
   }, []);
 
-  // Fit map to show all markers ONLY on initial route load (not on every render)
-  useEffect(() => {
-    // Only fit to coordinates if we actually have markers to show AND haven't fit yet
-    if (mapRef.current && (origin || destination || waypoints.length > 0) && !hasFitToCoordinates.current) {
-      const coordinates = [
-        origin && { latitude: origin.lat, longitude: origin.lng },
-        destination && {
-          latitude: destination.lat,
-          longitude: destination.lng,
-        },
-        ...waypoints.map((wp) => ({ latitude: wp.lat, longitude: wp.lng })),
-      ].filter(Boolean) as Coordinate[];
+  // Fit map to show route bounds when origin/destination are available AND when route data loads.
+  // IMPORTANT: fitToCoordinates() on Android can fail silently. We use animateCamera with explicit
+  // zoom calculated from the full route bounds for better reliability.
+  const hasFitToRoute = useRef(false);
+  const latestHasRouteDataRef = useRef(false);
 
-      if (coordinates.length > 0) {
-        hasFitToCoordinates.current = true; // Mark that we've fitted coordinates
-        setTimeout(() => {
-          mapRef.current?.fitToCoordinates(coordinates, {
-            edgePadding: { top: 320, right: 260, bottom: 560, left: 260 },
-            animated: true,
-          });
-        }, 100);
+  useEffect(() => {
+    latestHasRouteDataRef.current = !!routePolyline || !!internalRoutePolylines;
+  }, [routePolyline, internalRoutePolylines]);
+
+  useEffect(() => {
+    const hasRouteData = !!routePolyline || !!internalRoutePolylines;
+    if (!mapReady || !mapRef.current) return;
+    if (!origin && !destination && waypoints.length === 0) return;
+
+    // Skip if we've already fit for the current state
+    if (hasFitToCoordinates.current && !hasRouteData) return;
+    if (hasFitToRoute.current && hasRouteData) return;
+
+    // Build initial coordinate array
+    let coordinates = [
+      origin && { latitude: origin.lat, longitude: origin.lng },
+      destination && {
+        latitude: destination.lat,
+        longitude: destination.lng,
+      },
+      ...waypoints.map((wp) => ({ latitude: wp.lat, longitude: wp.lng })),
+    ].filter(Boolean) as Coordinate[];
+
+    // If route data is available, add ACTUAL route coordinates for accurate bounds
+    if (hasRouteData && internalRoutePolylines) {
+      const routeCoords = [
+        ...(internalRoutePolylines.walkToStop || []),
+        ...(internalRoutePolylines.busSegment || []),
+        ...(internalRoutePolylines.walkFromStop || []),
+      ];
+
+      if (routeCoords.length > 0) {
+        const formattedRouteCoords = routeCoords.map((coord: any) => ({
+          latitude: typeof coord.lat === 'number' ? coord.lat : coord.latitude,
+          longitude: typeof coord.lng === 'number' ? coord.lng : coord.longitude,
+        }));
+        coordinates = [...coordinates, ...formattedRouteCoords];
       }
+    } else if (hasRouteData && routeCoordinates.length > 0) {
+      coordinates = [...coordinates, ...routeCoordinates];
     }
-  }, [origin, destination, waypoints]);
+
+    if (coordinates.length === 0) return;
+
+    if (hasRouteData) {
+      hasFitToRoute.current = true;
+    } else {
+      hasFitToCoordinates.current = true;
+    }
+
+    // ALWAYS use animateCamera for Android routes
+    if (hasRouteData && coordinates.length > 2) {
+      const delay = Platform.OS === 'android' ? 400 : 100;
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        const camera = calculateCameraFromCoordinates(coordinates);
+        if (!camera) return;
+        console.log(`[RouteFit] animateCamera source=${internalRoutePolylines ? 'internal' : 'google'} zoom=${camera.zoom}`);
+        mapRef.current.animateCamera(camera, { duration: 300 });
+      }, delay);
+    } else {
+      // For initial fit without route, use fitToCoordinates
+      const delay = Platform.OS === 'android' ? 400 : 100;
+      setTimeout(() => {
+        if (!mapRef.current) return;
+        mapRef.current.fitToCoordinates(coordinates, {
+          edgePadding: { top: 320, right: 260, bottom: 560, left: 260 },
+          animated: true,
+        });
+      }, delay);
+    }
+  }, [mapReady, origin, destination, waypoints, routePolyline, internalRoutePolylines]);
 
   const handleOriginPress = (e: MarkerPressEvent) => {
     e.stopPropagation();
@@ -2722,7 +2872,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Off-screen SVG renderer for bus stop label images */}
+      {/* Off-screen SVG renderer for label images (bus stops + area labels) */}
       <View style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', overflow: 'hidden', width: 0, height: 0 }}>
         {busStopLabelProps.map((props) => {
           const stopName = props.stop.ShortName || props.stop.caption || props.stop.name;
@@ -2735,6 +2885,34 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               fontSize={labelFontSize}
               strokeWidth={labelStrokeWidth}
               color={props.labelColor}
+              onImageReady={handleLabelImageReady}
+            />
+          );
+        })}
+        {ACADEMIC_AREA_LABELS.map((area) => {
+          const areaLabelId = `area-${area.name}-${area.color}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
+          return (
+            <OffscreenAreaLabelSvg
+              key={`offscreen-academic-${area.name}`}
+              id={areaLabelId}
+              text={area.name}
+              fontSize={labelFontSize}
+              strokeWidth={labelStrokeWidth}
+              color={area.color}
+              onImageReady={handleLabelImageReady}
+            />
+          );
+        })}
+        {RESIDENCE_LABELS.map((area) => {
+          const areaLabelId = `area-${area.name}-${area.color}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
+          return (
+            <OffscreenAreaLabelSvg
+              key={`offscreen-residence-${area.name}`}
+              id={areaLabelId}
+              text={area.name}
+              fontSize={labelFontSize}
+              strokeWidth={labelStrokeWidth}
+              color={area.color}
               onImageReady={handleLabelImageReady}
             />
           );
@@ -2775,7 +2953,13 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={styles.map}
-        initialRegion={safeInitialRegion}
+        // On Android, use initialCamera with explicit zoom instead of initialRegion.
+        // Android's Google Maps SDK uses zoom levels natively, and the delta-to-zoom
+        // conversion in initialRegion is unreliable (often shows world view on mount).
+        {...(Platform.OS === 'android'
+          ? { initialCamera: safeInitialCamera }
+          : { initialRegion: safeInitialRegion }
+        )}
         showsUserLocation={Platform.OS === 'android'}
         userLocationAnnotationTitle="My Location"
         userLocationCalloutEnabled={false}
@@ -2789,6 +2973,21 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         onRegionChangeComplete={handleRegionChangeDebounced}
         onMapReady={() => {
           setMapReady(true);
+          // Safety: force camera position on Android after map is ready.
+          // Even with initialCamera, Android may not apply it if the native
+          // view layout isn't finalized. This ensures correct zoom/position.
+          if (Platform.OS === 'android' && mapRef.current) {
+            setTimeout(() => {
+              const shouldApplyInitialCamera =
+                !latestHasRouteDataRef.current && !hasFitToRoute.current;
+              if (shouldApplyInitialCamera) {
+                console.log('[MapReady] Applying initial camera override');
+                mapRef.current?.animateCamera(safeInitialCamera, { duration: 0 });
+              } else {
+                console.log('[MapReady] Skipping initial camera override (route data present)');
+              }
+            }, 200);
+          }
         }}
         onMapLoaded={() => {
           setMapReady(true);
@@ -3252,9 +3451,8 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
         })}
         {/* Academic Area Labels - Visible at zoom 15+ (hidden at zoom 14 with key bus stops) */}
         {ACADEMIC_AREA_LABELS.map((area) => {
-          const labelZoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
           const isVisible = shouldShowAcademic && currentZoom > 14;
-          
+          const areaLabelId = `area-${area.name}-${area.color}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
           return (
             <AreaLabelMarker
               key={`academic-label-${area.name}`}
@@ -3264,14 +3462,14 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               color={area.color}
               isVisible={isVisible}
               currentZoom={labelZoom}
+              imageUri={labelImages[areaLabelId]}
             />
           );
         })}
         {/* Residence Hall Labels - Visible at zoom 17+ only when bus stops are shown */}
         {RESIDENCE_LABELS.map((area) => {
-          const labelZoom = effectiveZoomLevel > 0 ? effectiveZoomLevel : currentZoom;
           const isVisible = shouldShowResidences && currentZoom >= 17;
-          
+          const areaLabelId = `area-${area.name}-${area.color}-${getLabelSizeByZoomBucket(labelZoom).zoomBucket}`;
           return (
             <AreaLabelMarker
               key={`residence-label-${area.name}`}
@@ -3281,6 +3479,7 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
               color={area.color}
               isVisible={isVisible}
               currentZoom={labelZoom}
+              imageUri={labelImages[areaLabelId]}
             />
           );
         })}
@@ -3327,17 +3526,16 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             </Marker>
           )}
         
-        {/* Origin Marker */}
-        {origin && showOriginMarker && (
-          <Marker
-            key="origin"
-            identifier="origin"
-            coordinate={{ latitude: origin.lat, longitude: origin.lng }}
-            pinColor="#274F9C"
-            onPress={handleOriginPress}
-            onSelect={(e) => handleOriginPress(e as MarkerPressEvent)}
-          />
-        )}
+        {/* Origin Marker - ALWAYS MOUNTED to prevent Android MapView child reordering reset */}
+        <Marker
+          key="origin"
+          identifier="origin"
+          coordinate={origin ? { latitude: origin.lat, longitude: origin.lng } : { latitude: 0, longitude: 0 }}
+          pinColor="#274F9C"
+          opacity={origin && showOriginMarker ? 1 : 0}
+          onPress={handleOriginPress}
+          onSelect={(e) => handleOriginPress(e as MarkerPressEvent)}
+        />
         {/* Waypoint Markers */}
         {waypoints.map((waypoint, index) => (
           <Marker
@@ -3349,58 +3547,65 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
             onSelect={(e) => handleWaypointPress(index)(e as MarkerPressEvent)}
           />
         ))}
-        {/* Destination Marker */}
-        {destination && (
-          <Marker
-            key="destination"
-            identifier="destination"
-            coordinate={{
-              latitude: destination.lat,
-              longitude: destination.lng,
-            }}
-            pinColor="#D32F2F"
-            onPress={handleDestinationPress}
-            onSelect={(e) => handleDestinationPress(e as MarkerPressEvent)}
-          />
-        )}
-        {/* Connector Dotted Lines - origin to route start, route end to destination */}
-        {connectorSegments.map((seg) => (
-          <Polyline
-            key={seg.key}
-            coordinates={seg.coordinates}
-            strokeColor={seg.strokeColor}
-            strokeWidth={seg.strokeWidth}
-            lineCap="round"
-            lineJoin="round"
-            lineDashPattern={seg.lineDashPattern}
-            zIndex={seg.zIndex}
-          />
-        ))}
-        {/* Transit/Internal Route Segments (colored per segment) */}
-        {transitSegments.map((seg) => (
-          <Polyline
-            key={seg.key}
-            coordinates={seg.coordinates}
-            strokeColor={seg.strokeColor}
-            strokeColors={seg.strokeColorArray}
-            strokeWidth={seg.strokeWidth}
-            lineCap="round"
-            lineJoin="round"
-            lineDashPattern={seg.lineDashPattern}
-            zIndex={seg.zIndex}
-          />
-        ))}
+        {/* Destination Marker - ALWAYS MOUNTED to prevent Android MapView child reordering reset */}
+        <Marker
+          key="destination"
+          identifier="destination"
+          coordinate={destination ? { latitude: destination.lat, longitude: destination.lng } : { latitude: 0, longitude: 0 }}
+          pinColor="#D32F2F"
+          opacity={destination ? 1 : 0}
+          onPress={handleDestinationPress}
+          onSelect={(e) => handleDestinationPress(e as MarkerPressEvent)}
+        />
+        {/* Connector Dotted Lines - ALWAYS MOUNT fixed slots to prevent Android child count changes */}
+        <Polyline
+          key="connector-origin-to-route"
+          coordinates={connectorSegments[0]?.coordinates ?? [{ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0 }]}
+          strokeColor={connectorSegments[0]?.strokeColor ?? 'transparent'}
+          strokeWidth={connectorSegments[0] ? connectorSegments[0].strokeWidth : 0}
+          lineCap="round"
+          lineJoin="round"
+          lineDashPattern={connectorSegments[0]?.lineDashPattern}
+          zIndex={connectorSegments[0]?.zIndex ?? 10}
+        />
+        <Polyline
+          key="connector-route-to-dest"
+          coordinates={connectorSegments[1]?.coordinates ?? [{ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0 }]}
+          strokeColor={connectorSegments[1]?.strokeColor ?? 'transparent'}
+          strokeWidth={connectorSegments[1] ? connectorSegments[1].strokeWidth : 0}
+          lineCap="round"
+          lineJoin="round"
+          lineDashPattern={connectorSegments[1]?.lineDashPattern}
+          zIndex={connectorSegments[1]?.zIndex ?? 10}
+        />
+        {/* Transit/Internal Route Segments - ALWAYS MOUNT fixed slots for up to 10 segments
+            to prevent Android MapView camera reset on child insertion */}
+        {Array.from({ length: 10 }, (_, idx) => {
+          const seg = transitSegments[idx];
+          return (
+            <Polyline
+              key={`transit-segment-${idx}`}
+              coordinates={seg?.coordinates ?? [{ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0 }]}
+              strokeColor={seg?.strokeColor ?? 'transparent'}
+              strokeColors={seg?.strokeColorArray}
+              strokeWidth={seg ? seg.strokeWidth : 0}
+              lineCap="round"
+              lineJoin="round"
+              lineDashPattern={seg?.lineDashPattern}
+              zIndex={seg?.zIndex ?? 20}
+            />
+          );
+        })}
 
-        {/* Fallback: single polyline when no segmented steps are available */}
-        {transitSegments.length === 0 && routeCoordinates.length > 0 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor="#274F9C"
-            strokeWidth={4}
-            lineCap="round"
-            lineJoin="round"
-          />
-        )}
+        {/* Fallback route polyline - ALWAYS MOUNTED, visibility via strokeWidth */}
+        <Polyline
+          key="fallback-route-polyline"
+          coordinates={routeCoordinates.length > 0 ? routeCoordinates : [{ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 0 }]}
+          strokeColor="#274F9C"
+          strokeWidth={transitSegments.length === 0 && routeCoordinates.length > 0 ? 4 : 0}
+          lineCap="round"
+          lineJoin="round"
+        />
         {/* Live bus markers moved after polylines to minimize index shifts */}
 
         {/* Bus Route Polylines - normal visibility using filters/active route */}

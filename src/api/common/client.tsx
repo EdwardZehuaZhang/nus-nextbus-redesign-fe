@@ -10,7 +10,6 @@ export const client = axios.create({
 // Minimal request/response logging to help validate integration
 client.interceptors.request.use((config) => {
   if (__DEV__) {
-    console.log('[bus-client] →', (config.baseURL || '') + (config.url || ''), config.params || {});
   }
   return config;
 });
@@ -23,7 +22,6 @@ client.interceptors.response.use(
     if (__DEV__) {
       const status = error?.response?.status;
       const url = (error?.config?.baseURL || '') + (error?.config?.url || '');
-      console.warn('[bus-client] ✖', status ?? 'NO_STATUS', url, error?.message);
     }
     return Promise.reject(error);
   }

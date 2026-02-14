@@ -571,7 +571,7 @@ const PopularSearchCard = ({
           source={item.image}
           contentFit="cover"
           className="absolute inset-0 size-full"
-          style={{ borderRadius: '6px' }}
+          style={{ borderRadius: 6 }}
           placeholder={undefined}
         />
         <View className="absolute inset-0" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }} />
