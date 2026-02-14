@@ -301,6 +301,9 @@ const regionToCamera = (region: Region): Camera => ({
 // Calculate bounded region from a list of coordinates and convert to zoom level.
 // This is used for route fitting to ensure all route points are visible.
 // Returns a Camera object for use with animateCamera on Android.
+// Negative latitude shifts move the content upward on screen (center moves south).
+const ROUTE_CAMERA_LAT_OFFSET = -0.002;
+
 const calculateCameraFromCoordinates = (
   coordinates: { latitude: number; longitude: number }[]
 ): Camera | null => {
@@ -316,8 +319,8 @@ const calculateCameraFromCoordinates = (
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
 
-    // Calculate center point
-    const centerLat = (minLat + maxLat) / 2;
+    // Calculate center point (apply small vertical offset for visual framing)
+    const centerLat = (minLat + maxLat) / 2 + ROUTE_CAMERA_LAT_OFFSET;
     const centerLng = (minLng + maxLng) / 2;
 
     // Calculate latitudeDelta from bounds with padding
