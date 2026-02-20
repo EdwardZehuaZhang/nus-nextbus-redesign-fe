@@ -220,14 +220,19 @@ export async function computeRoutes(
  * Get transit route from current location to destination
  * @param origin - Starting location (lat/lng or address)
  * @param destination - Ending location (lat/lng or address)
- * @param departureTime - Optional departure time in RFC3339 format
+ * @param options - Optional departure or arrival time in RFC3339 format (mutually exclusive)
  * @returns Promise with route data
  */
 export async function getTransitRoute(
   origin: Waypoint,
   destination: Waypoint,
-  departureTime?: string
+  options?: { departureTime?: string; arrivalTime?: string }
 ): Promise<ComputeRoutesResponse> {
+  const timeParams: { departureTime?: string; arrivalTime?: string } =
+    options?.arrivalTime
+      ? { arrivalTime: options.arrivalTime }
+      : { departureTime: options?.departureTime || new Date().toISOString() };
+
   return computeRoutes({
     origin,
     destination,
@@ -235,7 +240,7 @@ export async function getTransitRoute(
     computeAlternativeRoutes: true,
     languageCode: 'en-US',
     units: 'METRIC',
-    departureTime: departureTime || new Date().toISOString(),
+    ...timeParams,
     transitPreferences: {
       routingPreference: 'FEWER_TRANSFERS',
       allowedTravelModes: ['BUS', 'SUBWAY', 'TRAIN', 'LIGHT_RAIL', 'RAIL'],

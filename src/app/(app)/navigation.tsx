@@ -1322,7 +1322,9 @@ export default function NavigationPage() {
         };
         
         // Call Google Routes API (Transit first, then fallback to Walking)
-        let result = await getTransitRoute(origin, dest);
+        let result = await getTransitRoute(origin, dest,
+          selectedArrivalTime ? { arrivalTime: selectedArrivalTime.toISOString() } : undefined
+        );
 
         if (!result || !result.routes || result.routes.length === 0) {
           // Fallback to walking if no transit routes are available (common for intra-campus)
@@ -1364,7 +1366,7 @@ export default function NavigationPage() {
 
     // Start async fetch but don't wait for it
     fetchRoutes();
-  }, [currentDestination, effectiveOrigin, shouldFetchData]);
+  }, [currentDestination, effectiveOrigin, shouldFetchData, selectedArrivalTime]);
 
   // (moved) helpers and effect for stops are defined after locations state
 
@@ -1745,7 +1747,9 @@ export default function NavigationPage() {
           const destWp: Waypoint = { location: { latLng: { latitude: target.lat, longitude: target.lng } } };
 
           // Try transit first; if none, fallback to walking for this segment
-          let res = await getTransitRoute(originWp, destWp);
+          let res = await getTransitRoute(originWp, destWp,
+            selectedArrivalTime ? { arrivalTime: selectedArrivalTime.toISOString() } : undefined
+          );
           let firstRoute = res?.routes?.[0];
           if (!firstRoute) {
             try {
@@ -1874,7 +1878,7 @@ export default function NavigationPage() {
     };
 
     recomputeWithStops();
-  }, [stopsKey, effectiveOrigin?.latitude, effectiveOrigin?.longitude, currentDestination]);
+  }, [stopsKey, effectiveOrigin?.latitude, effectiveOrigin?.longitude, currentDestination, selectedArrivalTime]);
 
   // Handle location selection from search
   const handleLocationSelect = (item: BusStation) => {
@@ -3834,34 +3838,6 @@ export default function NavigationPage() {
 
 
 
-            {/* Divider */}
-            <View
-              style={{
-                alignSelf: 'stretch',
-                height: 1,
-                backgroundColor: '#E4E7E7',
-                marginBottom: 16,
-              }}
-            />
-
-            {/* Reminder Toggle */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                alignSelf: 'stretch',
-                marginBottom: 16,
-              }}
-            >
-              <Text style={{ fontSize: 14, color: '#09090B' }}>
-                Remind me to leave on time
-              </Text>
-              <ToggleSwitch
-                value={reminderEnabled}
-                onValueChange={setReminderEnabled}
-              />
-            </View>
 
             {/* Action Buttons Row */}
             <View
@@ -3869,6 +3845,7 @@ export default function NavigationPage() {
                 flexDirection: 'row',
                 gap: 12,
                 alignSelf: 'stretch',
+                maxWidth: '50%',
               }}
             >
               {/* Save as Favorite Button */}
@@ -3884,25 +3861,6 @@ export default function NavigationPage() {
                 }}
               />
 
-              {/* Start Navigation Button */}
-              <ActionButton
-                label="Start Navigation"
-                onPress={() => {
-                  router.push({
-                    pathname: '/turn-by-turn-navigation',
-                    params: {
-                      destination: currentDestination,
-                      destinationLat: destinationCoords?.lat?.toString(),
-                      destinationLng: destinationCoords?.lng?.toString(),
-                      userLat: userLat?.toString(),
-                      userLng: userLng?.toString(),
-                    },
-                  });
-                }}
-                variant="primary"
-                icon={<NavigationArrowIcon fill="#FFFFFF" />}
-                iconOffsetY={-2}
-              />
             </View>
             </Animated.View>
             )}
