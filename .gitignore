@@ -28,4 +28,5 @@ expo-env.d.ts
 # Environment files — keep real secrets out of git
 .env.*
 !.env.example
+nus-nextbus-redesign-c61de1c9ba92.json
 .vercel
