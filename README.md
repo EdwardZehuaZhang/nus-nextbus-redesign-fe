@@ -7,7 +7,7 @@ pnpm eas build -p android --profile adhoc
 pnpm eas build -p android --profile production
 pnpm eas build -p ios --profile production
 
-pnpm eas submit -p ios --profile production --latest
+pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --latest
 
 <h1 align="center">
   🚌 NUS Maps

@@ -1,6 +1,6 @@
 {
   "name": "nus-nextbus-redesign",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A modern redesign of the NUS Internal Shuttle Bus Service mobile app",
   "author": "Edward Zehua Zhang",
   "license": "MIT",
@@ -52,6 +52,7 @@
     "build:staging:android": "cross-env APP_ENV=staging EXPO_NO_DOTENV=1 eas build --profile staging --platform android ",
     "build:production:ios": "cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build --profile production --platform ios",
     "build:production:android": "cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build --profile production --platform android ",
+    "submit:production:ios": "cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --latest",
     "prepare": "husky",
     "app-release": "cross-env SKIP_BRANCH_PROTECTION=true np --no-publish --no-cleanup --no-release-draft",
     "version": "pnpm run prebuild && git add .",

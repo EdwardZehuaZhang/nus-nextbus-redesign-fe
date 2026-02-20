@@ -35,7 +35,7 @@ require('dotenv').config({
 
 // TODO: Replace these values with your own
 
-const BUNDLE_ID = 'com.edwardzehuazhang.nusmaps'; // ios bundle id
+const BUNDLE_ID = 'com.edwardzhang.nusnextbus'; // ios bundle id
 const PACKAGE = 'com.edwardzehuazhang.nusmaps'; // android package name
 const NAME = 'NUS-Maps'; // app name
 const EXPO_ACCOUNT_OWNER = 'edwardzehuazhang'; // expo account owner
