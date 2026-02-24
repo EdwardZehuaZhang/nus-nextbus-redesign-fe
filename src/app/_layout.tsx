@@ -12,12 +12,15 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { APIProvider } from '@/api';
+import { ErrorBoundary, setupGlobalErrorHandler } from '@/components/crash-handler';
 import { hydrateAuth, loadSelectedTheme } from '@/lib';
 import { FavoritesProvider } from '@/lib/contexts/favorites-context';
 import '@/lib/sentry';
 import { useThemeConfig } from '@/lib/use-theme-config';
 
-export { ErrorBoundary } from 'expo-router';
+export { ErrorBoundary };
+
+setupGlobalErrorHandler();
 
 export const unstable_settings = {
   initialRouteName: '(app)',

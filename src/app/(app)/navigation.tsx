@@ -314,6 +314,55 @@ const ChevronExpand = ({ expanded }: { expanded: boolean }) => (
   </Svg>
 );
 
+type RouteIssueCode = 'NO_ROUTE' | 'OFFLINE' | 'GENERIC';
+
+type RouteIssue = {
+  code: RouteIssueCode;
+  details?: string;
+};
+
+const isLikelyOfflineError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('network request failed') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('load failed') ||
+    normalized.includes('networkerror') ||
+    normalized.includes('internet appears to be offline')
+  );
+};
+
+const getRouteIssueContent = (issue: RouteIssue | null): {
+  title: string;
+  description?: string;
+  isFriendly: boolean;
+} | null => {
+  if (!issue) return null;
+
+  if (issue.code === 'NO_ROUTE') {
+    return {
+      title: "Can't seem to find a way there",
+      description: 'Try a different location',
+      isFriendly: true,
+    };
+  }
+
+  if (issue.code === 'OFFLINE') {
+    return {
+      title: "Can't reach the internet",
+      description: 'Check your connection and try again',
+      isFriendly: true,
+    };
+  }
+
+  return {
+    title: issue.details ? `Error: ${issue.details}` : 'Error: Failed to fetch routes',
+    description: undefined,
+    isFriendly: false,
+  };
+};
+
 // Custom hook for drag handlers (similar to transit page)
 const useDragHandlers = (config?: {
   minHeight?: number;
@@ -663,14 +712,15 @@ export default function NavigationPage() {
   const [routeExpanded, setRouteExpanded] = useState(false);
   const [forceResetCenter, setForceResetCenter] = useState(true);
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(true);
+  const [routeError, setRouteError] = useState<RouteIssue | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
   const [showIntermediateStops, setShowIntermediateStops] = useState(false);
   const [shouldFetchData, setShouldFetchData] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const routeIssueContent = useMemo(() => getRouteIssueContent(routeError), [routeError]);
   
   // OPTIMIZATION: Defer data fetching to after page renders
   // This ensures the page slides in instantly without blocking on API calls
@@ -729,6 +779,7 @@ export default function NavigationPage() {
   const [activeStopId, setActiveStopId] = useState<string | null>(null); // Track which stop is being edited
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [editingOriginalText, setEditingOriginalText] = useState('');
+  const [searchSelection, setSearchSelection] = useState<{ start: number; end: number } | undefined>(undefined);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
@@ -1284,7 +1335,10 @@ export default function NavigationPage() {
 
     const destCoords = getDestinationCoordinates(currentDestination);
     if (!destCoords) {
-      setRouteError(`Destination coordinates not found for: "${currentDestination}"`);
+      setRouteError({
+        code: 'GENERIC',
+        details: `Destination coordinates not found for: "${currentDestination}"`,
+      });
       setIsLoadingRoutes(false);
       return;
     }
@@ -1293,7 +1347,7 @@ export default function NavigationPage() {
 
     // If we don't have an origin yet, wait
     if (!effectiveOrigin) {
-      setRouteError('Waiting for your location...');
+      setRouteError({ code: 'GENERIC', details: 'Waiting for your location...' });
       setIsLoadingRoutes(false);
       return;
     }
@@ -1340,9 +1394,10 @@ export default function NavigationPage() {
           setRoutes(result.routes);
           setRouteError(null);
         } else {
-          setRouteError('No routes found');
+          setRouteError({ code: 'NO_ROUTE' });
         }
       } catch (error) {
+        const transitError = error;
         // If transit call failed, attempt a walking fallback once
         try {
           const origin: Waypoint = { location: { latLng: effectiveOrigin } };
@@ -1351,13 +1406,35 @@ export default function NavigationPage() {
           if (walkResult && walkResult.routes && walkResult.routes.length > 0) {
             setRoutes(walkResult.routes);
             setRouteError(null);
+          } else if (isLikelyOfflineError(transitError)) {
+            setRouteError({
+              code: 'OFFLINE',
+              details: transitError instanceof Error ? transitError.message : undefined,
+            });
           } else {
-            setRouteError(error instanceof Error ? error.message : 'Failed to fetch routes');
+            setRouteError({ code: 'NO_ROUTE' });
           }
         } catch (fallbackErr) {
-          setRouteError(
-            fallbackErr instanceof Error ? fallbackErr.message : 'Failed to fetch routes'
-          );
+          const offline = isLikelyOfflineError(transitError) || isLikelyOfflineError(fallbackErr);
+          if (offline) {
+            setRouteError({
+              code: 'OFFLINE',
+              details:
+                fallbackErr instanceof Error
+                  ? fallbackErr.message
+                  : transitError instanceof Error
+                    ? transitError.message
+                    : undefined,
+            });
+          } else {
+            setRouteError({
+              code: 'GENERIC',
+              details:
+                fallbackErr instanceof Error
+                  ? fallbackErr.message
+                  : 'Failed to fetch routes',
+            });
+          }
         }
       } finally {
         setIsLoadingRoutes(false);
@@ -1624,6 +1701,7 @@ export default function NavigationPage() {
   const closeSearchPanel = React.useCallback(() => {
     resetEditingState();
     setSearchText('');
+    setSearchSelection(undefined);
     if (panelState !== 'closed') {
       setPanelState('closing');
     }
@@ -1645,8 +1723,10 @@ export default function NavigationPage() {
       setActiveStopId(null);
     }
     setEditingLocationId(location.id);
-    setEditingOriginalText(location.text || '');
-    setSearchText(location.text || '');
+    const currentText = location.text || '';
+    setEditingOriginalText(currentText);
+    setSearchText(currentText);
+    setSearchSelection({ start: 0, end: currentText.length });
     if (panelState !== 'expanded') {
       setPanelState('animating');
     }
@@ -1654,8 +1734,11 @@ export default function NavigationPage() {
   }, [MAX_HEIGHT, closeSearchPanel, editingLocationId, panelState, snapToHeight]);
 
   const setSearchTextAndSync = React.useCallback((text: string) => {
+    if (searchSelection) {
+      setSearchSelection(undefined);
+    }
     setSearchText(text);
-  }, []);
+  }, [searchSelection]);
 
   const revertEditingText = React.useCallback(() => {
     if (editingLocationId) {
@@ -1844,7 +1927,7 @@ export default function NavigationPage() {
 
         // Safety check: ensure we have at least some valid steps
         if (validSteps.length === 0) {
-          setRouteError('No route found with the selected stops');
+          setRouteError({ code: 'NO_ROUTE' });
           setIsLoadingRoutes(false);
           return;
         }
@@ -1871,7 +1954,17 @@ export default function NavigationPage() {
         setRouteError(null);
       } catch (err) {
         console.error('❌ Failed to compute route with stops:', err);
-        setRouteError('Failed to compute route with stops');
+        if (isLikelyOfflineError(err)) {
+          setRouteError({
+            code: 'OFFLINE',
+            details: err instanceof Error ? err.message : undefined,
+          });
+        } else {
+          setRouteError({
+            code: 'GENERIC',
+            details: 'Failed to compute route with stops',
+          });
+        }
       } finally {
         setIsLoadingRoutes(false);
       }
@@ -2487,6 +2580,12 @@ export default function NavigationPage() {
                       placeholderTextColor="#737373"
                       value={searchText}
                       onChangeText={setSearchTextAndSync}
+                      selection={searchSelection}
+                      onSelectionChange={() => {
+                        if (searchSelection) {
+                          setSearchSelection(undefined);
+                        }
+                      }}
                       autoFocus={true}
                       style={{
                         flex: 1,
@@ -2627,12 +2726,14 @@ export default function NavigationPage() {
                 }}
               >
                 {isLoadingRoutes || isLoadingInternalRoutes 
-                  ? '— Mins' 
+                  ? '— Mins'
                   : bestInternalRoute 
                     ? `${Math.ceil(bestInternalRoute.totalTime / 60)} Mins` 
                     : routes.length > 0 && routes[0].legs?.[0]?.duration 
                       ? `${Math.ceil(durationToMinutes(routes[0].legs[0].duration))} Mins` 
-                      : '—'}
+                      : routeError
+                        ? '—'
+                        : '—'}
               </Text>
 
               <View
@@ -2900,13 +3001,35 @@ export default function NavigationPage() {
                   </View>
                 </>
               ) : routeError && !bestInternalRoute ? (
-                <View style={{ padding: 16, backgroundColor: '#FFE5E5', borderRadius: 8, marginBottom: 16 }}>
-                  <Text style={{ fontSize: 14, color: '#F00', fontWeight: '600', marginBottom: 8 }}>
-                    Error: {routeError}
+                <View
+                  style={{
+                    padding: 16,
+                    backgroundColor: routeIssueContent?.isFriendly ? '#F5F5F5' : '#FFE5E5',
+                    borderRadius: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: routeIssueContent?.isFriendly ? 18 : 14,
+                      color: routeIssueContent?.isFriendly ? '#211F26' : '#F00',
+                      fontWeight: '600',
+                      marginBottom: routeIssueContent?.description ? 8 : 0,
+                    }}
+                  >
+                    {routeIssueContent?.title ?? 'Error: Failed to fetch routes'}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
-                    Destination: {currentDestination}
-                  </Text>
+                  {routeIssueContent?.description ? (
+                    <Text
+                      style={{
+                        fontSize: routeIssueContent?.isFriendly ? 16 : 12,
+                        color: '#666',
+                        marginBottom: 8,
+                      }}
+                    >
+                      {routeIssueContent.description}
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
 

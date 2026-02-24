@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 3.8.1"
+    "version": ">= 3.8.1",
+    "appVersionSource": "remote"
   },
   "build": {
     "production": {
@@ -18,7 +19,6 @@
         "EXPO_NO_DOTENV": "1",
         "APP_ENV": "production",
         "FLIPPER_DISABLE": "1",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "staging": {
@@ -36,7 +36,6 @@
         "APP_ENV": "staging",
         "EXPO_NO_DOTENV": "1",
         "FLIPPER_DISABLE": "1",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "development": {
@@ -69,7 +68,6 @@
         "APP_ENV": "production",
         "EXPO_NO_DOTENV": "1",
         "FLIPPER_DISABLE": "1",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "simulator": {
