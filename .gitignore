@@ -30,3 +30,5 @@ expo-env.d.ts
 !.env.example
 nus-nextbus-redesign-c61de1c9ba92.json
 .vercel
+
+.env.local

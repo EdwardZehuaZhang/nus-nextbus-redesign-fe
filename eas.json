@@ -19,6 +19,7 @@
         "EXPO_NO_DOTENV": "1",
         "APP_ENV": "production",
         "FLIPPER_DISABLE": "1",
+        "SENTRY_ALLOW_FAILURE": "true"
       }
     },
     "staging": {
@@ -35,7 +36,7 @@
       "env": {
         "APP_ENV": "staging",
         "EXPO_NO_DOTENV": "1",
-        "FLIPPER_DISABLE": "1",
+        "FLIPPER_DISABLE": "1"
       }
     },
     "development": {
@@ -68,10 +69,12 @@
         "APP_ENV": "production",
         "EXPO_NO_DOTENV": "1",
         "FLIPPER_DISABLE": "1",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       }
     },
     "simulator": {
       "pnpm": "9.12.3",
+      "environment": "production",
       "ios": {
         "simulator": true,
         "image": "latest"
@@ -80,8 +83,10 @@
         "image": "latest"
       },
       "env": {
-        "APP_ENV": "development",
-        "EXPO_NO_DOTENV": "1"
+        "APP_ENV": "production",
+        "EXPO_NO_DOTENV": "1",
+        "FLIPPER_DISABLE": "1",
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
       },
       "channel": "simulator"
     }

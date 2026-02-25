@@ -1,7 +1,4 @@
-pnpm exec cross-env EXPO_NO_DOTENV=1 expo start --tunnel
-
 pnpm eas build -p ios --profile adhoc
-yes | pnpm eas build -p ios --profile adhoc
 pnpm eas build -p android --profile adhoc
 
 pnpm eas build -p android --profile production
@@ -9,7 +6,6 @@ pnpm eas build -p ios --profile production
 
 
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --latest
-
 
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --path ./build-1771696319144.ipa
 

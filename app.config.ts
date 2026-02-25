@@ -83,7 +83,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundler: 'metro',
   },
   plugins: [
-    '@sentry/react-native/expo',
+    [
+      '@sentry/react-native/expo',
+      {
+        url: 'https://sentry.io/',
+        project: 'react-native',
+        organization: 'edwardzehuazhang',
+        // Token sourced from SENTRY_AUTH_TOKEN env var; undefined is fine for local dev
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+      },
+    ],
     'expo-notifications',
     [
       'expo-splash-screen',
