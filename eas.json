@@ -68,8 +68,7 @@
       "env": {
         "APP_ENV": "production",
         "EXPO_NO_DOTENV": "1",
-        "FLIPPER_DISABLE": "1",
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "FLIPPER_DISABLE": "1"
       }
     },
     "simulator": {

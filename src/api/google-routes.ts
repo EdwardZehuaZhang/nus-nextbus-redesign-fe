@@ -184,10 +184,12 @@ export async function computeRoutes(
   const url = `${backendUrl}/api/routes/compute`;
 
   try {
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[google-routes] →', url, request);
-    } catch {}
+    if (__DEV__) {
+      try {
+        // eslint-disable-next-line no-console
+        console.log('[google-routes] →', url, request);
+      } catch {}
+    }
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -205,13 +207,17 @@ export async function computeRoutes(
     }
 
     const data: ComputeRoutesResponse = await response.json();
-    try {
-      // eslint-disable-next-line no-console
-      console.log('[google-routes] ←', response.status, url);
-    } catch {}
+    // Normalize: Google returns {} (no routes property) when no route found
+    data.routes = data.routes ?? [];
+    if (__DEV__) {
+      try {
+        // eslint-disable-next-line no-console
+        console.log('[google-routes] ←', response.status, url);
+      } catch {}
+    }
     return data;
   } catch (error) {
-    console.error('Error computing routes:', error);
+    if (__DEV__) console.error('Error computing routes:', error);
     throw error;
   }
 }

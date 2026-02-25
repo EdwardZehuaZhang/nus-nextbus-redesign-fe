@@ -714,6 +714,8 @@ export default function NavigationPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(true);
   const [routeError, setRouteError] = useState<RouteIssue | null>(null);
+
+  const MAX_INTERMEDIATE_STOPS = 1;
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
@@ -1357,6 +1359,9 @@ export default function NavigationPage() {
     setIsLoadingRoutes(true);
     setRouteError(null);
 
+    // Track whether this effect has been cleaned up to avoid setState on unmounted component
+    let cancelled = false;
+
     // Async fetching happens in background without blocking page render
     const fetchRoutes = async () => {
       try {
@@ -1380,15 +1385,20 @@ export default function NavigationPage() {
           selectedArrivalTime ? { arrivalTime: selectedArrivalTime.toISOString() } : undefined
         );
 
+        if (cancelled) return;
+
         if (!result || !result.routes || result.routes.length === 0) {
           // Fallback to walking if no transit routes are available (common for intra-campus)
           try {
             const walkResult = await getWalkingRoute(origin, dest);
+            if (cancelled) return;
             if (walkResult && walkResult.routes && walkResult.routes.length > 0) {
               result = walkResult;
             }
           } catch {}
         }
+
+        if (cancelled) return;
 
         if (result && result.routes && result.routes.length > 0) {
           setRoutes(result.routes);
@@ -1397,12 +1407,14 @@ export default function NavigationPage() {
           setRouteError({ code: 'NO_ROUTE' });
         }
       } catch (error) {
+        if (cancelled) return;
         const transitError = error;
         // If transit call failed, attempt a walking fallback once
         try {
           const origin: Waypoint = { location: { latLng: effectiveOrigin } };
           const dest: Waypoint = { location: { latLng: { latitude: destCoords.lat, longitude: destCoords.lng } } };
           const walkResult = await getWalkingRoute(origin, dest);
+          if (cancelled) return;
           if (walkResult && walkResult.routes && walkResult.routes.length > 0) {
             setRoutes(walkResult.routes);
             setRouteError(null);
@@ -1415,6 +1427,7 @@ export default function NavigationPage() {
             setRouteError({ code: 'NO_ROUTE' });
           }
         } catch (fallbackErr) {
+          if (cancelled) return;
           const offline = isLikelyOfflineError(transitError) || isLikelyOfflineError(fallbackErr);
           if (offline) {
             setRouteError({
@@ -1437,12 +1450,18 @@ export default function NavigationPage() {
           }
         }
       } finally {
-        setIsLoadingRoutes(false);
+        if (!cancelled) {
+          setIsLoadingRoutes(false);
+        }
       }
     };
 
     // Start async fetch but don't wait for it
     fetchRoutes();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentDestination, effectiveOrigin, shouldFetchData, selectedArrivalTime]);
 
   // (moved) helpers and effect for stops are defined after locations state
@@ -1456,11 +1475,13 @@ export default function NavigationPage() {
       }
 
       try {
-        console.log('🗺�?Generating polylines for internal route:', {
-          routeCode: bestInternalRoute.routeCode,
-          departure: bestInternalRoute.departureStop.name,
-          arrival: bestInternalRoute.arrivalStop.name
-        });
+        if (__DEV__) {
+          console.log('Generating polylines for internal route:', {
+            routeCode: bestInternalRoute.routeCode,
+            departure: bestInternalRoute.departureStop.name,
+            arrival: bestInternalRoute.arrivalStop.name
+          });
+        }
 
         const polylines = await createInternalRoutePolylines(
           bestInternalRoute.routeCode,
@@ -1471,13 +1492,15 @@ export default function NavigationPage() {
         );
 
         setInternalRoutePolylines(polylines);
-        console.log('�?Internal route polylines generated:', {
-          walkToStopPoints: polylines.walkToStop.length,
-          busSegmentPoints: polylines.busSegment.length,
-          walkFromStopPoints: polylines.walkFromStop.length
-        });
+        if (__DEV__) {
+          console.log('Internal route polylines generated:', {
+            walkToStopPoints: polylines.walkToStop.length,
+            busSegmentPoints: polylines.busSegment.length,
+            walkFromStopPoints: polylines.walkFromStop.length
+          });
+        }
       } catch (error) {
-        console.error('�?Error generating internal route polylines:', error);
+        if (__DEV__) console.error('Error generating internal route polylines:', error);
         setInternalRoutePolylines(null);
       }
     };
@@ -1577,7 +1600,10 @@ export default function NavigationPage() {
     const stopsParam = typeof stops === 'string' ? stops : '';
     if (!stopsParam) return;
     
-    const stopNames = stopsParam.split('|').filter(s => s.trim());
+    const stopNames = stopsParam
+      .split('|')
+      .filter(s => s.trim())
+      .slice(0, MAX_INTERMEDIATE_STOPS);
     console.log('[URL LOAD] Loading stops from URL:', stopNames);
     
     setLocations((prevLocations) => {
@@ -1612,7 +1638,7 @@ export default function NavigationPage() {
         prevLocations[prevLocations.length - 1] // destination
       ];
     });
-  }, [stops]);
+  }, [stops, MAX_INTERMEDIATE_STOPS]);
 
   // Sync intermediate stops to URL
   useEffect(() => {
@@ -1635,6 +1661,11 @@ export default function NavigationPage() {
   }, [locations, router, isNavigationReady]);
 
   const handleAddStop = () => {
+    const currentStops = locations.filter((loc) => loc.type === 'stop').length;
+    if (currentStops >= MAX_INTERMEDIATE_STOPS) {
+      return;
+    }
+
     const newStop: LocationItem = {
       id: Date.now().toString(),
       text: '',
@@ -1643,11 +1674,18 @@ export default function NavigationPage() {
       coords: undefined,
     };
     // Insert before the last item (destination)
-    setLocations((prev) => [
-      ...prev.slice(0, -1),
-      newStop,
-      prev[prev.length - 1],
-    ]);
+    setLocations((prev) => {
+      const currentStops = prev.filter((loc) => loc.type === 'stop').length;
+      if (currentStops >= MAX_INTERMEDIATE_STOPS) {
+        return prev;
+      }
+
+      return [
+        ...prev.slice(0, -1),
+        newStop,
+        prev[prev.length - 1],
+      ];
+    });
 
     // Open search panel for the new stop with live editing
     startEditingLocation(newStop);
@@ -2037,6 +2075,7 @@ export default function NavigationPage() {
 
   // Show X and drag icons when there are 3+ locations (origin + at least 1 stop + destination)
   const showControls = locations.length >= 3;
+  const canAddStop = locations.filter((l) => l.type === 'stop').length < MAX_INTERMEDIATE_STOPS;
 
   // 🔧 TEMPORARY: Disable map when 3+ stops to isolate crash
   const numIntermediateStops = locations.filter(l => l.type === 'stop').length;
@@ -2413,32 +2452,36 @@ export default function NavigationPage() {
             );
           })}
 
-          {/* Divider before Add Stop button */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 20,
-              paddingLeft: 9,
-              height: 10,
-              justifyContent: 'center',
-              marginVertical: 4,
-            }}
-          >
-            <DotDivider />
-            <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
-          </View>
+          {canAddStop && (
+            <>
+              {/* Divider before Add Stop button */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 20,
+                  paddingLeft: 9,
+                  height: 10,
+                  justifyContent: 'center',
+                  marginVertical: 4,
+                }}
+              >
+                <DotDivider />
+                <View style={{ height: 1, flex: 1, backgroundColor: '#E4E7E7' }} />
+              </View>
 
-          {/* Add Stop */}
-          <Pressable
-            onPress={handleAddStop}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-          >
-            <PlusCircle />
-            <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
-              Add Stop
-            </Text>
-          </Pressable>
+              {/* Add Stop */}
+              <Pressable
+                onPress={handleAddStop}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
+                <PlusCircle />
+                <Text style={{ fontSize: 16, fontWeight: '500', color: '#274F9C' }}>
+                  Add Stop
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* Backdrop/Shading - only appears when in search mode, tapping dismisses */}

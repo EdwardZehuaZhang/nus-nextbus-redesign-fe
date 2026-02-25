@@ -3,6 +3,7 @@ import '../../global.css';
 
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { ThemeProvider } from '@react-navigation/native';
+import * as Sentry from '@sentry/react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React from 'react';
@@ -12,10 +13,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { APIProvider } from '@/api';
-import { ErrorBoundary, setupGlobalErrorHandler } from '@/components/crash-handler';
+import {
+  ErrorBoundary,
+  setupGlobalErrorHandler,
+} from '@/components/crash-handler';
 import { hydrateAuth, loadSelectedTheme } from '@/lib';
 import { FavoritesProvider } from '@/lib/contexts/favorites-context';
-import '@/lib/sentry';
+import { useSentryNavigationConfig } from '@/lib/sentry';
 import { useThemeConfig } from '@/lib/use-theme-config';
 
 export { ErrorBoundary };
@@ -36,8 +40,9 @@ SplashScreen.setOptions({
   fade: true,
 });
 
-export default function RootLayout() {
+function RootLayout() {
   const theme = useThemeConfig();
+  useSentryNavigationConfig();
   
   return (
     <GestureHandlerRootView
@@ -66,6 +71,9 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+// Wrap with Sentry to enable native crash handling and performance monitoring
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   container: {

@@ -1576,20 +1576,43 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
     }
   }, [onMapTypeChangeReady]);
 
-  const routeCoordinates = routePolyline
-    ? polyline
+  const routeCoordinates = React.useMemo(() => {
+    if (!routePolyline) return [];
+    try {
+      const decoded = polyline
         .decode(routePolyline)
-        .map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
-    : [];
+        .map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+      
+      // Downsample if too many points to prevent OOM on map rendering
+      const MAX_POLYLINE_POINTS = 500;
+      if (decoded.length > MAX_POLYLINE_POINTS) {
+        const step = Math.ceil(decoded.length / MAX_POLYLINE_POINTS);
+        return decoded.filter((_, index) => index % step === 0);
+      }
+      
+      return decoded;
+    } catch {
+      return [];
+    }
+  }, [routePolyline]);
 
   // Safe-decode helper: wrap decode in try/catch but don't filter coordinates
   const tryDecodePolyline = (encoded?: string) => {
     if (!encoded) return [];
     try {
       const pts = polyline.decode(encoded);
-      return Array.isArray(pts) && pts.length > 0
+      const decoded = Array.isArray(pts) && pts.length > 0
         ? pts.map(([lat, lng]) => ({ latitude: lat, longitude: lng }))
         : [];
+      
+      // Downsample if too many points to prevent OOM
+      const MAX_POLYLINE_POINTS = 500;
+      if (decoded.length > MAX_POLYLINE_POINTS) {
+        const step = Math.ceil(decoded.length / MAX_POLYLINE_POINTS);
+        return decoded.filter((_, index) => index % step === 0);
+      }
+      
+      return decoded;
     } catch (err) {
       return [];
     }
@@ -1847,6 +1870,25 @@ export const InteractiveMap = React.memo<InteractiveMapProps>(({
       // FALLBACK: If no route segments exist, draw a direct connector from origin to destination
       const originPoint = { latitude: connectorOrigin.lat, longitude: connectorOrigin.lng };
       const destPoint = { latitude: connectorDestination.lat, longitude: connectorDestination.lng };
+      
+      // Calculate distance to prevent rendering extreme-distance connectors (OOM prevention)
+      const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const R = 6371e3; // Earth radius in meters
+      const φ1 = toRad(originPoint.latitude);
+      const φ2 = toRad(destPoint.latitude);
+      const Δφ = toRad(destPoint.latitude - originPoint.latitude);
+      const Δλ = toRad(destPoint.longitude - originPoint.longitude);
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+      
+      // Don't render connector if distance > 100km (prevents OOM for impossible routes)
+      if (distance > 100_000) {
+        return segments;
+      }
+      
       const dottedColor = hexToRgba('#274F9C', 1.0);
       
       segments.push({

@@ -10,9 +10,10 @@ pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --prof
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --path ./build-1771696319144.ipa
 
 
-
+set -a; source .env.local; set +a
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile production --local
 
+set -a; source .env.local; set +a
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile adhoc --local
 
 <h1 align="center">

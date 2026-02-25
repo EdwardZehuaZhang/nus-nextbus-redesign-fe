@@ -32,6 +32,15 @@ const BUS_CATCH_BUFFER = 120; // 2 minutes
 // All NUS shuttle bus routes
 const SHUTTLE_ROUTES: RouteCode[] = ['A1', 'A2', 'D1', 'D2'];
 
+// NUS campus center coordinates (for distance check)
+const NUS_CAMPUS_CENTER: LatLng = {
+  latitude: 1.2966,
+  longitude: 103.7764,
+};
+
+// Maximum distance from NUS campus to consider internal routes (50km)
+const MAX_ORIGIN_DISTANCE_FROM_CAMPUS = 50_000; // meters
+
 // OPTIMIZATION: Cache for walking route API calls to avoid duplicate requests
 // Key format: "lat1,lng1|lat2,lng2"
 const walkingRouteCache = new Map<string, GoogleRoute>();
@@ -45,7 +54,7 @@ async function getCachedWalkingRoute(origin: LatLng, destination: LatLng): Promi
   
   // Check cache first
   if (walkingRouteCache.has(cacheKey)) {
-    console.log('[CACHE HIT] Walking route:', cacheKey);
+    if (__DEV__) console.log('[CACHE HIT] Walking route:', cacheKey);
     return walkingRouteCache.get(cacheKey) || null;
   }
   
@@ -58,11 +67,11 @@ async function getCachedWalkingRoute(origin: LatLng, destination: LatLng): Promi
     if (response.routes && response.routes.length > 0) {
       const route = response.routes[0];
       walkingRouteCache.set(cacheKey, route);
-      console.log('[CACHE MISS] Cached walking route:', cacheKey);
+      if (__DEV__) console.log('[CACHE MISS] Cached walking route:', cacheKey);
       return route;
     }
   } catch (error) {
-    console.error('[ERROR] Error fetching walking route:', error);
+    if (__DEV__) console.error('[ERROR] Error fetching walking route:', error);
   }
   
   return null;
@@ -162,7 +171,7 @@ export async function findNearestBusStop(
 
     return nearestStop;
   } catch (error) {
-    console.error('Error finding nearest bus stop:', error);
+    if (__DEV__) console.error('Error finding nearest bus stop:', error);
     return null;
   }
 }
@@ -208,7 +217,7 @@ export async function findNearbyBusStops(
 
     return nearbyStops;
   } catch (error) {
-    console.error('Error finding nearby bus stops:', error);
+    if (__DEV__) console.error('Error finding nearby bus stops:', error);
     return [];
   }
 }
@@ -262,7 +271,7 @@ async function routeConnectsStops(
 
     return { connects: true, estimatedTravelTime, intermediateStops };
   } catch (error) {
-    console.error(`❌ Error checking route ${routeCode}:`, error);
+    if (__DEV__) console.error(`❌ Error checking route ${routeCode}:`, error);
     return { connects: false, estimatedTravelTime: 0, intermediateStops: [] };
   }
 }
@@ -308,7 +317,7 @@ async function getBusArrivals(
 
     return arrivals;
   } catch (error) {
-    console.error(`Error getting shuttle service for ${stopName}:`, error);
+    if (__DEV__) console.error(`Error getting shuttle service for ${stopName}:`, error);
     return [];
   }
 }
@@ -324,6 +333,15 @@ export async function findInternalBusRoutes(
   const routes: InternalBusRoute[] = [];
 
   try {
+    // Early exit: skip internal route search if origin or destination is too far from NUS campus
+    // This prevents dozens of unnecessary API calls for impossible routes (e.g., San Francisco → UTown)
+    const originDistFromCampus = calculateDistance(origin, NUS_CAMPUS_CENTER);
+    const destDistFromCampus = calculateDistance(destination, NUS_CAMPUS_CENTER);
+    if (originDistFromCampus > MAX_ORIGIN_DISTANCE_FROM_CAMPUS && destDistFromCampus > MAX_ORIGIN_DISTANCE_FROM_CAMPUS) {
+      if (__DEV__) console.log('[ROUTE] Skipping internal route search - both origin and destination too far from NUS campus');
+      return routes;
+    }
+
     // Find nearby bus stops from origin (within 800m)
     const nearbyOriginStops = await findNearbyBusStops(origin, 800);
     
@@ -392,7 +410,7 @@ export async function findInternalBusRoutes(
               }
             }
           } catch (error) {
-            console.error('[ERROR] Error fetching walking routes:', error);
+            if (__DEV__) console.error('[ERROR] Error fetching walking routes:', error);
             // Continue with Haversine estimate if Google Maps fails
           }
 
@@ -451,16 +469,18 @@ export async function findInternalBusRoutes(
             allBusArrivals: busArrivals, // Include all bus timings for display
           };
           
-          console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {
-            totalTime: `${Math.ceil(totalTime / 60)} min (${totalTime}s)`,
-            walkToStop: `${Math.ceil(actualWalkToStopTime / 60)} min (${actualWalkToStopTime}s)`,
-            wait: `${Math.ceil(waitingTime / 60)} min (${waitingTime}s)`,
-            actualWait: `${Math.ceil(Math.max(0, waitingTime - actualWalkToStopTime) / 60)} min`,
-            busRide: `${Math.ceil(estimatedTravelTime / 60)} min (${estimatedTravelTime}s)`,
-            walkFromStop: `${Math.ceil(actualWalkFromStopTime / 60)} min (${actualWalkFromStopTime}s)`,
-            canCatch: canCatchBus,
-            hasWalkingRoute: !!walkToStopRoute
-          });
+          if (__DEV__) {
+            console.log(`✅ Created route ${routeCode} (${departureStop.code} → ${arrivalStop.code}):`, {
+              totalTime: `${Math.ceil(totalTime / 60)} min (${totalTime}s)`,
+              walkToStop: `${Math.ceil(actualWalkToStopTime / 60)} min (${actualWalkToStopTime}s)`,
+              wait: `${Math.ceil(waitingTime / 60)} min (${waitingTime}s)`,
+              actualWait: `${Math.ceil(Math.max(0, waitingTime - actualWalkToStopTime) / 60)} min`,
+              busRide: `${Math.ceil(estimatedTravelTime / 60)} min (${estimatedTravelTime}s)`,
+              walkFromStop: `${Math.ceil(actualWalkFromStopTime / 60)} min (${actualWalkFromStopTime}s)`,
+              canCatch: canCatchBus,
+              hasWalkingRoute: !!walkToStopRoute
+            });
+          }
           
           routes.push(route);
         }
@@ -470,7 +490,7 @@ export async function findInternalBusRoutes(
     // Sort routes by total time
     routes.sort((a, b) => a.totalTime - b.totalTime);
     
-    if (routes.length > 0) {
+    if (__DEV__ && routes.length > 0) {
       console.log('[ROUTES] Top 3 routes by time:');
       routes.slice(0, 3).forEach((route, idx) => {
         console.log(`  ${idx + 1}. ${route.routeCode} (${route.departureStop.code} -> ${route.arrivalStop.code}): ${Math.ceil(route.totalTime / 60)} min total`);
@@ -483,7 +503,7 @@ export async function findInternalBusRoutes(
 
     return routes;
   } catch (error) {
-    console.error('Error finding internal bus routes:', error);
+    if (__DEV__) console.error('Error finding internal bus routes:', error);
     return routes;
   }
 }
