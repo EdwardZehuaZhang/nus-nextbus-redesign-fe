@@ -50,6 +50,7 @@ import { getTransitLineColor, isPublicBus } from '@/lib/transit-colors';
 import { useInternalRouteFinder } from '@/lib/hooks/use-internal-route-finder';
 import { useKeyboardAwareInteraction } from '@/lib/hooks/use-keyboard-aware-interaction';
 import type { InternalBusRoute } from '@/lib/route-finding';
+import { calculateDistance } from '@/lib/route-finding';
 import { createInternalRoutePolylines } from '@/lib/route-polylines';
 import {
   type BusStation,
@@ -1821,6 +1822,8 @@ export default function NavigationPage() {
 
   // Recompute Google routing when intermediate stops are present
   useEffect(() => {
+    let cancelled = false;
+
     const recomputeWithStops = async () => {
       const rawStopKeys = JSON.parse(stopsKey) as string[];
       if (!rawStopKeys || rawStopKeys.length === 0) {
@@ -1844,6 +1847,26 @@ export default function NavigationPage() {
         return;
       }
 
+      // Distance safety check: reject routes where any segment > 100km
+      // Prevents massive API responses that crash the native Google Maps SDK (OOM / GMSPolyline hang)
+      const MAX_SEGMENT_DISTANCE = 100_000; // 100km in meters
+      const allPoints = [
+        { lat: effectiveOrigin.latitude, lng: effectiveOrigin.longitude },
+        ...stops.map((s) => s.coords),
+        destCoords,
+      ];
+      for (let i = 0; i < allPoints.length - 1; i++) {
+        const segDist = calculateDistance(
+          { latitude: allPoints[i].lat, longitude: allPoints[i].lng },
+          { latitude: allPoints[i + 1].lat, longitude: allPoints[i + 1].lng },
+        );
+        if (segDist > MAX_SEGMENT_DISTANCE) {
+          setRouteError({ code: 'NO_ROUTE' });
+          setIsLoadingRoutes(false);
+          return;
+        }
+      }
+
       setIsLoadingRoutes(true);
       setRouteError(null);
 
@@ -1858,6 +1881,7 @@ export default function NavigationPage() {
 
         
         for (const target of segmentTargets) {
+          if (cancelled) return;
           
           // Safety check for target
           if (!target || typeof target.lat !== 'number' || typeof target.lng !== 'number') {
@@ -1988,9 +2012,12 @@ export default function NavigationPage() {
           polyline: { encodedPolyline: combinedPolyline },
         };
 
-        setRoutes([combinedRoute]);
-        setRouteError(null);
+        if (!cancelled) {
+          setRoutes([combinedRoute]);
+          setRouteError(null);
+        }
       } catch (err) {
+        if (cancelled) return;
         console.error('❌ Failed to compute route with stops:', err);
         if (isLikelyOfflineError(err)) {
           setRouteError({
@@ -2004,11 +2031,17 @@ export default function NavigationPage() {
           });
         }
       } finally {
-        setIsLoadingRoutes(false);
+        if (!cancelled) {
+          setIsLoadingRoutes(false);
+        }
       }
     };
 
     recomputeWithStops();
+
+    return () => {
+      cancelled = true;
+    };
   }, [stopsKey, effectiveOrigin?.latitude, effectiveOrigin?.longitude, currentDestination, selectedArrivalTime]);
 
   // Handle location selection from search
