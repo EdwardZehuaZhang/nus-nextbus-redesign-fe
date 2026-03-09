@@ -1,6 +1,6 @@
-import { router, usePathname } from 'expo-router';
+import { router, usePathname, useFocusEffect } from 'expo-router';
 import React from 'react';
-import { Animated, TextInput, Keyboard, Platform } from 'react-native';
+import { Animated, TextInput, Keyboard, Platform, InteractionManager } from 'react-native';
 
 
 import {
@@ -244,7 +244,7 @@ const DynamicBusTime = ({
     >
       <Text
         style={{
-          color: textColor,
+          ...(textColor !== undefined && { color: textColor }),
           fontSize: fontSize,
           fontWeight: '500',
           fontFamily: 'Inter',
@@ -451,7 +451,7 @@ const PopularSearchCard = ({
           contentFit="cover"
           className="absolute inset-0 size-full"
           style={{ borderRadius: '6px' }}
-          placeholder={undefined}
+          placeholder={null}
         />
         <View className="absolute inset-x-0 bottom-0 p-3">
           <Text className="text-lg font-bold leading-tight text-white">
@@ -712,20 +712,17 @@ const FavoritesSection = ({ onSearchPress }: { onSearchPress: () => void }) => {
   // Get user's current location to pass to navigation
   const { coords: userLocation } = useLocation();
 
-  // Load favorites from storage
+  // Load favorites from storage, deferred so it doesn't block first render
   const loadFavorites = React.useCallback(() => {
-    const stored = getFavorites();
-    setFavorites(stored);
+    const task = InteractionManager.runAfterInteractions(() => {
+      const stored = getFavorites();
+      setFavorites(stored);
+    });
+    return () => task.cancel();
   }, []);
 
-  React.useEffect(() => {
-    loadFavorites();
-
-    // Set up an interval to refresh favorites (in case they're added from another screen)
-    const interval = setInterval(loadFavorites, 1000);
-
-    return () => clearInterval(interval);
-  }, [loadFavorites]);
+  // Refresh favorites when the screen comes into focus (e.g. returning from navigation page)
+  useFocusEffect(loadFavorites);
 
   return (
     <View>

@@ -88,7 +88,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style ?? {}]}>
       <MapView
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
@@ -102,7 +102,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {/* Origin Marker */}
         {origin && (
           <Marker
-            coordinate={{ latitude: origin.lat, longitude: origin.lng }}
+            coordinate={{ latitude: origin.lat ?? 0, longitude: origin.lng ?? 0 }}
             title="Your Location"
             description="Starting point"
             pinColor="#274F9C"
@@ -114,8 +114,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {waypoints.map((waypoint, index) => (
           <Marker
             key={`waypoint-${index}`}
-            coordinate={{ latitude: waypoint.lat, longitude: waypoint.lng }}
+            coordinate={{ latitude: waypoint.lat ?? 0, longitude: waypoint.lng ?? 0 }}
             title={`Stop ${index + 1}`}
+            description=""
             pinColor="#FF8C00"
             onPress={handleWaypointPress(index)}
           />
@@ -125,8 +126,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {destination && (
           <Marker
             coordinate={{
-              latitude: destination.lat,
-              longitude: destination.lng,
+              latitude: destination.lat ?? 0,
+              longitude: destination.lng ?? 0,
             }}
             title="Destination"
             description="Final destination"
