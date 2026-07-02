@@ -44,7 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: Env.BUNDLE_ID,
-    buildNumber: '4',
+    buildNumber: '5',
     icon: './assets/app-icons/icon.png',
     privacyManifests: applePrivacyManifest,
     infoPlist: {

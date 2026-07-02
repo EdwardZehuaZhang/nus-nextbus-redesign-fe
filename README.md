@@ -4,17 +4,23 @@ pnpm eas build -p android --profile adhoc
 pnpm eas build -p android --profile production
 pnpm eas build -p ios --profile production
 
+# Set production version remote
+pnpm exec eas build:version:set -p ios -e production
 
+# Confimr production version remote
+pnpm exec eas build:version:get --platform ios --profile production
+
+
+# Submit production build via expo
 pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --latest
 
-pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --path ./build-1771696319144.ipa
+pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas submit -p ios --profile production --path ./build-1772182891868.ipa
 
 
-set -a; source .env.local; set +a
-pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile production --local
+# Build local
+set -a; source .env.local; set +a && pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile production --local
 
-set -a; source .env.local; set +a
-pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile adhoc --local
+set -a; source .env.local; set +a && pnpm exec cross-env APP_ENV=production EXPO_NO_DOTENV=1 eas build -p ios --profile adhoc --local
 
 <h1 align="center">
   🚌 NUS Maps
